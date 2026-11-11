@@ -1,0 +1,73 @@
+# Ollama is not here on purpose: it runs on the host, and containers reach it
+# at host.docker.internal:11434.
+name: prism
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ${PRISM_POSTGRES_USER:-prism}
+      POSTGRES_PASSWORD: ${PRISM_POSTGRES_PASSWORD:-prism}
+      POSTGRES_DB: ${PRISM_POSTGRES_DB:-prism}
+    ports:
+      - "127.0.0.1:${PRISM_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: ${PRISM_NEO4J_USER:-neo4j}/${PRISM_NEO4J_PASSWORD:-prism-dev-password}
+      # Capped: the build machine has 15.6 GB and Docker gets 6 GB of it.
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    mem_limit: 1500m
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+
+  # Off until Phase 5: `docker compose --profile ops up -d`.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["ops"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    mem_limit: 256m
+
+  grafana:
+    image: grafana/grafana-oss:11.3.0
+    profiles: ["ops"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 256m
+
+volumes:
+  postgres-data:
+  neo4j-data:
