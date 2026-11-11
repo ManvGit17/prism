@@ -23,6 +23,7 @@ class SymbolTable:
         self.top_level: dict[str, list[Node]] = defaultdict(list)  # functions and classes
         self.methods: dict[str, list[FunctionNode]] = defaultdict(list)
         self.class_methods: dict[str, dict[str, FunctionNode]] = defaultdict(dict)
+        self._fallback_cache: dict[str, bool] = {}
         for node in nodes:
             self._add(node)
         self.import_names = self._import_names()
@@ -94,10 +95,30 @@ class SymbolTable:
                 return found
         return None
 
+    def is_shadowed_fallback(self, node: Node) -> bool:
+        """A module-level definition in an `except` clause whose name the file also imports
+        from the repo, as in `try: from .x import f` / `except ImportError: def f(): ...`.
+        The import is what normally runs, so lookups skip the fallback.
+        """
+        if not isinstance(node, ClassNode | FunctionNode) or not node.is_fallback:
+            return False
+        if node.owner != node.path:
+            return False
+        qn = node.qualified_name
+        if qn in self._fallback_cache:
+            return self._fallback_cache[qn]
+        self._fallback_cache[qn] = False  # guards against import cycles
+        file = self.files.get(node.path)
+        ref = self.binding(file, node.name) if file is not None else None
+        target = self.resolve_dotted(ref.target) if ref is not None else None
+        result = target is not None and target.qualified_name != qn
+        self._fallback_cache[qn] = result
+        return result
+
     def _in_module(self, module: FileNode, rest: list[str], depth: int) -> Node | None:
         qn = f"{module.module}.{'.'.join(rest)}"
         node = self.nodes.get(qn)
-        if node is not None:
+        if node is not None and not self.is_shadowed_fallback(node):
             return node
         if len(rest) >= 2:
             cls = self.nodes.get(f"{module.module}.{rest[0]}")

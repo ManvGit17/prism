@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from repo_ids import repo_id
+
 from prism.indexer.embedder import FakeEmbedder
 from prism.indexer.model import Resolution
 from prism.indexer.pipeline import (
@@ -18,8 +20,8 @@ from prism.store import (
     OverlayVectors,
 )
 
-R = "r"
-OTHER = "other"
+R = repo_id("r")
+OTHER = repo_id("other")
 
 # Two different head commits of shop/pricing.py.
 PRICING_A = b'''"""Prices and tax, version A."""

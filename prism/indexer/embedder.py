@@ -1,8 +1,4 @@
-"""Embedder interface and a deterministic fake for tests.
-
-The real code embedder (PLAN.md Phase 1) comes in a later stage and implements
-the same `Embedder` protocol.
-"""
+"""Embedder interface, the Ollama embedder, and a deterministic fake for tests."""
 
 import hashlib
 import math
@@ -10,6 +6,9 @@ import re
 from collections.abc import Sequence
 from typing import Protocol
 
+import httpx
+
+from prism.config import get_settings
 from prism.indexer.model import FunctionNode
 
 _TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9]*|\d+")
@@ -63,9 +62,75 @@ class FakeEmbedder:
 
 
 def function_text(node: FunctionNode, source: bytes) -> str:
-    """What gets embedded for a function: its qualified name and full source.
+    """What gets embedded for a function: signature, docstring and body.
 
-    The source covers decorators, signature, docstring and body.
+    The docstring is the first statement of the body, so the body carries it.
+    Embedders truncate to their own input limit.
     """
-    start, end = node.span
-    return f"{node.qualified_name}\n{source[start:end].decode('utf-8', 'replace')}"
+    start, end = node.body_span
+    body = source[start:end].decode("utf-8", "replace")
+    return f"{node.signature}:\n    {body}"
+
+
+class OllamaEmbedder:
+    """Embeddings from the host Ollama `/api/embed` endpoint (ADR 0005).
+
+    Texts are cut to `max_chars` and Ollama truncates anything still over the
+    model's context. Vectors are normalised to unit length.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: str | None = None,
+        url: str | None = None,
+        batch_size: int | None = None,
+        max_chars: int | None = None,
+        prefix: str | None = None,
+        timeout: float = 120.0,
+        client: httpx.Client | None = None,
+    ) -> None:
+        s = get_settings()
+        self.model = model or s.embedding_model
+        self._url = (url or s.ollama_url).rstrip("/") + "/api/embed"
+        self._batch = batch_size or s.embedding_batch_size
+        self._max_chars = max_chars or s.embedding_max_chars
+        self._prefix = s.embedding_document_prefix if prefix is None else prefix
+        self._client = client or httpx.Client(timeout=timeout)
+        self._dimension: int | None = None
+
+    @property
+    def name(self) -> str:
+        return f"ollama:{self.model}"
+
+    @property
+    def dimension(self) -> int:
+        if self._dimension is None:
+            self._dimension = len(self.embed(["dimension probe"])[0])
+        return self._dimension
+
+    def embed(self, texts: Sequence[str]) -> list[tuple[float, ...]]:
+        out: list[tuple[float, ...]] = []
+        for i in range(0, len(texts), self._batch):
+            chunk = [self._prefix + t[: self._max_chars] for t in texts[i : i + self._batch]]
+            response = self._client.post(
+                self._url, json={"model": self.model, "input": chunk, "truncate": True}
+            )
+            response.raise_for_status()
+            vectors = response.json()["embeddings"]
+            if len(vectors) != len(chunk):
+                raise RuntimeError(f"Ollama returned {len(vectors)} vectors for {len(chunk)} texts")
+            out.extend(_unit(v) for v in vectors)
+        if out and self._dimension is None:
+            self._dimension = len(out[0])
+        return out
+
+    def close(self) -> None:
+        self._client.close()
+
+
+def _unit(values: Sequence[float]) -> tuple[float, ...]:
+    norm = math.sqrt(sum(float(x) * float(x) for x in values))
+    if norm == 0.0:
+        return tuple(float(x) for x in values)
+    return tuple(float(x) / norm for x in values)

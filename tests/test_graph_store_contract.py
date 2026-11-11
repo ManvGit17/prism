@@ -7,6 +7,7 @@ implementations, so a new store runs through exactly these tests.
 from pathlib import Path
 
 import pytest
+from repo_ids import repo_id
 
 from prism.indexer.model import (
     ClassNode,
@@ -20,8 +21,9 @@ from prism.indexer.model import (
 from prism.indexer.pipeline import build_file_graphs, discover_files, parse_sources
 from prism.store import GraphStore
 
-A = "repo-a"
-B = "repo-b"
+A = repo_id("a")
+B = repo_id("b")
+NOBODY = repo_id("nobody")
 
 
 def _sample_graphs(sample_repo: Path, repo_id: str) -> list[FileGraph]:
@@ -181,7 +183,7 @@ def test_stats(graph_store: GraphStore, sample_repo: Path) -> None:
     assert stats.edges["CALLS"] == sum(stats.calls_by_resolution.values())
     assert stats.calls_retrievable < stats.edges["CALLS"]
     assert stats.threshold == 0.5
-    empty = graph_store.stats("nobody")
+    empty = graph_store.stats(NOBODY)
     assert (empty.files, empty.functions, empty.edges["CALLS"]) == (0, 0, 0)
 
 
@@ -220,7 +222,7 @@ def test_repo_isolation(graph_store: GraphStore, sample_repo: Path) -> None:
     assert graph_store.callees(B, "shop.pricing.with_tax") == []
     assert graph_store.stats(A).functions == graph_store.stats(B).functions + 1
 
-    for query in ("nobody",):
+    for query in (NOBODY,):
         assert graph_store.lookup(query, "with_tax") == []
         assert graph_store.get_node(query, "shop.pricing.with_tax") is None
         assert list(graph_store.iter_nodes(query)) == []

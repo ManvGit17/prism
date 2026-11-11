@@ -276,6 +276,13 @@ class GraphStore(GraphReader):
     @abstractmethod
     def delete_repo(self, repo_id: str) -> None: ...
 
+    @abstractmethod
+    def repo_ids(self) -> list[str]:
+        """Every repo with at least one node."""
+
+    def close(self) -> None:
+        """Release connections. A no-op for stores that hold none."""
+
 
 def check_file_graph(repo_id: str, graph: FileGraph) -> None:
     """Raise ValueError unless every node and edge in `graph` belongs to `repo_id` and its file."""
@@ -326,6 +333,10 @@ class VectorReader(Protocol):
 
 class VectorStore(VectorReader, Protocol):
     def count(self, repo_id: str) -> int: ...
+
+    def repo_ids(self) -> list[str]: ...
+
+    def close(self) -> None: ...
 
     def upsert(self, repo_id: str, items: Iterable[VectorItem]) -> None:
         """Insert or replace items by qualified name. Raises ValueError on a dimension mismatch."""

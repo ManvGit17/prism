@@ -64,16 +64,20 @@ A call to a class points at the class node, not at `__init__`.
   fall back to a name match.
 - **Functions passed as values.** `call_with_retry(fetch, ...)` gives an edge to `call_with_retry`
   only. Callbacks, `map(f, ...)` and handler registries are missed.
-- **Decorators.** `@decorator` without parentheses is not a call, so the decorator gets no CALLS
-  edge from the decorated function. A decorator that replaces the function is not modelled; calls
-  go to the original definition.
+- **Decorators.** Applying a decorator counts as a call from the scope the definition sits in:
+  `@login_required` and `@route("/")` both give the module (or class) a CALLS edge to the
+  decorator. A decorator that replaces the function is not modelled; calls go to the original
+  definition.
 - **Monkey-patching.** Assignments such as `Class.method = other` or `mock.patch(...)` are
   ignored.
 - **Star imports.** Followed only into repo modules, and with re-exports at most five steps deep.
   `__all__` is not read, so private names can match.
-- **Conditional definitions.** A module-level definition shadows an import of the same name, even
-  when the definition is the fallback in `except ImportError:`. Redefinitions get a `#2` suffix
-  and calls go to the first one.
+- **Conditional definitions.** A module-level definition inside an `except` clause
+  (`is_fallback`) loses to a repo import of the same name in that file, since the import is what
+  normally runs. It is skipped for same-file lookups, for lookups through the module, and as a
+  name-match candidate. Without such an import it resolves like any other definition. Other
+  conditionals (`if`, `else`) are not modelled: redefinitions get a `#2` suffix and calls go to
+  the first one.
 - **Imports inside functions** are treated as file-level imports.
 - **Module names** come from the path. `src/pkg/mod.py` is also reachable as `pkg.mod` when `src/`
   has no `__init__.py`. A repo file whose import name is a standard-library module name is not used
@@ -81,6 +85,9 @@ A call to a class points at the class node, not at `__init__`.
 - **PR overlays** re-resolve only the changed files. A name-matched edge in an unchanged file keeps
   its old target even if the PR adds a better candidate. Edges from unchanged files into a symbol
   the PR removes are dropped.
+- **Incremental base updates** re-resolve the changed files and their dependents (ADR 0006). A
+  file whose only link to a changed file is a name match the change creates is not a dependent,
+  so its edges stay as they were until the next full index.
 
 ## Consequences
 

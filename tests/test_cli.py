@@ -1,20 +1,46 @@
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from prism.cli import app
+from prism.config import get_settings
 
 runner = CliRunner()
 
 
 def test_index_prints_stats(sample_repo: Path) -> None:
-    result = runner.invoke(app, ["index", str(sample_repo), "--repo-id", "shop"])
+    result = runner.invoke(
+        app, ["index", str(sample_repo), "--repo-id", "shop", "--store", "memory"]
+    )
     assert result.exit_code == 0, result.output
     assert "repo: shop" in result.output
     assert "files: 9 (2 test files)" in result.output
     assert "functions: 29 (14 methods, 3 tests)" in result.output
-    assert "CALLS 27" in result.output
-    assert "calls at or above threshold 0.5: 22 of 27" in result.output
+    # 27 calls plus the bare `@cached` decorator on slugify.
+    assert "CALLS 28" in result.output
+    assert "calls at or above threshold 0.5: 23 of 28" in result.output
+    assert "store: memory" in result.output
+
+
+def test_index_falls_back_to_memory_when_stores_are_down(
+    sample_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PRISM_STORE", "persistent")
+    monkeypatch.setenv("PRISM_NEO4J_URI", "bolt://127.0.0.1:1")
+    get_settings.cache_clear()
+    result = runner.invoke(app, ["index", str(sample_repo), "--repo-id", "shop"])
+    assert result.exit_code == 0, result.output
+    assert "persistent store unavailable" in result.output
+    assert "store: memory" in result.output
+
+
+def test_graph_without_path_needs_the_store(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PRISM_NEO4J_URI", "bolt://127.0.0.1:1")
+    get_settings.cache_clear()
+    result = runner.invoke(app, ["graph", "callers", "anything"])
+    assert result.exit_code == 3
+    assert "--path" in result.output
 
 
 def test_graph_neighbours(sample_repo: Path) -> None:

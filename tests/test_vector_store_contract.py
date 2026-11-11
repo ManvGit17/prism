@@ -3,13 +3,14 @@
 from pathlib import Path
 
 import pytest
+from repo_ids import repo_id
 
 from prism.indexer.embedder import Embedder, FakeEmbedder
 from prism.indexer.pipeline import index_repository
 from prism.store import InMemoryGraphStore, VectorItem, VectorStore
 
-A = "repo-a"
-B = "repo-b"
+A = repo_id("a")
+B = repo_id("b")
 
 
 def _item(qn: str, path: str, vector: tuple[float, ...]) -> VectorItem:
@@ -65,7 +66,7 @@ def test_repo_isolation(vector_store: VectorStore) -> None:
     a_item = vector_store.get(A, "m.x")
     assert a_item is not None
     assert a_item.vector == (1.0, 0.0)
-    assert vector_store.search("nobody", (1.0, 0.0), k=10) == []
+    assert vector_store.search(repo_id("nobody"), (1.0, 0.0), k=10) == []
     vector_store.delete_repo(B)
     assert vector_store.count(B) == 0
     assert vector_store.count(A) == 1

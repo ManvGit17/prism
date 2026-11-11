@@ -1,43 +1,52 @@
 """`prism` command line.
 
-There is no persistent store yet, so every command indexes the repo in memory
-first. The graph commands take the repo with `--path` until the Neo4j store
-exists.
+`prism index` writes to the persistent stores (Neo4j, pgvector, the ledger)
+when `PRISM_STORE=persistent` and they are reachable, else to memory. The graph
+commands read from the persistent store, or with `--path` index that folder in
+memory first and answer from it.
 """
 
 import io
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from prism.config import get_settings
 from prism.indexer.model import Node
 from prism.indexer.pipeline import IndexReport, index_repository
-from prism.store import GraphStats, InMemoryGraphStore, Related
+from prism.store import GraphReader, GraphStats, InMemoryGraphStore, Related
+from prism.store.factory import StoreKind, Stores, StoreUnavailable, open_stores
 
 app = typer.Typer(help="PRism: repo-aware code review.", no_args_is_help=True)
 graph_app = typer.Typer(
     help=(
-        "Query the code graph. Until the persistent store exists, each command indexes the repo "
-        "given by --path in memory first, then answers from that."
+        "Query the code graph. Reads the persistent store by default; with --path, indexes "
+        "that folder in memory first and answers from that."
     ),
     no_args_is_help=True,
 )
 app.add_typer(graph_app, name="graph")
 
 RepoPath = Annotated[
-    Path,
+    Path | None,
     typer.Option(
         "--path",
         exists=True,
         file_okay=False,
         dir_okay=True,
-        help="Repo to index in memory before the query (needed until the persistent store exists).",
+        help="Index this folder in memory and query that instead of the persistent store.",
     ),
 ]
 RepoId = Annotated[
-    str | None, typer.Option("--repo-id", help="Repo id. Defaults to the folder name.")
+    str | None,
+    typer.Option(
+        "--repo-id",
+        help="Repo id. Defaults to the folder name, or the only repo in the persistent store.",
+    ),
 ]
 MinConfidence = Annotated[
     float | None,
@@ -50,6 +59,7 @@ MinConfidence = Annotated[
         ),
     ),
 ]
+Symbol = Annotated[str, typer.Argument(help="Qualified name, short name or dotted suffix.")]
 
 
 @app.callback()
@@ -59,14 +69,7 @@ def _main() -> None:
         sys.stdout.reconfigure(errors="backslashreplace")
 
 
-def _index(path: Path, repo_id: str | None) -> tuple[InMemoryGraphStore, str, IndexReport]:
-    rid = repo_id or path.resolve().name
-    store = InMemoryGraphStore()
-    report = index_repository(path, rid, store)
-    return store, rid, report
-
-
-def _format_stats(stats: GraphStats, report: IndexReport) -> list[str]:
+def _format_stats(stats: GraphStats, report: IndexReport | None) -> list[str]:
     lines = [
         f"repo: {stats.repo_id}",
         f"files: {stats.files} ({stats.test_files} test files)",
@@ -77,10 +80,13 @@ def _format_stats(stats: GraphStats, report: IndexReport) -> list[str]:
         + ", ".join(f"{k} {v}" for k, v in stats.calls_by_resolution.items()),
         f"calls at or above threshold {stats.threshold:g}: {stats.calls_retrievable}"
         f" of {stats.edges.get('CALLS', 0)}",
-        f"parse errors in {len(report.files_with_errors)} files; "
-        f"{len(report.skipped)} files skipped for size; {report.seconds:.2f}s",
     ]
-    lines.extend(f"  parse error: {p}" for p in report.files_with_errors)
+    if report is not None:
+        lines.append(
+            f"parse errors in {len(report.files_with_errors)} files; "
+            f"{len(report.skipped)} files skipped for size; {report.seconds:.2f}s"
+        )
+        lines.extend(f"  parse error: {p}" for p in report.files_with_errors)
     return lines
 
 
@@ -88,10 +94,10 @@ def _where(node: Node) -> str:
     return f"{node.path}:{node.start_line}"
 
 
-def _pick(store: InMemoryGraphStore, repo_id: str, symbol: str) -> Node:
-    matches = store.lookup(repo_id, symbol)
+def _pick(graph: GraphReader, repo_id: str, symbol: str) -> Node:
+    matches = graph.lookup(repo_id, symbol)
     if not matches:
-        typer.echo(f"no symbol matches {symbol!r}", err=True)
+        typer.echo(f"no symbol matches {symbol!r} in repo {repo_id!r}", err=True)
         raise typer.Exit(1)
     if len(matches) > 1:
         typer.echo(f"{symbol!r} is ambiguous; use a qualified name:", err=True)
@@ -107,29 +113,95 @@ def index(
         Path, typer.Argument(exists=True, file_okay=False, dir_okay=True, help="Repo to index.")
     ],
     repo_id: RepoId = None,
+    store: Annotated[
+        str | None,
+        typer.Option(
+            "--store",
+            help="memory or persistent. Defaults to PRISM_STORE; persistent falls back to "
+            "memory when Neo4j or Postgres is unreachable.",
+        ),
+    ] = None,
+    embed: Annotated[
+        bool, typer.Option("--embed/--no-embed", help="Embed functions into pgvector.")
+    ] = True,
 ) -> None:
-    """Index a repo in memory and print graph stats."""
-    store, rid, report = _index(path, repo_id)
-    for line in _format_stats(store.stats(rid), report):
-        typer.echo(line)
+    """Index a repo and print graph stats. The commit comes from git, else "working-tree"."""
+    rid = repo_id or path.resolve().name
+    kind: StoreKind = "memory" if (store or get_settings().store) == "memory" else "persistent"
+    try:
+        stores = open_stores(kind, with_vectors=embed)
+    except StoreUnavailable as exc:
+        typer.echo(f"persistent store unavailable, indexing in memory: {exc}", err=True)
+        stores = open_stores("memory")
+    try:
+        report = index_repository(
+            path,
+            rid,
+            stores.graph,
+            vectors=stores.vectors,
+            embedder=stores.embedder,
+            ledger=stores.ledger,
+        )
+        for line in _format_stats(stores.graph.stats(rid), report):
+            typer.echo(line)
+        typer.echo(f"store: {stores.kind}; commit {report.commit_sha}; run {report.run_id}")
+        if stores.vectors is not None:
+            typer.echo(f"vectors: {report.vectors} written, {stores.vectors.count(rid)} stored")
+    finally:
+        stores.close()
+
+
+@contextmanager
+def _graph(path: Path | None, repo_id: str | None) -> Iterator[tuple[GraphReader, str]]:
+    """The graph to query and the repo id, from --path (memory) or the persistent store."""
+    if path is not None:
+        rid = repo_id or path.resolve().name
+        memory = InMemoryGraphStore()
+        index_repository(path, rid, memory)
+        yield memory, rid
+        return
+    try:
+        stores: Stores = open_stores("persistent", with_vectors=False)
+    except StoreUnavailable as exc:
+        typer.echo(f"{exc}\nStart the services (make up) or pass --path.", err=True)
+        raise typer.Exit(3) from exc
+    try:
+        rid = repo_id or _only_repo(stores.graph.repo_ids())
+        if stores.ledger is not None:
+            if stores.ledger.index_in_progress(rid):
+                typer.echo(f"note: an index run for {rid!r} is in progress", err=True)
+            elif stores.ledger.latest_complete_run(rid) is None:
+                typer.echo(f"note: {rid!r} has no complete index run", err=True)
+        yield stores.graph, rid
+    finally:
+        stores.close()
+
+
+def _only_repo(repos: list[str]) -> str:
+    if len(repos) == 1:
+        return repos[0]
+    listing = ", ".join(repos) if repos else "none"
+    typer.echo(f"pass --repo-id; repos in the store: {listing}", err=True)
+    raise typer.Exit(2)
 
 
 @graph_app.command()
 def neighbours(
-    symbol: Annotated[str, typer.Argument(help="Qualified name, short name or dotted suffix.")],
-    path: RepoPath,
+    symbol: Symbol,
+    path: RepoPath = None,
     hops: Annotated[int, typer.Option("--hops", min=1, max=5)] = 1,
     repo_id: RepoId = None,
     min_confidence: MinConfidence = None,
 ) -> None:
     """Nodes within --hops edges of a symbol, in either direction."""
-    store, rid, _ = _index(path, repo_id)
-    node = _pick(store, rid, symbol)
-    typer.echo(f"{node.qualified_name}  {_where(node)}")
-    for n in store.neighbours(rid, node.qualified_name, hops=hops, min_confidence=min_confidence):
-        typer.echo(
-            f"  {n.distance}  {n.node.kind.value:<8}  {n.node.qualified_name}  {_where(n.node)}"
-        )
+    with _graph(path, repo_id) as (graph, rid):
+        node = _pick(graph, rid, symbol)
+        typer.echo(f"{node.qualified_name}  {_where(node)}")
+        found = graph.neighbours(rid, node.qualified_name, hops=hops, min_confidence=min_confidence)
+        for n in found:
+            typer.echo(
+                f"  {n.distance}  {n.node.kind.value:<8}  {n.node.qualified_name}  {_where(n.node)}"
+            )
 
 
 def _print_related(rows: list[Related]) -> None:
@@ -141,41 +213,41 @@ def _print_related(rows: list[Related]) -> None:
 
 @graph_app.command()
 def callers(
-    symbol: Annotated[str, typer.Argument(help="Qualified name, short name or dotted suffix.")],
-    path: RepoPath,
+    symbol: Symbol,
+    path: RepoPath = None,
     repo_id: RepoId = None,
     min_confidence: MinConfidence = None,
 ) -> None:
     """Functions that call a symbol, with confidence and how each call was resolved."""
-    store, rid, _ = _index(path, repo_id)
-    node = _pick(store, rid, symbol)
-    typer.echo(f"{node.qualified_name}  {_where(node)}")
-    _print_related(store.callers(rid, node.qualified_name, min_confidence=min_confidence))
+    with _graph(path, repo_id) as (graph, rid):
+        node = _pick(graph, rid, symbol)
+        typer.echo(f"{node.qualified_name}  {_where(node)}")
+        _print_related(graph.callers(rid, node.qualified_name, min_confidence=min_confidence))
 
 
 @graph_app.command()
 def callees(
-    symbol: Annotated[str, typer.Argument(help="Qualified name, short name or dotted suffix.")],
-    path: RepoPath,
+    symbol: Symbol,
+    path: RepoPath = None,
     repo_id: RepoId = None,
     min_confidence: MinConfidence = None,
 ) -> None:
     """Functions and classes a symbol calls."""
-    store, rid, _ = _index(path, repo_id)
-    node = _pick(store, rid, symbol)
-    typer.echo(f"{node.qualified_name}  {_where(node)}")
-    _print_related(store.callees(rid, node.qualified_name, min_confidence=min_confidence))
+    with _graph(path, repo_id) as (graph, rid):
+        node = _pick(graph, rid, symbol)
+        typer.echo(f"{node.qualified_name}  {_where(node)}")
+        _print_related(graph.callees(rid, node.qualified_name, min_confidence=min_confidence))
 
 
 @graph_app.command()
 def tests(
-    symbol: Annotated[str, typer.Argument(help="Qualified name, short name or dotted suffix.")],
-    path: RepoPath,
+    symbol: Symbol,
+    path: RepoPath = None,
     repo_id: RepoId = None,
     min_confidence: MinConfidence = None,
 ) -> None:
     """Test functions that call a symbol directly."""
-    store, rid, _ = _index(path, repo_id)
-    node = _pick(store, rid, symbol)
-    typer.echo(f"{node.qualified_name}  {_where(node)}")
-    _print_related(store.tests_for(rid, node.qualified_name, min_confidence=min_confidence))
+    with _graph(path, repo_id) as (graph, rid):
+        node = _pick(graph, rid, symbol)
+        typer.echo(f"{node.qualified_name}  {_where(node)}")
+        _print_related(graph.tests_for(rid, node.qualified_name, min_confidence=min_confidence))
