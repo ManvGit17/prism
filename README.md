@@ -12,7 +12,7 @@ Needs Docker, [`uv`](https://docs.astral.sh/uv/), `make`, and [Ollama](https://o
 the host.
 
 ```bash
-ollama pull qwen2.5-coder:1.5b
+ollama pull qwen2.5-coder:3b
 make sync
 make up
 make test

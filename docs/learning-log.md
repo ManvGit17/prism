@@ -5,7 +5,7 @@
 **What was built.** An empty but working project. `uv` manages Python 3.12 and the dependencies.
 Docker Compose runs three services: Postgres with the pgvector extension (for embeddings and
 ordinary tables), Neo4j (for the code graph) and Redis (for the job queue later). Ollama runs on
-Windows itself, outside Docker, and serves the base reviewer model `qwen2.5-coder:1.5b`. A smoke
+Windows itself, outside Docker, and serves the base reviewer model `qwen2.5-coder:3b`. A smoke
 test proves each of the four answers. The Pydantic schemas in `prism/schemas.py` define what a
 review looks like before any code produces one.
 

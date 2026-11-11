@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Ollama runs on the host, not in Compose.
     ollama_url: str = "http://localhost:11434"
-    reviewer_model: str = "qwen2.5-coder:1.5b"
+    reviewer_model: str = "qwen2.5-coder:3b"
 
     @property
     def postgres_dsn(self) -> str:

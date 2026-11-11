@@ -11,6 +11,9 @@ figures. Re-measure after Phase 1 indexes a real repo.
 | Neo4j Community (heap 512 MB, page cache 256 MB) | 889 MiB | 1500 MiB |
 | Redis | 4 MiB | 256 MiB |
 | **Compose total** | **about 0.95 GiB** | 2.3 GiB |
+| Ollama on the host, `qwen2.5-coder:3b` (the default), CPU, 4096-token context | 2.2 GB | none |
 | Ollama on the host, `qwen2.5-coder:1.5b`, CPU, 4096-token context | 1.2 GB | none |
+
+Only one of the two models is loaded at a time.
 
 Not yet measured: the Celery worker, the API, and Prometheus and Grafana (the `ops` profile).
