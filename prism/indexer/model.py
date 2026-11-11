@@ -111,6 +111,7 @@ class ClassNode(_NodeBase):
     decorators: tuple[str, ...] = ()
     span: tuple[int, int] = Field(description="Byte offsets of the whole definition.")
     is_test: bool = False
+    is_fallback: bool = Field(default=False, description="Defined inside an `except` clause.")
 
 
 class FunctionNode(_NodeBase):
@@ -124,6 +125,7 @@ class FunctionNode(_NodeBase):
     is_method: bool = False
     is_async: bool = False
     is_test: bool = False
+    is_fallback: bool = Field(default=False, description="Defined inside an `except` clause.")
 
 
 Node = FileNode | ClassNode | FunctionNode

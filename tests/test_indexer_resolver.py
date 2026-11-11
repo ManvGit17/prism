@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from prism.config import get_settings
-from prism.indexer.model import Edge, EdgeKind, Resolution
+from prism.indexer.model import Edge, EdgeKind, FunctionNode, Resolution
 from prism.indexer.pipeline import build_file_graphs, index_repository, parse_sources
 from prism.indexer.resolver import CONFIDENCE, is_common_name
 from prism.store import InMemoryGraphStore
@@ -188,3 +188,53 @@ def test_too_many_candidates_get_no_edge() -> None:
     sources["use.py"] = "def f(x):\n    x.frobnicate()\n"
     calls = _calls(sources)
     assert not any(src == "use.f" for src, _ in calls)
+
+
+FALLBACK_REPO = Path(__file__).parent / "fixtures" / "fallback_repo"
+
+
+@pytest.fixture
+def fallback_store() -> InMemoryGraphStore:
+    s = InMemoryGraphStore()
+    index_repository(FALLBACK_REPO, R, s)
+    return s
+
+
+def test_import_wins_over_except_fallback(fallback_store: InMemoryGraphStore) -> None:
+    stub = fallback_store.get_node(R, "svc.publish_service.get_draft_details")
+    assert isinstance(stub, FunctionNode)
+    assert stub.is_fallback
+    real = "svc.post_service.get_draft_details"
+    publish = "svc.publish_service.publish_draft_now"
+    callees = {r.node.qualified_name: r.edge for r in fallback_store.callees(R, publish)}
+    assert set(callees) == {real, "svc.post_service.delete_draft"}
+    assert callees[real].resolution is Resolution.IMPORT
+    assert fallback_store.callers(R, stub.qualified_name, min_confidence=0) == []
+    # The getattr alias in app.py falls to a name match; the stub is no longer a candidate.
+    callers = {r.node.qualified_name: r.edge for r in fallback_store.callers(R, real)}
+    assert set(callers) == {publish, "app.content_details"}
+    assert callers["app.content_details"].resolution is Resolution.NAME_UNIQUE
+
+
+def test_fallback_without_a_repo_import_still_resolves() -> None:
+    calls = _calls(
+        {
+            "m.py": (
+                "try:\n"
+                "    from ujson import dumps\n"
+                "except ImportError:\n"
+                "    def dumps(x):\n"
+                "        return str(x)\n"
+                "\n"
+                "def f():\n"
+                "    dumps(1)\n"
+            )
+        }
+    )
+    assert calls[("m.f", "m.dumps")].resolution is Resolution.SAME_FILE
+
+
+def test_bare_decorator_is_a_reference(fallback_store: InMemoryGraphStore) -> None:
+    callers = fallback_store.callers(R, "app.login_required")
+    assert [(r.node.qualified_name, r.edge.line) for r in callers] == [("app.py", 16)]
+    assert callers[0].edge.resolution is Resolution.SAME_FILE

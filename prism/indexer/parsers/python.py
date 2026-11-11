@@ -28,6 +28,7 @@ from prism.indexer.parsers.base import CallSite, ParsedFile, ReceiverKind
 
 _LANGUAGE = Language(tree_sitter_python.language())
 _WS = re.compile(r"\s+")
+_SCOPE_TYPES = frozenset({"module", "function_definition", "class_definition"})
 
 
 def is_python_test_file(path: str) -> bool:
@@ -106,6 +107,7 @@ class _FileVisitor:
         self.functions: list[_RawFunction] = []
         self.imports: list[ImportRef] = []
         self.calls: list[CallSite] = []
+        self.fallbacks: set[str] = set()
 
     def text(self, node: Node) -> str:
         return self.source[node.start_byte : node.end_byte].decode("utf-8", "replace")
@@ -132,6 +134,11 @@ class _FileVisitor:
             definition = node.child_by_field_name("definition")
             decorators = [c for c in node.named_children if c.type == "decorator"]
             out: list[tuple[Node, _Scope]] = [(d, scope) for d in decorators]
+            for d in decorators:
+                # `@login_required` applies the decorator just as `@route("/")` calls one.
+                expr = d.named_children[0] if d.named_children else None
+                if expr is not None and expr.type in ("identifier", "attribute"):
+                    self.reference(expr, d.start_point.row + 1, scope)
             if definition is not None:
                 texts = tuple(self.text(d).lstrip("@").strip() for d in decorators)
                 out.extend(self.definition(definition, node, texts, scope))
@@ -163,6 +170,9 @@ class _FileVisitor:
         end_line = outer.end_point.row + 1
         span = (outer.start_byte, outer.end_byte)
         docstring = self.docstring(body)
+        fallback = self.in_except(outer)
+        if fallback:
+            self.fallbacks.add(qn)
         out: list[tuple[Node, _Scope]] = []
 
         if node.type == "class_definition":
@@ -228,6 +238,15 @@ class _FileVisitor:
         )
         out.append((body, inner))
         return out
+
+    def in_except(self, node: Node) -> bool:
+        """True if the definition sits in an `except` clause of its own scope."""
+        parent = node.parent
+        while parent is not None and parent.type not in _SCOPE_TYPES:
+            if parent.type == "except_clause":
+                return True
+            parent = parent.parent
+        return False
 
     def signature(self, node: Node, params: Node | None, body: Node) -> str:
         """The def line on one line: whitespace collapsed, no trailing comma in the parameters."""
@@ -346,9 +365,11 @@ class _FileVisitor:
 
     def call(self, node: Node, scope: _Scope) -> None:
         fn = node.child_by_field_name("function")
-        if fn is None:
-            return
-        line = node.start_point.row + 1
+        if fn is not None:
+            self.reference(fn, node.start_point.row + 1, scope)
+
+    def reference(self, fn: Node, line: int, scope: _Scope) -> None:
+        """Record a call to the callable expression `fn` (a name or an attribute chain)."""
         if fn.type == "identifier":
             self.calls.append(
                 CallSite(
@@ -433,6 +454,7 @@ class _FileVisitor:
                     decorators=rc.decorators,
                     span=rc.span,
                     is_test=is_test,
+                    is_fallback=rc.qn in self.fallbacks,
                 )
             )
 
@@ -460,6 +482,7 @@ class _FileVisitor:
                     is_method=is_method,
                     is_async=rf.is_async,
                     is_test=is_test,
+                    is_fallback=rf.qn in self.fallbacks,
                 )
             )
 

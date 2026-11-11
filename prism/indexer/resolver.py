@@ -174,7 +174,7 @@ class _FileResolver:
         return self.name_match(site.name, self.symbols.methods.get(site.name, []))
 
     def name_match(self, name: str, candidates: Iterable[Node]) -> list[tuple[Node, Resolution]]:
-        found = list(candidates)
+        found = [c for c in candidates if not self.symbols.is_shadowed_fallback(c)]
         if not found or len(found) > MAX_NAME_CANDIDATES:
             return []
         if is_common_name(name):
@@ -194,7 +194,10 @@ class _FileResolver:
         while node is not None:
             if isinstance(node, FileNode):
                 hit = self.symbols.nodes.get(f"{node.module}.{name}")
-                return None if isinstance(hit, FileNode) else hit
+                if hit is None or isinstance(hit, FileNode):
+                    return None
+                # An `except ImportError` fallback loses to the import it stands in for.
+                return None if self.symbols.is_shadowed_fallback(hit) else hit
             if isinstance(node, FunctionNode) or node.qualified_name == caller:
                 hit = self.symbols.nodes.get(f"{node.qualified_name}.{name}")
                 if hit is not None:

@@ -105,6 +105,9 @@ class InMemoryGraphStore(GraphStore):
     def delete_repo(self, repo_id: str) -> None:
         self._repos.pop(repo_id, None)
 
+    def repo_ids(self) -> list[str]:
+        return sorted(r for r, g in self._repos.items() if g.nodes)
+
     # Primitives
 
     def get_node(self, repo_id: str, qualified_name: str) -> Node | None:
@@ -204,6 +207,12 @@ class InMemoryVectorStore:
 
     def count(self, repo_id: str) -> int:
         return len(self._repos.get(repo_id, {}))
+
+    def repo_ids(self) -> list[str]:
+        return sorted(r for r, items in self._repos.items() if items)
+
+    def close(self) -> None:
+        pass
 
     def search(
         self,
