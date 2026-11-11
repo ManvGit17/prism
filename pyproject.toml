@@ -11,7 +11,13 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "redis>=5.0",
+    "tree-sitter>=0.26.1",
+    "tree-sitter-python>=0.25.0",
+    "typer>=0.29.1",
 ]
+
+[project.scripts]
+prism = "prism.cli:app"
 
 [dependency-groups]
 dev = [
@@ -30,6 +36,8 @@ packages = ["prism"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Sample source code the indexer tests parse; it is data, not project code.
+extend-exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
@@ -39,6 +47,7 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 files = ["prism", "tests"]
+exclude = ["^tests/fixtures/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

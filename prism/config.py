@@ -7,7 +7,7 @@ and `PRISM_OLLAMA_URL` to `http://host.docker.internal:11434`.
 
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Ollama runs on the host, not in Compose.
     ollama_url: str = "http://localhost:11434"
     reviewer_model: str = "qwen2.5-coder:3b"
+
+    # Graph queries leave out CALLS and TESTS edges below this confidence (ADR 0004).
+    call_confidence_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
     @property
     def postgres_dsn(self) -> str:
