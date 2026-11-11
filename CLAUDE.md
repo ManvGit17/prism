@@ -32,6 +32,8 @@ the phase numbers.
 | `make unit` | Tests that need no services; this is what CI runs |
 | `make check` | Lint, type check, unit tests |
 | `make stats` | Memory per container |
+| `uv run prism index <path>` | Index a repo into Neo4j + pgvector (`--no-embed`, `--store memory`) |
+| `uv run prism graph callers <symbol>` | Query the graph: `callers`, `callees`, `tests`, `neighbours --hops 2`; `--path <repo>` indexes in memory first |
 
 ## Conventions
 

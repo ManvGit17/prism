@@ -19,6 +19,7 @@ class ReceiverKind(StrEnum):
     SUPER = "super"  # super().foo()
     NAME = "name"  # a.b.foo(): receiver is a dotted name
     EXPR = "expr"  # f().foo(), x[0].foo(): receiver is any other expression
+    NEW = "new"  # Java `new Foo(...)`: `name` is the type as written
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +30,9 @@ class CallSite:
     receiver: str | None  # dotted receiver text for NAME, else None
     line: int
     enclosing_class: str | None  # class whose `self` is in scope, for SELF and SUPER
+    receiver_type: str | None = None  # declared type of the receiver, when written down
+    arg_count: int | None = None  # None when unknown (Python, method references)
+    arg_types: tuple[str | None, ...] | None = None  # Java: per argument, None if unknown
 
 
 @dataclass(frozen=True, slots=True)

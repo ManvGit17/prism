@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from prism.indexer.embedder import Embedder, function_text
-from prism.indexer.model import FileGraph, Node
+from prism.indexer.model import FileGraph, FileNode, Node
 from prism.indexer.parsers import ParsedFile, parser_for
 from prism.indexer.resolver import resolve
 from prism.indexer.symbols import SymbolTable
@@ -22,14 +22,21 @@ from prism.store.base import GraphReader, GraphStore, VectorItem, VectorStore
 from prism.store.ledger import IndexLedger, IndexRun
 from prism.store.overlay import OverlayGraph
 
+# Build output, virtualenvs and generated code. Hidden folders (.git, .gradle) are skipped too.
 SKIP_DIRS = frozenset(
     {
         "__pycache__",
+        "bin",
         "build",
         "dist",
         "env",
+        "generated",
+        "generated-sources",
+        "generated-test-sources",
         "node_modules",
+        "out",
         "site-packages",
+        "target",
         "venv",
     }
 )
@@ -222,16 +229,25 @@ def find_dependents(
     Two sources: (1) any file with an edge into a node of a touched file, read
     from the store before the update (callers, importers, tests); (2) any file
     whose imports resolve, against the updated symbols, to a touched module (a
-    file that imports a module the update adds). Name-match edges that a new
+    file that imports a module the update adds); (3) for Java, every file in a
+    touched package or importing a touched type or package. Name-match edges that a new
     definition would capture are not found (ADR 0004).
     """
     touched_set = set(touched)
     out: set[str] = set()
+    touched_files: list[FileNode] = []
     for path in touched_set:
         for node in store.nodes_in_file(repo_id, path):
+            if isinstance(node, FileNode):
+                touched_files.append(node)
             for edge in store.in_edges(repo_id, node.qualified_name):
                 if edge.path not in touched_set:
                     out.add(edge.path)
+        new = symbols.nodes.get(path)
+        if isinstance(new, FileNode):
+            touched_files.append(new)
+    # Java needs no import within a package, so a change reaches the whole package.
+    out |= symbols.java.dependents(touched_files)
     for file in symbols.files.values():
         if file.path in touched_set or file.path in out:
             continue

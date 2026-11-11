@@ -1,13 +1,14 @@
 """Language parsers, looked up by file extension.
 
-A Java or TypeScript parser implements `LanguageParser` and is added to
-`_PARSERS`; nothing else needs to change for files to be picked up.
+Python and Java are registered. Another language implements `LanguageParser`, is added
+to `_PARSERS`, and gets a resolver in `resolver.resolve`.
 """
 
 from prism.indexer.parsers.base import CallSite, LanguageParser, ParsedFile, ReceiverKind
+from prism.indexer.parsers.java import JavaParser
 from prism.indexer.parsers.python import PythonParser
 
-_PARSERS: tuple[LanguageParser, ...] = (PythonParser(),)
+_PARSERS: tuple[LanguageParser, ...] = (PythonParser(), JavaParser())
 _BY_EXTENSION: dict[str, LanguageParser] = {
     ext: parser for parser in _PARSERS for ext in parser.extensions
 }
@@ -27,6 +28,7 @@ def supported_extensions() -> frozenset[str]:
 
 __all__ = [
     "CallSite",
+    "JavaParser",
     "LanguageParser",
     "ParsedFile",
     "PythonParser",

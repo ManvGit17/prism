@@ -34,6 +34,8 @@ class EdgeKind(StrEnum):
     IMPORTS = "IMPORTS"
     CALLS = "CALLS"
     TESTS = "TESTS"
+    INHERITS = "INHERITS"  # class -> a repo class it extends or implements
+    OVERRIDES = "OVERRIDES"  # method -> the supertype method it overrides or implements
 
 
 class Resolution(StrEnum):
@@ -42,6 +44,7 @@ class Resolution(StrEnum):
     SAME_FILE = "same_file"
     SELF_METHOD = "self_method"
     INHERITED = "inherited"
+    SAME_PACKAGE = "same_package"
     IMPORT = "import"
     STAR_IMPORT = "star_import"
     NAME_UNIQUE = "name_unique"
@@ -71,6 +74,7 @@ class ImportRef(_Frozen):
     target: str
     module: str
     line: int = Field(ge=1)
+    is_static: bool = Field(default=False, description="Java `import static`.")
 
     @property
     def is_star(self) -> bool:
@@ -96,7 +100,7 @@ class _NodeBase(_Frozen):
 
 class FileNode(_NodeBase):
     kind: Literal[NodeKind.FILE] = NodeKind.FILE
-    module: str = Field(description="Dotted module name derived from the path.")
+    module: str = Field(description="Python: dotted module name from the path. Java: the package.")
     is_test: bool = False
     imports: tuple[ImportRef, ...] = ()
 
@@ -112,6 +116,9 @@ class ClassNode(_NodeBase):
     span: tuple[int, int] = Field(description="Byte offsets of the whole definition.")
     is_test: bool = False
     is_fallback: bool = Field(default=False, description="Defined inside an `except` clause.")
+    class_kind: str = Field(
+        default="class", description="class, interface, enum, record or annotation (Java)."
+    )
 
 
 class FunctionNode(_NodeBase):

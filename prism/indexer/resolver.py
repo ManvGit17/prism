@@ -1,5 +1,8 @@
 """Best-effort call resolution: same file, then imports, then name match.
 
+This module holds the shared edge building and the Python rules; Java rules are
+in `java_resolver.py`.
+
 Each CALLS edge records how it was resolved and a confidence from a fixed band
 (ADR 0004). Name matches on very common names get the lowest band, which the
 default retrieval threshold (`PRISM_CALL_CONFIDENCE_THRESHOLD`) leaves out.
@@ -29,6 +32,7 @@ CONFIDENCE: dict[Resolution, float] = {
     Resolution.SAME_FILE: 0.95,
     Resolution.SELF_METHOD: 0.9,
     Resolution.IMPORT: 0.9,
+    Resolution.SAME_PACKAGE: 0.85,
     Resolution.INHERITED: 0.8,
     Resolution.STAR_IMPORT: 0.7,
     Resolution.NAME_UNIQUE: 0.6,
@@ -45,6 +49,9 @@ _COMMON_WORDS = """
     insert items iter join keys list load log main map next open parse patch pop post process put
     query read register remove render replace reset run save send set setup sort split start stop
     strip teardown test update validate values wait warning write
+    accept apply compareTo contains equals forEach getId getName getType getValue hashCode
+    isEmpty isPresent iterator length name of orElse ordinal setId setName setValue size stream
+    toString valueOf
 """
 COMMON_NAMES: frozenset[str] = frozenset(_COMMON_WORDS.split())
 
@@ -60,14 +67,24 @@ def resolve(parsed: Sequence[ParsedFile], symbols: SymbolTable) -> list[FileGrap
     `symbols` must hold every node the calls may point at, including the nodes
     of `parsed` itself.
     """
-    return [_FileResolver(pf, symbols).run() for pf in parsed]
+    from prism.indexer.java_resolver import JavaFileResolver
+
+    out: list[FileGraph] = []
+    for pf in parsed:
+        if pf.language == "java":
+            out.append(JavaFileResolver(pf, symbols).run())
+        else:
+            out.append(PythonFileResolver(pf, symbols).run())
+    return out
 
 
 def is_common_name(name: str) -> bool:
     return name in COMMON_NAMES or (name.startswith("__") and name.endswith("__"))
 
 
-class _FileResolver:
+class FileResolver:
+    """Builds one file's edges. Subclasses supply the language rules."""
+
     def __init__(self, pf: ParsedFile, symbols: SymbolTable) -> None:
         self.pf = pf
         self.symbols = symbols
@@ -83,6 +100,7 @@ class _FileResolver:
                 self.add_call(site, target, resolution)
         edges: list[Edge] = [*self.pf.defines, *self.import_edges(), *self.calls.values()]
         edges.extend(self.test_edges())
+        edges.extend(self.inherit_edges())
         return FileGraph(
             repo_id=self.pf.repo_id, path=self.pf.path, nodes=self.pf.nodes, edges=tuple(edges)
         )
@@ -106,6 +124,59 @@ class _FileResolver:
             resolution=resolution,
         )
 
+    def resolve_site(self, site: CallSite) -> list[tuple[Node, Resolution]]:
+        raise NotImplementedError
+
+    def import_edges(self) -> list[Edge]:
+        raise NotImplementedError
+
+    def inherit_edges(self) -> list[Edge]:
+        """INHERITS from each class to its repo supertypes, OVERRIDES from each method to
+        the nearest supertype method it overrides or implements."""
+        raise NotImplementedError
+
+    def edge(
+        self, kind: EdgeKind, src: str, dst: str, line: int | None, resolution: Resolution | None
+    ) -> Edge:
+        return Edge(
+            kind=kind,
+            repo_id=self.pf.repo_id,
+            src=src,
+            dst=dst,
+            path=self.pf.path,
+            line=line,
+            confidence=CONFIDENCE[resolution] if resolution else 1.0,
+            resolution=resolution,
+        )
+
+    def name_match(self, name: str, candidates: Iterable[Node]) -> list[tuple[Node, Resolution]]:
+        found = [c for c in candidates if not self.symbols.is_shadowed_fallback(c)]
+        if not found or len(found) > MAX_NAME_CANDIDATES:
+            return []
+        # Overloads of one method in one class count as one candidate.
+        owners = {getattr(n, "owner", n.qualified_name) for n in found}
+        if is_common_name(name):
+            band = Resolution.NAME_COMMON
+        elif len(owners) == 1:
+            band = Resolution.NAME_UNIQUE
+        else:
+            band = Resolution.NAME_AMBIGUOUS
+        return [(node, band) for node in found]
+
+    def test_edges(self) -> list[Edge]:
+        out: list[Edge] = []
+        for edge in self.calls.values():
+            src = self.symbols.nodes.get(edge.src)
+            dst = self.symbols.nodes.get(edge.dst)
+            if not (isinstance(src, FunctionNode) and src.is_test):
+                continue
+            if dst is None or isinstance(dst, FileNode) or dst.is_test:
+                continue
+            out.append(edge.model_copy(update={"kind": EdgeKind.TESTS}))
+        return out
+
+
+class PythonFileResolver(FileResolver):
     # Resolution
 
     def resolve_site(self, site: CallSite) -> list[tuple[Node, Resolution]]:
@@ -173,18 +244,6 @@ class _FileResolver:
             return []  # str.join, dict.fromkeys
         return self.name_match(site.name, self.symbols.methods.get(site.name, []))
 
-    def name_match(self, name: str, candidates: Iterable[Node]) -> list[tuple[Node, Resolution]]:
-        found = [c for c in candidates if not self.symbols.is_shadowed_fallback(c)]
-        if not found or len(found) > MAX_NAME_CANDIDATES:
-            return []
-        if is_common_name(name):
-            band = Resolution.NAME_COMMON
-        elif len(found) == 1:
-            band = Resolution.NAME_UNIQUE
-        else:
-            band = Resolution.NAME_AMBIGUOUS
-        return [(node, band) for node in found]
-
     def scope_lookup(self, caller: str, name: str) -> Node | None:
         """Find `name` in the caller's enclosing function scopes, then the module.
 
@@ -225,14 +284,36 @@ class _FileResolver:
             )
         return list(seen.values())
 
-    def test_edges(self) -> list[Edge]:
+    def inherit_edges(self) -> list[Edge]:
         out: list[Edge] = []
-        for edge in self.calls.values():
-            src = self.symbols.nodes.get(edge.src)
-            dst = self.symbols.nodes.get(edge.dst)
-            if not (isinstance(src, FunctionNode) and src.is_test):
+        for cls in self.pf.classes:
+            seen: set[str] = set()
+            for base in self.symbols.base_classes(cls.qualified_name):
+                if base.qualified_name not in seen:
+                    seen.add(base.qualified_name)
+                    out.append(
+                        self.edge(
+                            EdgeKind.INHERITS,
+                            cls.qualified_name,
+                            base.qualified_name,
+                            cls.start_line,
+                            None,
+                        )
+                    )
+        for fn in self.pf.functions:
+            if not fn.is_method or "#" in fn.qualified_name:
                 continue
-            if dst is None or isinstance(dst, FileNode) or dst.is_test:
-                continue
-            out.append(edge.model_copy(update={"kind": EdgeKind.TESTS}))
+            for base in self.symbols.base_classes(fn.owner):
+                parent, _ = self.symbols.find_method(base.qualified_name, fn.name)
+                if parent is not None and parent.qualified_name != fn.qualified_name:
+                    out.append(
+                        self.edge(
+                            EdgeKind.OVERRIDES,
+                            fn.qualified_name,
+                            parent.qualified_name,
+                            fn.start_line,
+                            None,
+                        )
+                    )
+                    break
         return out
