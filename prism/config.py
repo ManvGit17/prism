@@ -49,6 +49,21 @@ class Settings(BaseSettings):
     # nomic-embed-text expects a task prefix; set to "" for models that do not.
     embedding_document_prefix: str = "search_document: "
 
+    # Retrieved context for the verifier and the frontier path (ADR 0007).
+    context_mode: Literal["none", "vector", "graph", "graph+vector"] = "graph+vector"
+    context_budget_tokens: int = Field(default=1500, ge=50, description="Per hunk.")
+    context_hops: int = Field(default=1, ge=1, le=2)
+    context_vector_k: int = Field(default=8, ge=0)
+    context_snippet_max_lines: int = Field(default=40, ge=3)
+    # A truncated item smaller than this is dropped instead.
+    context_min_item_tokens: int = Field(default=40, ge=1)
+    reranker: Literal["cross-encoder", "none"] = "cross-encoder"
+    reranker_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
+    token_counter: Literal["chars", "qwen"] = "chars"
+    token_chars_per_token: float = Field(default=4.0, gt=0)
+    # Downloaded models (reranker, tokenizer) live here.
+    model_cache_dir: str = "~/.cache/prism"
+
     @property
     def postgres_dsn(self) -> str:
         return (

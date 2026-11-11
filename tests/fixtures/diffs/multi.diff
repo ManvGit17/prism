@@ -1,0 +1,31 @@
+diff --git a/shop/pricing.py b/shop/pricing.py
+index 4478f7d..fd9f92e 100644
+--- a/shop/pricing.py
++++ b/shop/pricing.py
+@@ -4,7 +4,8 @@ TAX = 0.2
+ 
+ 
+ def with_tax(amount):
+-    return round_price(amount * (1 + TAX))
++    rate = 1 + TAX
++    return round_price(amount * rate)
+ 
+ 
+ def round_price(value):
+diff --git a/shop/gift.py b/shop/gift.py
+new file mode 100644
+index 0000000..3b18e51
+--- /dev/null
++++ b/shop/gift.py
+@@ -0,0 +1,3 @@
++def wrap(item):
++    """Gift-wrap an item."""
++    return item
+diff --git a/shop/legacy.py b/shop/legacy.py
+deleted file mode 100644
+index 9c1b2a3..0000000
+--- a/shop/legacy.py
++++ /dev/null
+@@ -1,2 +0,0 @@
+-def old_total(amount):
+-    return with_tax(amount)

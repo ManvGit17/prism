@@ -99,6 +99,10 @@ def test_stale_run_is_expired_and_redone(ledger: IndexLedger, rid: str) -> None:
 
 
 class _Exploding(FakeEmbedder):
+    @property
+    def name(self) -> str:
+        return "exploding"  # a new model name, so every function is re-embedded
+
     def embed(self, texts: Sequence[str]) -> list[tuple[float, ...]]:
         raise RuntimeError("embedder down")
 

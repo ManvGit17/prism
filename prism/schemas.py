@@ -101,3 +101,99 @@ class PRReview(_Strict):
     @property
     def comments(self) -> tuple[ReviewComment, ...]:
         return tuple(c for f in self.files for c in f.comments)
+
+
+# Retrieved context (Phase 2, ADR 0007). The verifier and the frontier path read it;
+# the fine-tuned reviewer is served the hunk alone.
+
+
+class ContextMode(StrEnum):
+    """What retrieval may use. Phase 7 compares the four."""
+
+    NONE = "none"
+    VECTOR = "vector"
+    GRAPH = "graph"
+    GRAPH_VECTOR = "graph+vector"
+
+    @property
+    def uses_graph(self) -> bool:
+        return self in (ContextMode.GRAPH, ContextMode.GRAPH_VECTOR)
+
+    @property
+    def uses_vector(self) -> bool:
+        return self in (ContextMode.VECTOR, ContextMode.GRAPH_VECTOR)
+
+
+class ContextKind(StrEnum):
+    """Kinds of retrieved item, in packing priority order (first packs first)."""
+
+    SIGNATURE = "signature"  # the changed symbol itself
+    CONTRACT = "contract"  # supertype method it overrides or implements
+    TEST = "test"
+    CALLER = "caller"
+    IMPLEMENTATION = "implementation"  # methods that override or implement it
+    CLASS = "class"  # the class the changed method belongs to
+    CALLEE = "callee"
+    CLASS_TEST = "class_test"  # tests of its class, when it has no direct test
+    SIMILAR = "similar"
+
+    @property
+    def priority(self) -> int:
+        return list(ContextKind).index(self)
+
+
+class ContextItem(_Strict):
+    kind: ContextKind
+    source: str = Field(description="'graph' or 'vector'.")
+    qualified_name: str
+    path: str
+    start_line: LineNumber
+    end_line: LineNumber
+    reason: NonEmptyStr = Field(description="Why this item was retrieved.")
+    snippet: str = Field(description="Code read from the head commit, possibly cut.")
+    confidence: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Edge confidence, or vector similarity."
+    )
+    score: float = Field(default=0.0, description="Rerank score; higher is more relevant.")
+    tokens: int = Field(default=0, ge=0, description="Tokens of the rendered item.")
+    truncated: bool = False
+
+
+class DroppedItem(_Strict):
+    kind: ContextKind
+    qualified_name: str
+    tokens: int = Field(ge=0)
+    reason: NonEmptyStr
+
+
+class HunkContext(_Strict):
+    path: NonEmptyStr
+    hunk_header: str
+    new_start: LineNumber
+    new_end: LineNumber
+    symbols: tuple[str, ...] = Field(default=(), description="Changed symbols at the head.")
+    deleted_symbols: tuple[str, ...] = Field(
+        default=(), description="Symbols of the base graph the hunk removes or renames."
+    )
+    target: str = Field(description="symbol, module, deleted or non_code.")
+    items: tuple[ContextItem, ...] = ()
+    dropped: tuple[DroppedItem, ...] = ()
+    tokens_used: int = Field(default=0, ge=0)
+    budget: int = Field(ge=0)
+
+
+class ContextBundle(_Strict):
+    repo_id: NonEmptyStr
+    mode: ContextMode
+    token_counter: NonEmptyStr
+    reranker: NonEmptyStr
+    hunks: tuple[HunkContext, ...] = ()
+    skipped_files: tuple[str, ...] = Field(default=(), description="Binary files.")
+
+    @property
+    def tokens_used(self) -> int:
+        return sum(h.tokens_used for h in self.hunks)
+
+    @property
+    def items(self) -> int:
+        return sum(len(h.items) for h in self.hunks)

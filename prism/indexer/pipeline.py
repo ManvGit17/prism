@@ -54,7 +54,9 @@ class IndexReport:
     skipped: list[str] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)
     dependents: list[str] = field(default_factory=list)
-    vectors: int = 0
+    vectors: int = 0  # functions embedded in this run
+    vectors_unchanged: int = 0  # functions whose stored vector was kept (same text hash)
+    embed_seconds: float = 0.0
     seconds: float = 0.0
 
 
@@ -96,6 +98,11 @@ def build_file_graphs(
     return resolve(parsed, symbols)
 
 
+def text_hash(embedder: Embedder, text: str) -> str:
+    """Hash of what gets embedded, including the model, so a model change re-embeds."""
+    return hashlib.sha256(f"{embedder.name}\n{text}".encode()).hexdigest()
+
+
 def embed_functions(parsed: Sequence[ParsedFile], embedder: Embedder) -> list[VectorItem]:
     texts: list[str] = []
     meta: list[tuple[str, str]] = []
@@ -109,7 +116,7 @@ def embed_functions(parsed: Sequence[ParsedFile], embedder: Embedder) -> list[Ve
             qualified_name=qn,
             path=path,
             vector=tuple(vec),
-            content_hash=hashlib.sha256(text.encode()).hexdigest(),
+            content_hash=text_hash(embedder, text),
         )
         for (qn, path), vec, text in zip(meta, vectors, texts, strict=True)
     ]
@@ -134,30 +141,59 @@ def commit_sha_for(root: Path) -> str:
 _EMBED_CHUNK = 64
 
 
+@dataclass
+class VectorWrite:
+    written: int = 0
+    unchanged: int = 0
+    removed: int = 0
+    seconds: float = 0.0
+
+
 def _write_vectors(
     parsed: Sequence[ParsedFile],
     vectors: VectorStore,
     embedder: Embedder,
     repo_id: str,
     beat: Callable[[], None],
-) -> int:
-    """Embed and upsert in chunks, beating the ledger heartbeat between chunks."""
-    written = 0
-    pending: list[ParsedFile] = []
-    count = 0
-    for pf in [*parsed, None]:
-        if pf is not None:
-            pending.append(pf)
-            count += len(pf.functions)
-            if count < _EMBED_CHUNK:
-                continue
-        if pending:
-            items = embed_functions(pending, embedder)
-            vectors.upsert(repo_id, items)
-            written += len(items)
-            beat()
-        pending, count = [], 0
-    return written
+    *,
+    scope: Collection[str] | None = None,
+) -> VectorWrite:
+    """Embed the functions of `parsed` whose text changed, and drop stale vectors.
+
+    Stale means a stored function that no longer exists, among the paths in
+    `scope` (all paths when None). Embeds in chunks, beating the ledger heartbeat
+    between chunks.
+    """
+    started = time.perf_counter()
+    stored = vectors.hashes(repo_id)
+    wanted: list[tuple[str, str, str, str]] = []  # qn, path, text, hash
+    for pf in parsed:
+        for fn in pf.functions:
+            text = function_text(fn, pf.source)
+            wanted.append((fn.qualified_name, fn.path, text, text_hash(embedder, text)))
+    keep = {qn for qn, _, _, _ in wanted}
+    stale = [
+        qn
+        for qn, (path, _) in stored.items()
+        if qn not in keep and (scope is None or path in scope)
+    ]
+    vectors.remove(repo_id, stale)
+    todo = [w for w in wanted if stored.get(w[0], ("", ""))[1] != w[3]]
+    result = VectorWrite(unchanged=len(wanted) - len(todo), removed=len(stale))
+    for i in range(0, len(todo), _EMBED_CHUNK):
+        chunk = todo[i : i + _EMBED_CHUNK]
+        embedded = embedder.embed([text for _, _, text, _ in chunk])
+        vectors.upsert(
+            repo_id,
+            [
+                VectorItem(qualified_name=qn, path=path, vector=tuple(vec), content_hash=h)
+                for (qn, path, _, h), vec in zip(chunk, embedded, strict=True)
+            ],
+        )
+        result.written += len(chunk)
+        beat()
+    result.seconds = time.perf_counter() - started
+    return result
 
 
 @contextmanager
@@ -212,8 +248,9 @@ def index_repository(
         report.files_with_errors = [pf.path for pf in parsed if pf.has_errors]
         report.run_id = run.id if run else None
         if vectors is not None and embedder is not None:
-            vectors.delete_repo(repo_id)
-            report.vectors = _write_vectors(parsed, vectors, embedder, repo_id, beat)
+            write = _write_vectors(parsed, vectors, embedder, repo_id, beat)
+            report.vectors, report.vectors_unchanged = write.written, write.unchanged
+            report.embed_seconds = write.seconds
     report.seconds = time.perf_counter() - started
     return report
 
@@ -339,8 +376,12 @@ def update_repository(
         report.files_with_errors = [pf.path for pf in parsed_changed if pf.has_errors]
         report.run_id = run.id if run else None
         if vectors is not None and embedder is not None:
-            vectors.remove_files(repo_id, sorted(touched))
-            report.vectors = _write_vectors(parsed_changed, vectors, embedder, repo_id, beat)
+            vectors.remove_files(repo_id, removed)
+            write = _write_vectors(
+                parsed_changed, vectors, embedder, repo_id, beat, scope=set(changed)
+            )
+            report.vectors, report.vectors_unchanged = write.written, write.unchanged
+            report.embed_seconds = write.seconds
     report.seconds = time.perf_counter() - started
     return report
 

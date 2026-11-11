@@ -114,7 +114,9 @@ class OllamaEmbedder:
         for i in range(0, len(texts), self._batch):
             chunk = [self._prefix + t[: self._max_chars] for t in texts[i : i + self._batch]]
             response = self._client.post(
-                self._url, json={"model": self.model, "input": chunk, "truncate": True}
+                self._url,
+                # keep_alive holds the model between batches and between index runs.
+                json={"model": self.model, "input": chunk, "truncate": True, "keep_alive": "10m"},
             )
             response.raise_for_status()
             vectors = response.json()["embeddings"]

@@ -5,12 +5,15 @@ description = "Repo-aware AI code reviewer: GraphRAG over a code graph, a fine-t
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "fastembed>=0.9.1",
     "httpx>=0.27",
+    "huggingface-hub>=1.33.0",
     "neo4j>=5.20",
     "psycopg[binary]>=3.2",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "redis>=5.0",
+    "tokenizers>=0.23.3",
     "tree-sitter>=0.26.1",
     "tree-sitter-java>=0.23.5",
     "tree-sitter-python>=0.25.0",
@@ -54,4 +57,5 @@ exclude = ["^tests/fixtures/"]
 testpaths = ["tests"]
 markers = [
     "smoke: needs the Compose services and the host Ollama to be running",
+    "download: downloads a model on first run (about 90 MB); CI skips it",
 ]

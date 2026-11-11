@@ -108,3 +108,42 @@ def test_index_repository_embeds_every_function(
     assert report.vectors == graph.stats(A).functions == vector_store.count(A)
     query = embedder.embed(["slugify make a slug clean replace text"])[0]
     assert vector_store.search(A, query, k=1)[0].qualified_name == "shop.util.slugify"
+
+
+def test_hashes_and_remove(vector_store: VectorStore) -> None:
+    vector_store.upsert(
+        A,
+        [
+            VectorItem(qualified_name="m.x", path="m.py", vector=(1.0, 0.0), content_hash="h1"),
+            VectorItem(qualified_name="m.y", path="m.py", vector=(0.0, 1.0), content_hash="h2"),
+        ],
+    )
+    assert vector_store.hashes(A) == {"m.x": ("m.py", "h1"), "m.y": ("m.py", "h2")}
+    vector_store.remove(A, ["m.x", "missing"])
+    assert set(vector_store.hashes(A)) == {"m.y"}
+    assert vector_store.hashes(B) == {}
+
+
+def test_full_index_skips_unchanged_functions(
+    vector_store: VectorStore, sample_repo: Path, tmp_path: Path
+) -> None:
+    import shutil
+
+    root = tmp_path / "repo"
+    shutil.copytree(sample_repo, root)
+    graph = InMemoryGraphStore()
+    embedder = FakeEmbedder(dimension=32)
+    first = index_repository(root, A, graph, vectors=vector_store, embedder=embedder)
+    assert (first.vectors, first.vectors_unchanged) == (29, 0)
+    again = index_repository(root, A, graph, vectors=vector_store, embedder=embedder)
+    assert (again.vectors, again.vectors_unchanged) == (0, 29)
+    pricing = root / "shop" / "pricing.py"
+    pricing.write_text(
+        pricing.read_text(encoding="utf-8").replace("round(value, 2)", "round(value, 3)"),
+        encoding="utf-8",
+    )
+    (root / "shop" / "jobs.py").unlink()
+    third = index_repository(root, A, graph, vectors=vector_store, embedder=embedder)
+    assert (third.vectors, third.vectors_unchanged) == (1, 25)
+    assert vector_store.count(A) == 26
+    assert vector_store.get(A, "shop.jobs.dispatch") is None

@@ -1,0 +1,6 @@
+--- shop/util.py	2026-11-01 10:00:00
++++ shop/util.py	2026-11-02 10:00:00
+@@ -20,2 +20,2 @@
+ def _clean(text):
+-    return text.strip().lower()
++    return text.strip().casefold()

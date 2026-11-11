@@ -86,6 +86,22 @@ class PgVectorStore:
         ).fetchall()
         return [r[0] for r in rows]
 
+    def hashes(self, repo_id: str) -> dict[str, tuple[str, str]]:
+        rows = self._conn.execute(
+            "SELECT qualified_name, path, content_hash FROM function_embeddings "
+            "WHERE repo_id = %s AND embedder = %s",
+            (repo_id, self.embedder),
+        ).fetchall()
+        return {r[0]: (r[1], r[2]) for r in rows}
+
+    def remove(self, repo_id: str, qualified_names: Iterable[str]) -> None:
+        names = list(qualified_names)
+        if names:
+            self._conn.execute(
+                "DELETE FROM function_embeddings WHERE repo_id = %s AND qualified_name = ANY(%s)",
+                (repo_id, names),
+            )
+
     def count(self, repo_id: str) -> int:
         row = self._conn.execute(
             "SELECT count(*) FROM function_embeddings WHERE repo_id = %s AND embedder = %s",

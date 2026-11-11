@@ -1,0 +1,10 @@
+diff --git a/logo.png b/logo.png
+index 3333333..4444444 100644
+Binary files a/logo.png and b/logo.png differ
+diff --git a/app.py b/app.py
+index 5555555..6666666 100644
+--- a/app.py
++++ b/app.py
+@@ -1 +1,2 @@
+ import os
++import sys

@@ -37,9 +37,22 @@ suggested `jinaai/jina-embeddings-v2-base-code` or the current best small code e
 
 ## Measured
 
-Indexing `smms` (28 files, 325 functions) into Neo4j and pgvector took about 330 s, and almost all
-of that was embedding on the CPU (about 1 s per function). Parsing and resolution of the same
-repo take about 2.5 s. This is one run on one machine, not a benchmark.
+The first runs on `smms` (325 functions) took 330 s and 397 s, about 1 s per function (ledger runs
+10 and 11). `eval/embedding_speed.py` later measured, on the same machine
+(`eval/reports/embedding_speed.jsonl`):
+
+- one request through `localhost` took 0.47 s against 0.054 s through `127.0.0.1`: on Windows,
+  `localhost` tries IPv6 first and Ollama listens on IPv4 only. The default URL is now
+  `127.0.0.1` (changed in stage 2);
+- a cold full index embedded all 325 functions in 50.8 s, 156 ms per function, at batch size 16;
+- a warm full index, nothing changed, embedded nothing and took 0.48 s, because functions whose
+  text hash is unchanged are skipped.
+
+The 1 s per function of the first runs was not reproduced. The `localhost` delay explains only
+part of it (21 batches at about 0.4 s); memory pressure at the time is a likely cause but was not
+measured. A scratch probe of request shapes showed batch size 1, 16 or 32 and `num_ctx` 2048 all
+within about 30% of each other, so batch size is left at 16. Requests now pass `keep_alive: 10m`
+so the model stays loaded between batches and runs.
 
 ## Not compared
 
@@ -50,7 +63,7 @@ should be measured in Phase 7 before this choice is treated as settled.
 
 ## Consequences
 
-- A full index re-embeds every function. For a mid-size repo this takes tens of minutes on this
-  CPU. Incremental updates embed only the changed files. The stored text hash would let a full
-  index skip unchanged functions; that is not built yet.
+- A first index embeds every function: about 2.6 minutes per 1,000 functions on this CPU at the
+  measured rate. Later full and incremental indexes embed only functions whose text (or model)
+  changed; vectors of functions that no longer exist are removed.
 - Embedding needs the host Ollama to be running. `prism index --no-embed` skips it.
