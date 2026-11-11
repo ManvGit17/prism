@@ -29,7 +29,10 @@ def test_parser_registry_by_extension() -> None:
     parser = parser_for("shop/cart.py")
     assert parser is not None
     assert parser.language == "python"
-    assert parser_for("Main.java") is None
+    java = parser_for("src/main/java/Main.java")
+    assert java is not None
+    assert java.language == "java"
+    assert parser_for("Main.kt") is None
     assert parser_for("Makefile") is None
 
 

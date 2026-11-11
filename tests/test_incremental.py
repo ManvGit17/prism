@@ -96,3 +96,55 @@ def test_update_on_an_empty_store_is_a_full_index(tree: Path) -> None:
     report = update_repository(tree, R, ["shop/pricing.py"], [], graph)
     assert report.kind == "full"
     assert graph.stats(R).files == 10
+
+
+JAVA_REPO = Path(__file__).parent / "fixtures" / "java_repo"
+SHOP = "src/main/java/com/acme/shop"
+
+ITEM_V2 = """package com.acme.shop;
+
+/** A thing for sale, version 2. */
+public class Item implements Priced {
+    private final double price;
+
+    public Item(String name, double price) {
+        this.price = price;
+    }
+
+    @Override
+    public double price() {
+        return Tax.apply(price);
+    }
+
+    public static Item of(String name) {
+        return new Item(name, 1.0);
+    }
+}
+"""
+
+TAX = """package com.acme.shop;
+
+final class Tax {
+    static double apply(double amount) {
+        return amount * 1.2;
+    }
+}
+"""
+
+
+def test_java_update_matches_a_full_index(graph_store: GraphStore, tmp_path: Path) -> None:
+    root = tmp_path / "java"
+    shutil.copytree(JAVA_REPO, root)
+    index_repository(root, R, graph_store)
+    (root / SHOP / "Item.java").write_text(ITEM_V2, encoding="utf-8")
+    (root / SHOP / "Tax.java").write_text(TAX, encoding="utf-8")
+    report = update_repository(root, R, [f"{SHOP}/Item.java", f"{SHOP}/Tax.java"], [], graph_store)
+    assert report.kind == "incremental"
+    # Same package needs no import, so the whole package is re-resolved.
+    assert f"{SHOP}/Cart.java" in report.dependents
+    fresh = InMemoryGraphStore()
+    index_repository(root, R, fresh)
+    assert _snapshot(graph_store, R) == _snapshot(fresh, R)
+    assert graph_store.get_node(R, "com.acme.shop.Item.name()") is None
+    callees = {r.node.qualified_name for r in graph_store.callees(R, "com.acme.shop.Item.price()")}
+    assert callees == {"com.acme.shop.Tax.apply(double)"}

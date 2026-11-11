@@ -313,3 +313,39 @@ def test_edge_to_a_missing_node_is_not_stored(graph_store: GraphStore) -> None:
     )
     assert [e.ident for e in graph_store.iter_edges(A)] == [defines.ident]
     assert graph_store.out_edges(A, "m.K") == []
+
+
+JAVA_REPO = Path(__file__).parent / "fixtures" / "java_repo"
+J = "com.acme.shop"
+
+
+def test_java_graph(graph_store: GraphStore) -> None:
+    graphs = _sample_graphs(JAVA_REPO, A)
+    graph_store.replace_files(A, graphs)
+    for graph in graphs:
+        for node in graph.nodes:
+            assert graph_store.get_node(A, node.qualified_name) == node
+    assert _qns(graph_store.lookup(A, "Cart.add")) == [
+        f"{J}.Cart.add(Item)",
+        f"{J}.Cart.add(Item,int)",
+    ]
+    callers = graph_store.callers(A, f"{J}.Cart.add(Item,int)")
+    assert [r.node.qualified_name for r in callers] == [f"{J}.CartTest.addWithQuantity(int)"]
+    # Callers of an interface method, and the implementations behind it.
+    assert [r.node.qualified_name for r in graph_store.callers(A, f"{J}.Priced.price()")] == [
+        f"{J}.Cart.checkout(List)"
+    ]
+    impls = graph_store.overridden_by(A, f"{J}.Priced.price()")
+    assert [(n.node.qualified_name, n.distance) for n in impls] == [
+        (f"{J}.Gift.price()", 1),
+        (f"{J}.Item.price()", 1),
+        (f"{J}.DiscountItem.price()", 2),
+    ]
+    assert [n.node.qualified_name for n in graph_store.overrides(A, f"{J}.Item.price()")] == [
+        f"{J}.Priced.price()"
+    ]
+    inner = graph_store.enclosing_symbol(A, "src/main/java/com/acme/shop/Cart.java", 60)
+    assert inner is not None and inner.qualified_name == f"{J}.Cart.Line.amount()"
+    stats = graph_store.stats(A)
+    assert (stats.files, stats.classes, stats.functions, stats.test_functions) == (8, 9, 27, 2)
+    assert (stats.edges["INHERITS"], stats.edges["OVERRIDES"]) == (3, 3)

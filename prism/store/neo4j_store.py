@@ -48,6 +48,8 @@ _REL_TYPES: dict[EdgeKind, LiteralString] = {
     EdgeKind.IMPORTS: "IMPORTS",
     EdgeKind.CALLS: "CALLS",
     EdgeKind.TESTS: "TESTS",
+    EdgeKind.INHERITS: "INHERITS",
+    EdgeKind.OVERRIDES: "OVERRIDES",
 }
 _BATCH = 1000
 

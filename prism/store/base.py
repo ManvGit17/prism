@@ -115,16 +115,22 @@ class GraphReader(ABC):
     def lookup(self, repo_id: str, symbol: str) -> list[Node]:
         """Find a symbol by qualified name, then by short name, then by dotted suffix.
 
-        `Cart.add` matches `shop.cart.Cart.add`. Results are sorted by qualified name.
+        `Cart.add` matches `shop.cart.Cart.add`. A Java method name matches every
+        overload; add the parameter list to pick one. Sorted by qualified name.
         """
         exact = self.get_node(repo_id, symbol)
         if exact is not None:
             return [exact]
-        last = symbol.rsplit(".", 1)[-1]
+        base, paren, params = symbol.partition("(")
+        last = base.rsplit(".", 1)[-1]
         named = [n for n in self.find_by_name(repo_id, last) if n.repo_id == repo_id]
-        if "." in symbol:
-            suffix = "." + symbol
-            named = [n for n in named if n.qualified_name.endswith(suffix)]
+        if "." in base:
+            suffix = "." + base
+            named = [n for n in named if n.qualified_name.split("(", 1)[0].endswith(suffix)]
+        if paren:
+            # `Cart.addItem(Item,int)` picks one Java overload.
+            wanted = "(" + params.replace(" ", "")
+            named = [n for n in named if n.qualified_name.endswith(wanted)]
         return sorted(named, key=lambda n: n.qualified_name)
 
     def callers(
@@ -142,6 +148,51 @@ class GraphReader(ABC):
     ) -> list[Related]:
         """Test functions that call the symbol directly."""
         return self._related(repo_id, qualified_name, EdgeKind.TESTS, False, min_confidence)
+
+    def overrides(self, repo_id: str, qualified_name: str) -> list[Neighbour]:
+        """Supertype methods this method overrides or implements, nearest first, following
+        OVERRIDES up the hierarchy. For an interface method this is the contract it sits in."""
+        return self._chain(repo_id, qualified_name, EdgeKind.OVERRIDES, outgoing=True)
+
+    def overridden_by(self, repo_id: str, qualified_name: str) -> list[Neighbour]:
+        """Methods that override or implement this one, nearest first."""
+        return self._chain(repo_id, qualified_name, EdgeKind.OVERRIDES, outgoing=False)
+
+    def supertypes(self, repo_id: str, qualified_name: str) -> list[Neighbour]:
+        """Repo classes and interfaces this class extends or implements, transitively."""
+        return self._chain(repo_id, qualified_name, EdgeKind.INHERITS, outgoing=True)
+
+    def subtypes(self, repo_id: str, qualified_name: str) -> list[Neighbour]:
+        return self._chain(repo_id, qualified_name, EdgeKind.INHERITS, outgoing=False)
+
+    def _chain(
+        self, repo_id: str, qualified_name: str, kind: EdgeKind, *, outgoing: bool
+    ) -> list[Neighbour]:
+        seen = {qualified_name}
+        found: list[Neighbour] = []
+        frontier = [qualified_name]
+        depth = 0
+        while frontier and depth < 20:
+            depth += 1
+            nxt: list[str] = []
+            for qn in frontier:
+                edges = (
+                    self.out_edges(repo_id, qn, (kind,))
+                    if outgoing
+                    else self.in_edges(repo_id, qn, (kind,))
+                )
+                for edge in edges:
+                    other = edge.dst if outgoing else edge.src
+                    if other in seen or edge.repo_id != repo_id:
+                        continue
+                    node = self.get_node(repo_id, other)
+                    if node is None or node.repo_id != repo_id:
+                        continue
+                    seen.add(other)
+                    nxt.append(other)
+                    found.append(Neighbour(node=node, distance=depth))
+            frontier = nxt
+        return sorted(found, key=lambda n: (n.distance, n.node.qualified_name))
 
     def _related(
         self,

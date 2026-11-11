@@ -7,8 +7,12 @@ a store (base graph minus a PR's changed files, plus the overlay's nodes).
 import sys
 from collections import defaultdict
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from prism.indexer.model import ClassNode, FileNode, FunctionNode, ImportRef, Node
+
+if TYPE_CHECKING:
+    from prism.indexer.java_resolver import JavaIndex
 
 _STDLIB = frozenset(sys.stdlib_module_names)
 _MAX_REEXPORT_DEPTH = 5
@@ -24,12 +28,17 @@ class SymbolTable:
         self.methods: dict[str, list[FunctionNode]] = defaultdict(list)
         self.class_methods: dict[str, dict[str, FunctionNode]] = defaultdict(dict)
         self._fallback_cache: dict[str, bool] = {}
+        self._other: list[Node] = []
+        self._java: JavaIndex | None = None
         for node in nodes:
             self._add(node)
         self.import_names = self._import_names()
 
     def _add(self, node: Node) -> None:
         self.nodes[node.qualified_name] = node
+        if node.language != "python":
+            self._other.append(node)
+            return  # the lookups below follow Python rules; Java has its own index
         if isinstance(node, FileNode):
             self.files[node.path] = node
             self.modules[node.module] = node
@@ -64,6 +73,15 @@ class SymbolTable:
             if name and name != node.module and name.split(".")[0] not in _STDLIB:
                 out[name].append(node.module)
         return out
+
+    @property
+    def java(self) -> "JavaIndex":
+        """Index of the Java nodes, built on first use."""
+        if self._java is None:
+            from prism.indexer.java_resolver import JavaIndex
+
+            self._java = JavaIndex(self, [n for n in self._other if n.language == "java"])
+        return self._java
 
     # Lookups
 
