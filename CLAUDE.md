@@ -29,11 +29,12 @@ the phase numbers.
 | `make sync` | Install dependencies with `uv` (Python 3.12) |
 | `make up` / `make down` | Start or stop Postgres + pgvector, Neo4j, Redis |
 | `make test` | All tests, including the smoke test (needs `make up` and the host Ollama) |
-| `make unit` | Tests that need no services; this is what CI runs |
+| `make unit` | Tests that need no services or model downloads; this is what CI runs |
 | `make check` | Lint, type check, unit tests |
 | `make stats` | Memory per container |
 | `uv run prism index <path>` | Index a repo into Neo4j + pgvector (`--no-embed`, `--store memory`) |
 | `uv run prism graph callers <symbol>` | Query the graph: `callers`, `callees`, `tests`, `neighbours --hops 2`; `--path <repo>` indexes in memory first |
+| `uv run prism context <repo> <diff>` | Ranked review context per hunk with token counts (`--mode`, `--budget`, `--json`, `--render`, `--store memory`) |
 
 ## Conventions
 

@@ -66,3 +66,45 @@ like it.
    on the next run?
 5. The hand-check found two wrong answers out of ten, both in Java. What do they have in common,
    and what would it take to fix them properly?
+
+## Phase 2: Retrieval and the context packer (2026-11-12)
+
+**What was built.** Given a checkout and a diff, `prism context` works out which function each
+hunk changes and collects what a reviewer would want to see next to it. From the graph: the
+function's signature, the tests that cover it, its callers and callees, and the interface method
+it implements. From the vector store: functions that look similar. All of it is ranked, trimmed to
+a token budget and printed with token counts.
+
+**Hunk to symbol.** A diff only has line numbers. The per-PR overlay from Phase 1 turns a line
+into "this is inside `Text.truncate`". A deleted function no longer exists at the PR head, so it
+is looked up in the base graph instead, which is how its callers can still be found.
+
+**Why there is a budget.** A model has a limited context window and a small local model is slow,
+so not everything can go in. The packer fills the budget in priority order: signature, contract,
+tests, callers, then the rest, with similar code last. Whatever does not fit is recorded as
+dropped, with the reason, so nothing disappears silently.
+
+**What the reranker does and does not do.** A cross-encoder reads the hunk and one candidate
+together and scores how related they are. That is more accurate than comparing two embeddings but
+slower, so it only runs on the shortlist. Here it only orders items inside a priority class. It
+never lets a similar function jump ahead of a test, because the model was trained on web text, not
+code, and has not been shown to deserve that.
+
+**Counting tokens.** The default counter assumes 4 characters per token. Measured against the
+real Qwen tokenizer it is usually a little high, but it undercounts on up to a third of functions
+in one repo, so a block can run over the budget by about a quarter. An exact counter is available
+as a setting.
+
+**Who gets the context.** Not the fine-tuned reviewer. It was trained on a hunk alone, so it is
+served a hunk alone. The context goes to the verifier and to the frontier model.
+
+**Quiz**
+
+1. A hunk deletes a whole function. Where do its callers come from, and why not from the overlay?
+2. On one test the packer dropped 6 of the callers of a long function. What used up the budget,
+   and name two ways to change that.
+3. Why does the reranker only reorder items within a priority class?
+4. In `graph+vector` mode on one diff, every "similar" item was dropped. Does that mean vector
+   search is useless? What experiment would answer it?
+5. The token counter can undercount. What is the risk when the block is sent to a model with a
+   small context window, and which setting removes it?

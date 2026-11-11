@@ -19,9 +19,9 @@ logs:
 test:
 	uv run pytest
 
-# What CI runs: no services needed.
+# What CI runs: no services and no model downloads.
 unit:
-	uv run pytest -m "not smoke"
+	uv run pytest -m "not smoke and not download"
 
 lint:
 	uv run ruff check .

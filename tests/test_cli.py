@@ -94,3 +94,86 @@ def test_graph_help_says_it_indexes_in_memory() -> None:
     result = runner.invoke(app, ["graph", "--help"])
     assert result.exit_code == 0
     assert "in memory" in result.output
+
+
+DIFFS = Path(__file__).parent / "fixtures" / "diffs"
+
+
+def _context(sample_repo: Path, *args: str) -> str:
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            str(sample_repo),
+            str(DIFFS / "plain.diff"),
+            "--store",
+            "memory",
+            "--reranker",
+            "overlap",
+            *args,
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    return result.stdout
+
+
+def test_context_text(sample_repo: Path) -> None:
+    out = _context(sample_repo, "--mode", "graph")
+    assert "mode graph" in out
+    assert "shop/util.py @@ -20,2 +20,2 @@" in out
+    assert "symbols shop.util._clean" in out
+    assert "signature" in out and "caller" in out
+    assert "shop.util.slugify" in out
+    assert "/1500" in out
+
+
+def test_context_json_and_budget(sample_repo: Path) -> None:
+    from prism.schemas import ContextBundle
+
+    out = _context(sample_repo, "--mode", "graph", "--json", "--budget", "100")
+    bundle = ContextBundle.model_validate_json(out)
+    hunk = bundle.hunks[0]
+    assert hunk.budget == 100
+    assert hunk.tokens_used <= 100
+
+
+def test_context_render(sample_repo: Path) -> None:
+    out = _context(sample_repo, "--mode", "graph", "--render")
+    assert out.startswith('<repository_context path="shop/util.py"')
+
+
+@pytest.mark.parametrize("mode", ["none", "vector", "graph", "graph+vector"])
+def test_context_modes(sample_repo: Path, mode: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    import prism.indexer.embedder as embedder
+
+    monkeypatch.setattr(embedder, "OllamaEmbedder", lambda: embedder.FakeEmbedder(64))
+    from prism.schemas import ContextBundle
+
+    bundle = ContextBundle.model_validate_json(_context(sample_repo, "--mode", mode, "--json"))
+    sources = {i.source for h in bundle.hunks for i in h.items}
+    assert bundle.mode.value == mode
+    assert (
+        sources
+        == {
+            "none": set(),
+            "vector": {"vector"},
+            "graph": {"graph"},
+            "graph+vector": {"graph", "vector"},
+        }[mode]
+    )
+
+
+def test_context_rejects_an_unknown_mode(sample_repo: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            str(sample_repo),
+            str(DIFFS / "plain.diff"),
+            "--store",
+            "memory",
+            "--mode",
+            "x",
+        ],
+    )
+    assert result.exit_code != 0

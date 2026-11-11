@@ -1,0 +1,4 @@
+{"at": "2026-11-11T18:05:05+00:00", "repo": "smms", "model": "nomic-embed-text", "batch_size": 16, "run": "request via localhost", "seconds_per_request": 0.47093480000003185}
+{"at": "2026-11-11T18:05:05+00:00", "repo": "smms", "model": "nomic-embed-text", "batch_size": 16, "run": "request via 127.0.0.1", "seconds_per_request": 0.053683879999880446}
+{"at": "2026-11-11T18:05:05+00:00", "repo": "smms", "model": "nomic-embed-text", "batch_size": 16, "run": "cold", "functions": 325, "embedded": 325, "unchanged": 0, "embed_seconds": 50.79, "total_seconds": 51.36, "ms_per_embedded_function": 156.3}
+{"at": "2026-11-11T18:05:05+00:00", "repo": "smms", "model": "nomic-embed-text", "batch_size": 16, "run": "warm", "functions": 325, "embedded": 0, "unchanged": 325, "embed_seconds": 0.0, "total_seconds": 0.48, "ms_per_embedded_function": null}

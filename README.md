@@ -4,7 +4,7 @@ A repo-aware AI code reviewer. It parses a repository into a code knowledge grap
 callers, callees and tests for each changed function, and reviews pull-request hunks with a small
 local model whose comments a verifier then checks.
 
-**Status:** Phase 1 done (code indexer and knowledge graph for Python and Java). Nothing reviews
+**Status:** Phases 1 and 2 done (code graph for Python and Java, context retrieval for a diff). Nothing reviews
 code yet. The plan is in [PLAN.md](PLAN.md).
 
 ## Run the services
@@ -29,5 +29,15 @@ uv run prism index path/to/repo                # Neo4j + pgvector; add --no-embe
 uv run prism graph callers Cart.add            # also: callees, tests, neighbours --hops 2
 uv run prism graph callers Cart.add --path path/to/repo   # index in memory first, no services
 ```
+
+## Context for a diff
+
+```bash
+git -C path/to/repo diff > change.diff         # the repo is checked out at the PR head
+uv run prism context path/to/repo change.diff  # ranked context per hunk with token counts
+uv run prism context path/to/repo change.diff --mode graph --render   # the prompt block
+```
+
+`--mode` is `none`, `vector`, `graph` or `graph+vector`; `--budget` is tokens per hunk.
 
 Python and Java are supported. With more than one repo indexed, pass `--repo-id`.

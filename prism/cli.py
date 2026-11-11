@@ -251,3 +251,121 @@ def tests(
         node = _pick(graph, rid, symbol)
         typer.echo(f"{node.qualified_name}  {_where(node)}")
         _print_related(graph.tests_for(rid, node.qualified_name, min_confidence=min_confidence))
+
+
+@app.command()
+def context(
+    repo: Annotated[
+        Path,
+        typer.Argument(
+            exists=True, file_okay=False, dir_okay=True, help="Checkout of the PR head commit."
+        ),
+    ],
+    diff: Annotated[str, typer.Argument(help="Unified diff file, or - for stdin.")],
+    repo_id: RepoId = None,
+    mode: Annotated[
+        str | None,
+        typer.Option(
+            "--mode", help="none, vector, graph or graph+vector. Default PRISM_CONTEXT_MODE."
+        ),
+    ] = None,
+    budget: Annotated[int | None, typer.Option("--budget", min=50, help="Tokens per hunk.")] = None,
+    hops: Annotated[int | None, typer.Option("--hops", min=1, max=2)] = None,
+    store: Annotated[
+        str | None,
+        typer.Option(
+            "--store",
+            help="persistent: base graph from Neo4j/pgvector for the repo id. memory: index "
+            "this tree in memory, so the base equals the head (deleted symbols lose their "
+            "callers, and vector modes embed the whole repo first).",
+        ),
+    ] = None,
+    reranker: Annotated[
+        str | None, typer.Option("--reranker", help="cross-encoder, overlap or none.")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="Print the bundle as JSON.")] = False,
+    render: Annotated[
+        bool, typer.Option("--render", help="Print the text block a prompt would include.")
+    ] = False,
+) -> None:
+    """Ranked context for each hunk of a diff, with token counts."""
+    from prism.indexer.embedder import OllamaEmbedder
+    from prism.retrieval.context import ContextOptions, build_context
+    from prism.retrieval.render import render_bundle
+    from prism.retrieval.rerank import make_reranker
+    from prism.retrieval.tokens import token_counter
+    from prism.schemas import ContextMode
+    from prism.store import InMemoryVectorStore
+
+    text = sys.stdin.read() if diff == "-" else Path(diff).read_text(encoding="utf-8")
+    try:
+        context_mode = ContextMode(mode or get_settings().context_mode)
+    except ValueError as exc:
+        raise typer.BadParameter(f"unknown mode {mode!r}") from exc
+    options = ContextOptions.from_settings(mode=context_mode, budget=budget, hops=hops)
+    rid = repo_id or repo.resolve().name
+    kind: StoreKind = "memory" if (store or get_settings().store) == "memory" else "persistent"
+    stores: Stores | None = None
+    if kind == "persistent":
+        try:
+            stores = open_stores("persistent", with_vectors=context_mode.uses_vector)
+        except StoreUnavailable as exc:
+            typer.echo(f"{exc}\nStart the services (make up) or pass --store memory.", err=True)
+            raise typer.Exit(3) from exc
+        graph: GraphReader = stores.graph
+        vectors = stores.vectors
+        embedder = stores.embedder
+        if stores.ledger is not None and stores.ledger.latest_complete_run(rid) is None:
+            typer.echo(f"note: {rid!r} has no complete index run; run prism index first", err=True)
+    else:
+        memory = InMemoryGraphStore()
+        embedder = OllamaEmbedder() if context_mode.uses_vector else None
+        mem_vectors = InMemoryVectorStore() if embedder is not None else None
+        if embedder is not None:
+            typer.echo("note: embedding the whole repo in memory for vector context", err=True)
+        index_repository(repo, rid, memory, vectors=mem_vectors, embedder=embedder)
+        graph, vectors = memory, mem_vectors
+    try:
+        bundle = build_context(
+            repo,
+            rid,
+            text,
+            graph,
+            options,
+            vectors=vectors,
+            embedder=embedder,
+            reranker=make_reranker(reranker),
+            counter=token_counter(),
+        )
+    finally:
+        if stores is not None:
+            stores.close()
+    if as_json:
+        typer.echo(bundle.model_dump_json(indent=2))
+        return
+    if render:
+        typer.echo(render_bundle(bundle))
+        return
+    typer.echo(
+        f"repo {bundle.repo_id}; mode {bundle.mode.value}; counter {bundle.token_counter}; "
+        f"reranker {bundle.reranker}"
+    )
+    for skipped in bundle.skipped_files:
+        typer.echo(f"skipped binary file {skipped}")
+    for h in bundle.hunks:
+        typer.echo(
+            f"\n{h.path} {h.hunk_header}\n  target {h.target}; "
+            f"symbols {', '.join(h.symbols) or '-'}"
+            + (f"; deleted {', '.join(h.deleted_symbols)}" if h.deleted_symbols else "")
+            + f"\n  tokens {h.tokens_used}/{h.budget}; {len(h.items)} items, "
+            f"{len(h.dropped)} dropped"
+        )
+        for rank, item in enumerate(h.items, 1):
+            cut = " cut" if item.truncated else ""
+            typer.echo(
+                f"  {rank:>2} {item.kind.value:<14} {item.score:7.3f} {item.tokens:>5}t{cut}  "
+                f"{item.qualified_name}  {item.path}:{item.start_line}-{item.end_line}"
+                f"\n       {item.reason}"
+            )
+        for d in h.dropped:
+            typer.echo(f"   - dropped {d.kind.value} {d.qualified_name}: {d.reason}")

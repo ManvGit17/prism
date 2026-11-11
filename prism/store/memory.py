@@ -211,6 +211,14 @@ class InMemoryVectorStore:
     def repo_ids(self) -> list[str]:
         return sorted(r for r, items in self._repos.items() if items)
 
+    def hashes(self, repo_id: str) -> dict[str, tuple[str, str]]:
+        return {qn: (i.path, i.content_hash) for qn, i in self._repos.get(repo_id, {}).items()}
+
+    def remove(self, repo_id: str, qualified_names: Iterable[str]) -> None:
+        repo = self._repos.get(repo_id, {})
+        for qn in qualified_names:
+            repo.pop(qn, None)
+
     def close(self) -> None:
         pass
 
