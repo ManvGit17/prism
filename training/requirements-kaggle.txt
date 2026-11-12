@@ -1,0 +1,13 @@
+# Installed by training/gate/gate_kaggle.ipynb on top of Kaggle's own image.
+# torch is NOT listed: Kaggle ships a CUDA build and reinstalling it breaks the GPU setup.
+# numpy, tokenizers, wandb and huggingface-hub come with the image; the lower bounds below only
+# upgrade them if they are older.
+transformers>=4.46
+accelerate>=1.0
+tokenizers>=0.20
+onnx>=1.16
+onnxruntime>=1.18
+numpy>=1.26
+# prism/models/gate.py (imported by the training code) needs these two.
+pydantic>=2.7
+pydantic-settings>=2.3

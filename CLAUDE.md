@@ -30,7 +30,9 @@ the phase numbers.
 | `make up` / `make down` | Start or stop Postgres + pgvector, Neo4j, Redis |
 | `make test` | All tests, including the smoke test (needs `make up` and the host Ollama) |
 | `make unit` | Tests that need no services or model downloads; this is what CI runs |
-| `make check` | Lint, type check, unit tests |
+| `make check` | Lint, type check, unit tests (no torch needed) |
+| `make train-test` | Install the `training` group (CPU torch) and run the `training`-marked CPU smoke tests |
+| `uv run --group training python -m training.gate.run --data <zip> --out <dir>` | Gate pipeline: train, threshold, ONNX export, parity (`--help` for flags); the real run is on Kaggle (`training/README.md`) |
 | `make stats` | Memory per container |
 | `uv run prism index <path>` | Index a repo into Neo4j + pgvector (`--no-embed`, `--store memory`) |
 | `uv run prism graph callers <symbol>` | Query the graph: `callers`, `callees`, `tests`, `neighbours --hops 2`; `--path <repo>` indexes in memory first |
