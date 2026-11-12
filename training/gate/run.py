@@ -14,6 +14,7 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
+import torch
 from transformers import AutoModelForSequenceClassification
 
 from prism.models.gate import softmax_positive
@@ -86,7 +87,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     metrics = train(cfg, train_rows, valid_rows, out)
     best = out / "best"
 
+    # from_pretrained loads onto the CPU. Scoring 60k hunks there takes hours, so move it.
     model = AutoModelForSequenceClassification.from_pretrained(str(best))
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = make_tokenizer(str(best), cfg.truncation_side)
 
     def scores(rows: list[Any]) -> list[float]:
