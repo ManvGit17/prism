@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # Downloaded models (reranker, tokenizer) live here.
     model_cache_dir: str = "~/.cache/prism"
 
+    # The gate decides which hunks go to the reviewer (ADR 0008). "pass-all" lets every hunk through
+    # until a trained model is in the directory below.
+    gate: Literal["pass-all", "onnx"] = "pass-all"
+    gate_model_dir: str = "models/gate"
+
     @property
     def postgres_dsn(self) -> str:
         return (

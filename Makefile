@@ -1,4 +1,4 @@
-.PHONY: sync up down ps logs test unit lint format typecheck check stats
+.PHONY: sync up down ps logs test unit train-test lint format typecheck check stats
 
 sync:
 	uv sync
@@ -21,7 +21,12 @@ test:
 
 # What CI runs: no services and no model downloads.
 unit:
-	uv run pytest -m "not smoke and not download"
+	uv run pytest -m "not smoke and not download and not training"
+
+# Gate training smoke tests on CPU with a tiny model. Installs the training group (torch, CPU build).
+train-test:
+	uv sync --group training
+	uv run --group training pytest -m training
 
 lint:
 	uv run ruff check .
