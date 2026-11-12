@@ -92,14 +92,8 @@ def test_head_takes_first_rows(zip_path: Path) -> None:
 
 def test_rows_are_normalised() -> None:
     # In the real train split only commented hunks end with a newline. That must not survive.
-    commented = "@@ -1,2 +1,2 @@
- a
-+b
-\ No newline at end of file
-"
-    plain = "@@ -1,2 +1,2 @@
- a
-+b"
+    plain = "@@ -1,2 +1,2 @@\n a\n+b"
+    commented = plain + "\n\\ No newline at end of file\n"
     row = parse_row(json.dumps({"patch": commented, "y": 1}))
     assert row.text == plain
     assert parse_row(json.dumps({"patch": plain, "y": 0})).text == plain
