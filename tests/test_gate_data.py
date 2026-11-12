@@ -1,9 +1,19 @@
+import json
 import zipfile
 from pathlib import Path
 
 import pytest
 
-from training.gate.data import class_balance, list_files, load_split, split_of
+from prism.models.gate import normalize_hunk
+from training.gate.data import (
+    Example,
+    class_balance,
+    drop_long,
+    list_files,
+    load_split,
+    parse_row,
+    split_of,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "gate"
 
@@ -78,3 +88,30 @@ def test_missing_split(tmp_path: Path) -> None:
 def test_head_takes_first_rows(zip_path: Path) -> None:
     full = load_split(zip_path, "train")
     assert load_split(zip_path, "train", max_rows=5, head=True) == full[:5]
+
+
+def test_rows_are_normalised() -> None:
+    # In the real train split only commented hunks end with a newline. That must not survive.
+    commented = "@@ -1,2 +1,2 @@
+ a
++b
+\ No newline at end of file
+"
+    plain = "@@ -1,2 +1,2 @@
+ a
++b"
+    row = parse_row(json.dumps({"patch": commented, "y": 1}))
+    assert row.text == plain
+    assert parse_row(json.dumps({"patch": plain, "y": 0})).text == plain
+
+
+def test_normalize_hunk_keeps_inner_lines() -> None:
+    assert normalize_hunk("@@ x @@\n a\n\n+b  \n\n") == "@@ x @@\n a\n\n+b"
+    assert normalize_hunk("") == ""
+
+
+def test_drop_long() -> None:
+    short = Example(text="@@\n a\n+b", label=0)
+    long = Example(text="@@\n" + "\n".join("+x" for _ in range(200)), label=1)
+    assert drop_long([short, long], 100) == [short]
+    assert drop_long([short, long], None) == [short, long]

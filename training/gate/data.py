@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from prism.models.gate import normalize_hunk
+
 Split = Literal["train", "valid", "test"]
 SPLITS: tuple[Split, ...] = ("train", "valid", "test")
 
@@ -72,7 +74,19 @@ def iter_lines(source: Path, split: Split) -> Iterator[str]:
 def parse_row(line: str) -> Example:
     """Keep the hunk and the label; the large `oldf` field is dropped with the rest."""
     obj = json.loads(line)
-    return Example(text=str(obj[TEXT_FIELD]), label=int(obj[LABEL_FIELD]))
+    return Example(text=normalize_hunk(str(obj[TEXT_FIELD])), label=int(obj[LABEL_FIELD]))
+
+
+def drop_long(examples: list[Example], max_lines: int | None) -> list[Example]:
+    """Leave out hunks with more than `max_lines` lines. For the train split only.
+
+    Train hunks with a comment run to thousands of lines, while every other hunk in the dataset
+    (train without a comment, valid, test) stops at about 85. Without a cap "very long" would
+    mean "has a comment" in training and nowhere else.
+    """
+    if max_lines is None:
+        return examples
+    return [e for e in examples if e.text.count("\n") + 1 <= max_lines]
 
 
 def iter_examples(source: Path, split: Split) -> Iterator[Example]:

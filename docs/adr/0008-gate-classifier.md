@@ -77,3 +77,23 @@ dependency group (CPU torch) is opt-in; `uv sync` and CI do not install it.
   the serving side follow the model.
 - Two exporters exist in torch; the legacy one is deprecated. The parity test will show if a torch
   upgrade breaks it.
+
+## Addendum, 2026-11-12: input normalisation
+
+The first Kaggle run failed in an instructive way. Train loss fell to about 0.0001 within half an
+epoch and validation F1 at 0.5 was 0. The cause was in the data, not the model: in the train split
+every commented hunk ends with a newline and no uncommented hunk does, and with left truncation
+that newline is the last token before the end marker. Validation and test hunks never end with a
+newline, so the model called everything there negative.
+
+Changes:
+
+- `normalize_hunk` strips trailing whitespace and git's "no newline at end of file" marker. It is
+  applied when rows are read for training and inside `OnnxGate`, so training and serving see the
+  same form.
+- Train hunks over 100 lines are dropped (`--max-train-lines`). Only commented train hunks are
+  that long; everything else in the dataset stops at about 85 lines.
+
+Not solved: length alone still predicts the label better in train than in valid and test (see
+`docs/datasets.md`). If validation PR-AUC ends up near what line count alone gives, the gate has
+learned little beyond length, and that is reported as the result.

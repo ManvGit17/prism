@@ -17,7 +17,7 @@ from typing import Any
 from transformers import AutoModelForSequenceClassification
 
 from prism.models.gate import softmax_positive
-from training.gate.data import class_balance, load_split
+from training.gate.data import class_balance, drop_long, load_split
 from training.gate.export_onnx import export, parity_check
 from training.gate.threshold import choose_and_report
 from training.gate.train import (
@@ -39,6 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--head",
         action="store_true",
         help="with --max-*-rows take the first rows instead of a random sample (fast; dry runs)",
+    )
+    p.add_argument(
+        "--max-train-lines",
+        type=int,
+        default=100,
+        help="drop train hunks longer than this many lines (valid and test stop at about 85)",
     )
     p.add_argument("--max-valid-rows", type=int, default=None)
     p.add_argument("--max-test-rows", type=int, default=None)
@@ -65,7 +71,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     out: Path = args.out
 
     print("reading data", flush=True)
-    train_rows = load_split(args.data, "train", args.max_train_rows, cfg.seed, args.head)
+    sampled = load_split(args.data, "train", args.max_train_rows, cfg.seed, args.head)
+    train_rows = drop_long(sampled, args.max_train_lines)
+    print(f"train rows over {args.max_train_lines} lines dropped: {len(sampled) - len(train_rows)}")
     valid_rows = load_split(args.data, "valid", args.max_valid_rows, cfg.seed, args.head)
     test_rows = load_split(args.data, "test", args.max_test_rows, cfg.seed, args.head)
     balance = {

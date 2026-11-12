@@ -114,3 +114,13 @@ Token length of `patch`:
    a `--head` sample is usable for a dry run, but a random sample is used for real runs.
 6. **Size.** The zip is 2.8 GB; unpacked the six files are about 14.9 GB, mostly `oldf`. The
    gate code reads the zip line by line and drops `oldf` as it goes.
+7. **Train positives end with a newline, nothing else does.** In the train split every `y = 1`
+   hunk ends with `\n` and no `y = 0` hunk does; in valid and test no hunk does. A first Kaggle
+   run learned exactly this: train loss went to about 0.0001 inside half an epoch while validation
+   F1 at 0.5 was 0. The gate now strips trailing whitespace and git's "no newline" marker from
+   every hunk, in training and when served (`normalize_hunk`).
+8. **Length still separates the labels, more in train than elsewhere.** Counting lines alone gives
+   an AUC of about 0.77 on train, 0.62 on valid and 0.64 on test (first 6,000 rows of each, after
+   normalising). Train hunks over 100 lines are dropped, which brings train to about 0.73. The
+   mismatch is reduced, not removed. "Longer hunks get more comments" is also the baseline the
+   trained gate has to beat.

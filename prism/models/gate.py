@@ -23,6 +23,20 @@ CONFIG_FILE = "gate_config.json"
 TOKENIZER_FILE = "tokenizer.json"
 
 
+NO_NEWLINE_MARKER = "\\ No newline at end of file"
+
+
+def normalize_hunk(text: str) -> str:
+    """The form of a hunk the gate is trained on and served with.
+
+    Trailing whitespace and git's "no newline" marker are removed. In the CodeReviewer train
+    split every commented hunk ends with a newline and no uncommented hunk does, so without
+    this the model learns that one character instead of the code (ADR 0008).
+    """
+    lines = [ln for ln in text.split("\n") if ln.rstrip() != NO_NEWLINE_MARKER]
+    return "\n".join(lines).rstrip()
+
+
 class GateError(RuntimeError):
     """The gate cannot be loaded or run."""
 
@@ -124,7 +138,7 @@ class OnnxGate:
         """Raw logits, shape (n, 2). Exposed for the parity tests."""
         chunks: list[npt.NDArray[np.float32]] = []
         for start in range(0, len(hunks), self.batch_size):
-            batch = list(hunks[start : start + self.batch_size])
+            batch = [normalize_hunk(h) for h in hunks[start : start + self.batch_size]]
             encodings = self._tokenizer.encode_batch(batch)
             feeds = {
                 "input_ids": np.array([e.ids for e in encodings], dtype=np.int64),
