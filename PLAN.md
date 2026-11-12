@@ -135,7 +135,7 @@ Download CodeReviewer in Phase 0 and write its actual fields, split sizes and di
 
 ```
 prism/
-├── PLAN.md  CLAUDE.md  docker-compose.yml  Makefile  .env.example
+├── PLAN.md  docker-compose.yml  Makefile  .env.example
 ├── docs/{architecture.md, adr/, learning-log.md}
 ├── prism/
 │   ├── api/            # FastAPI: webhooks, REST for dashboard
@@ -175,7 +175,7 @@ Every phase ends with: tests green, `make up` working, a commit, ADRs for decisi
 - Python 3.12 + `uv`, ruff, mypy, pytest. Compose services: Postgres (+ `pgvector` extension), Neo4j Community with its heap and page cache capped, Redis. Prometheus and Grafana go in an `ops` profile that stays off until Phase 5.
 - **Ollama runs on the host**, not in Compose. Containers reach it at `host.docker.internal:11434`; the address is a setting. Pull the base reviewer model now so Phase 5 has something to call.
 - Celery workers run in a container only; Celery's default worker pool is not supported on Windows.
-- `CLAUDE.md` with conventions (section 7). Pydantic schemas first, including the split between the model's raw output and a verified comment (section 2b). CI skeleton.
+- Conventions as in section 7. Pydantic schemas first, including the split between the model's raw output and a verified comment (section 2b). CI skeleton.
 - Download CodeReviewer and write `docs/datasets.md` (section 2a).
 - **Public copy of this plan.** The repo is public. Its `PLAN.md` leaves out the classmates line in section 0, section 5 and section 6. The summary PDF and the `.v1-original` and `.v2` copies stay out of the repo.
 - **Done when:** `make up` gives healthy services; `make test` passes a smoke test that creates the `vector` extension in Postgres, creates a constraint in Neo4j, pings Redis and gets a completion from the host Ollama; and `docker stats` memory per service is recorded in `docs/memory-budget.md` (Phase 8's self-hosting guide quotes it as the machine requirement).
@@ -284,7 +284,7 @@ No cloud deployment is built or run. PRism ships as a project people run themsel
 
 ---
 
-## 7. Instructions for Claude Code (paste into `CLAUDE.md`)
+## 7. Working rules
 
 - One phase per session, starting in plan mode. Wait for approval before writing code.
 - Pydantic schemas are the contract. Every LLM output is validated, with at most 2 retries, then dropped and logged.

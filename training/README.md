@@ -53,12 +53,14 @@ only when `WANDB_API_KEY` is set; otherwise `metrics.json` holds the log history
    `gate_config.json`, the tokenizer files and `metrics.json`.
 
 Kaggle sessions stop after 12 hours, so for a large train split set `MAX_TRAIN_ROWS` in the first
-cell. Time per step on a T4 was not measured when this was written.
+cell. With 100,000 rows on 2 x T4, one epoch took about 78 minutes plus about 8 minutes per
+validation pass; 2 epochs are enough (see the model card).
 
 ## Using the result
 
 1. Download `gate_out` from the notebook's output tab and put its files in a folder, for example
-   `models/gate/` in the repo root (`*.onnx` is git-ignored).
+   `models/gate/` in the repo root (`models/` is git-ignored). On Kaggle, use right-click, Save
+   link as, for the JSON files; a plain click opens them in the browser.
 2. In `.env`:
    ```
    PRISM_GATE=onnx
@@ -67,3 +69,5 @@ cell. Time per step on a T4 was not measured when this was written.
    `PRISM_GATE=pass-all` (the default) lets every hunk through. With `onnx` and a missing folder
    the code raises an error; it never falls back silently.
 3. Fill `training/model_cards/gate.md` from `metrics.json`.
+4. `uv run python eval/gate_breakdown.py data/codereviewer/Diff_Quality_Estimation.zip` scores a
+   sample of the test split by language and hunk length, for the model card's limits.

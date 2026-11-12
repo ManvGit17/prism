@@ -108,3 +108,47 @@ served a hunk alone. The context goes to the verifier and to the frontier model.
    search is useless? What experiment would answer it?
 5. The token counter can undercount. What is the risk when the block is sent to a model with a
    small context window, and which setting removes it?
+
+## Phase 3: Gate classifier (2026-11-12)
+
+**What was built.** A small classifier that looks at one diff hunk and says whether it is worth
+sending to the reviewer at all. It is CodeBERT fine-tuned on the CodeReviewer quality-estimation
+data, where each hunk is labelled by whether a human reviewer commented on it. Training runs on
+Kaggle; PRism serves the exported ONNX model with onnxruntime, so no torch at runtime.
+
+**The first run learned a newline.** In the train split every commented hunk ends with a newline
+and no other hunk does. The model found that within half an epoch: train loss near zero,
+validation F1 of 0. Every hunk is now normalised (trailing whitespace and git's "no newline"
+marker removed) in training and in serving. Very long hunks were a second, weaker version of the
+same problem, so train hunks over 100 lines are dropped.
+
+**Results.** Best validation PR-AUC 0.811, reached at epoch 2; the third epoch added nothing. The
+threshold is picked on validation for 90% recall (0.195). On test that gives recall 0.901 and the
+gate holds back 26.5% of hunks. Line count alone gets an AUC of about 0.64, so the model does
+more than count lines.
+
+**Why recall and not accuracy.** A hunk the gate drops never reaches the reviewer, so a missed
+issue cannot be recovered later. A hunk let through only costs some compute. So the threshold is
+set low enough to keep 90% of commented hunks, and the question is how much it filters at that
+recall.
+
+**What does not carry over.** The data is 50/50. Real pull requests have far fewer hunks worth a
+comment, so precision and the share filtered here will not hold on real traffic. Recall should.
+Phase 7 measures it on the bench PRs.
+
+**A slow end.** After training, the best checkpoint was reloaded on the CPU instead of the GPU,
+so scoring the 62,504 valid and test hunks took about 6 hours instead of minutes. The run
+finished with half an hour left of Kaggle's 12-hour limit. Fixed by moving the model to the GPU
+after loading it.
+
+**Quiz**
+
+1. Train loss went to 0.0001 and validation F1 to 0 on the first run. What does that pattern
+   usually mean, before looking at any data?
+2. Why is the normalisation applied in serving as well as in training?
+3. The threshold was chosen on validation and reported on test. What would go wrong if it were
+   chosen on test?
+4. On test the gate filters 26.5% of hunks at 90% recall. Will it filter more or less on a real
+   repository, and why?
+5. Validation PR-AUC peaked at epoch 2 while train loss kept falling. What is happening, and what
+   would you change in the next run?

@@ -1,0 +1,111 @@
+{
+  "at": "2026-11-12T18:25:57+00:00",
+  "model_dir": "models/gate",
+  "threshold": 0.19534406065940857,
+  "split": "test",
+  "rows": 3000,
+  "seed": 0,
+  "hunks_per_second_cpu": 1.3984449999679667,
+  "overall": {
+    "hunks": 3000,
+    "positives": 1478,
+    "recall": 0.9079837618403248,
+    "precision": 0.6069651741293532,
+    "filtered_share": 0.263
+  },
+  "by_language": {
+    "c": {
+      "hunks": 166,
+      "positives": 69,
+      "recall": 0.8115942028985508,
+      "precision": 0.5185185185185185,
+      "filtered_share": 0.3493975903614458
+    },
+    "cpp": {
+      "hunks": 282,
+      "positives": 99,
+      "recall": 0.8787878787878788,
+      "precision": 0.5117647058823529,
+      "filtered_share": 0.3971631205673759
+    },
+    "cs": {
+      "hunks": 190,
+      "positives": 97,
+      "recall": 0.9896907216494846,
+      "precision": 0.5714285714285714,
+      "filtered_share": 0.11578947368421055
+    },
+    "go": {
+      "hunks": 914,
+      "positives": 405,
+      "recall": 0.8567901234567902,
+      "precision": 0.5642276422764227,
+      "filtered_share": 0.3271334792122538
+    },
+    "java": {
+      "hunks": 450,
+      "positives": 209,
+      "recall": 0.9186602870813397,
+      "precision": 0.6,
+      "filtered_share": 0.28888888888888886
+    },
+    "js": {
+      "hunks": 276,
+      "positives": 158,
+      "recall": 0.9367088607594937,
+      "precision": 0.6324786324786325,
+      "filtered_share": 0.15217391304347827
+    },
+    "php": {
+      "hunks": 118,
+      "positives": 74,
+      "recall": 0.8918918918918919,
+      "precision": 0.673469387755102,
+      "filtered_share": 0.1694915254237288
+    },
+    "py": {
+      "hunks": 397,
+      "positives": 205,
+      "recall": 0.9219512195121952,
+      "precision": 0.6342281879194631,
+      "filtered_share": 0.24937027707808568
+    },
+    "rb": {
+      "hunks": 207,
+      "positives": 162,
+      "recall": 0.9938271604938271,
+      "precision": 0.805,
+      "filtered_share": 0.033816425120772986
+    }
+  },
+  "by_lines": {
+    "1-10": {
+      "hunks": 1212,
+      "positives": 458,
+      "recall": 0.8122270742358079,
+      "precision": 0.5414847161572053,
+      "filtered_share": 0.4331683168316832
+    },
+    "11-25": {
+      "hunks": 1276,
+      "positives": 651,
+      "recall": 0.9247311827956989,
+      "precision": 0.5861733203505355,
+      "filtered_share": 0.195141065830721
+    },
+    "26-50": {
+      "hunks": 442,
+      "positives": 314,
+      "recall": 0.9968152866242038,
+      "precision": 0.7330210772833724,
+      "filtered_share": 0.0339366515837104
+    },
+    "51+": {
+      "hunks": 70,
+      "positives": 55,
+      "recall": 1.0,
+      "precision": 0.7857142857142857,
+      "filtered_share": 0.0
+    }
+  }
+}
