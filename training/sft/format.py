@@ -20,12 +20,12 @@ import random
 import re
 from collections import Counter
 from collections.abc import Iterable, Iterator
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from prism.models.gate import normalize_hunk
-from prism.models.reviewer import training_messages
+from prism.models.reviewer import identifiers, training_messages
 from training.gate.data import Split, iter_lines
 
 _WS = re.compile(r"[ \t]+")
@@ -47,6 +47,40 @@ class FilterConfig:
     max_hunk_chars: int = 4000
     # Share of letters that must be ASCII; drops comments written mostly in other scripts.
     min_ascii_share: float = 0.9
+    # Train on specific human comments only (ADR 0009, run 2). The first run learned the
+    # data's most common shapes: "This is not needed." and linter output. Off for the test split.
+    specific_only: bool = True
+    # A comment that names nothing in the hunk (no shared identifier, no code) needs this many
+    # words to stay: "Why is this removed?" goes, a sentence that explains a concern stays.
+    min_words_unanchored: int = 8
+    # The same comment text (case-insensitive) is kept at most this often per split.
+    max_same_comment: int = 3
+
+
+# Linter and bot output that sits in the dataset as review comments: RuboCop cops
+# ("Layout/AlignHash: ..."), checkpatch "(style)", line length, whitespace and quote style.
+_BOT = re.compile(
+    r"""(?ix)
+    ^\(style\) | ^[a-z]+/[a-z]+:\s | line\ is\ too\ long | line\ over\ \d+\ characters
+    | trailing\ whitespace | prefer\ (single|double)-quoted\ strings | ruby\ 1\.9\ hash\ syntax
+    | ^align\ the\ (parameters|elements|arguments) | space\ (inside|before|after|around|missing)
+    | ^missing\ space | ^please\ use\ `string\#\w+\(.*stringcomparison\)` | ^standards:
+    | may\ be\ misspelled | indent\ should\ use\ tabs | no\ space\ before\ tabs
+    | ^(extra|unnecessary)\ (empty|blank)\ line | ^remove\ (empty|blank)\ line | <!--
+    """
+)
+# Something code-like in a comment: a number, snake_case, camelCase or a call.
+_CODE_TOKEN = re.compile(r"\d|\w_\w|[a-z][A-Z]|\w\(")
+
+
+def is_bot_comment(comment: str) -> bool:
+    return bool(_BOT.search(comment))
+
+
+def is_anchored(row: Row) -> bool:
+    """True if the comment points at something: an identifier from the hunk or code."""
+    c = row.comment
+    return bool(identifiers(c) & identifiers(row.hunk)) or "`" in c or bool(_CODE_TOKEN.search(c))
 
 
 @dataclass
@@ -85,6 +119,11 @@ def reject_reason(row: Row, cfg: FilterConfig) -> str | None:
         return "hunk_too_many_lines"
     if len(row.hunk) > cfg.max_hunk_chars:
         return "hunk_too_long"
+    if cfg.specific_only:
+        if is_bot_comment(row.comment):
+            return "bot_or_lint"
+        if words < cfg.min_words_unanchored and not is_anchored(row):
+            return "vague"
     return None
 
 
@@ -110,6 +149,7 @@ def filter_rows(
 ) -> Iterator[Row]:
     """Clean, filter and deduplicate (on hunk and comment) a stream of raw JSON lines."""
     seen: set[str] = set()
+    same_comment: Counter[str] = Counter()
     for line in lines:
         stats.read += 1
         row = parse_row(line)
@@ -121,6 +161,11 @@ def filter_rows(
             if key in seen:
                 reason = "duplicate"
             seen.add(key)
+        if reason is None and cfg.specific_only:
+            text = row.comment.lower().strip(" .!?")
+            same_comment[text] += 1
+            if same_comment[text] > cfg.max_same_comment:
+                reason = "repeated_comment"
         if reason:
             stats.dropped[reason] += 1
             continue
@@ -194,7 +239,10 @@ def build(
     """Write the three splits and `stats.json` to `out`; return the stats."""
     cfg = cfg or FilterConfig()
     out.mkdir(parents=True, exist_ok=True)
-    test, test_stats = load_rows(source, "test", test_rows, seed, cfg, head=head)
+    # The test split keeps every kind of human comment, so base vs tuned is measured on the
+    # same rows whatever the training filters are.
+    test_cfg = replace(cfg, specific_only=False)
+    test, test_stats = load_rows(source, "test", test_rows, seed, test_cfg, head=head)
     valid, valid_stats = load_rows(source, "valid", valid_rows, seed, cfg, head=head)
     # Exclude against the whole of valid and test, not only the sampled rows.
     held_out = {
@@ -207,6 +255,7 @@ def build(
         write_jsonl(out / f"{name}.jsonl", rows)
     stats: dict[str, Any] = {
         "filters": asdict(cfg),
+        "test_filters": asdict(test_cfg),
         "seed": seed,
         "splits": {
             name: {

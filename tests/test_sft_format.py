@@ -30,7 +30,17 @@ def test_ascii_share() -> None:
 @pytest.mark.parametrize(
     ("row", "reason"),
     [
-        (Row("@@\n+x", "Rename this variable please."), None),
+        (Row("@@\n+x", "Rename `x` please."), None),
+        (Row("@@\n+retries = 3", "Why three retries here?"), None),
+        (Row("@@\n+x", "Why 200? Shouldn't it be 400?"), None),
+        (Row("@@\n+x", "Is this really necessary?"), "vague"),
+        (Row("@@\n+x", "This is not needed."), "vague"),
+        (Row("@@\n+x", "Metrics/LineLength: Line is too long. [90/80]"), "bot_or_lint"),
+        (Row("@@\n+x", "(style) line over 80 characters"), "bot_or_lint"),
+        (
+            Row("@@\n+x", "Prefer double-quoted strings unless you need single quotes."),
+            "bot_or_lint",
+        ),
         (Row("", "Rename this variable please."), "empty_hunk"),
         (Row("@@\n+x", "ok then"), "comment_too_short"),
         (Row("@@\n+x", "word " * 200), "comment_too_long"),
@@ -79,3 +89,24 @@ def test_build_head(tmp_path: Path) -> None:
     assert stats["splits"]["train"]["sampled"] == 3
     first = read_jsonl(tmp_path / "train.jsonl")[0]
     assert "total_0" in first["messages"][1]["content"]
+
+
+def test_specific_only_off_keeps_vague_comments() -> None:
+    cfg = FilterConfig(specific_only=False)
+    assert reject_reason(Row("@@\n+x", "This is not needed."), cfg) is None
+    assert reject_reason(Row("@@\n+x", "Line is too long. [90/80]"), cfg) is None
+
+
+def test_repeated_comment_is_capped() -> None:
+    from training.sft.format import SplitStats, filter_rows
+
+    lines = [
+        json.dumps(
+            {"patch": f"@@ -1 +1 @@\n+v{i} = 1", "msg": "Please rename `v` here.", "lang": ".py"}
+        )
+        for i in range(6)
+    ]
+    stats = SplitStats()
+    kept = list(filter_rows(lines, FilterConfig(max_same_comment=2), stats))
+    assert len(kept) == 2
+    assert stats.dropped == {"repeated_comment": 4}
