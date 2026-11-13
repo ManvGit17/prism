@@ -40,6 +40,14 @@ def test_export_gguf_moves_the_gguf_and_drops_scratch(tmp_path: Path) -> None:
     assert sorted(p.name for p in tmp_path.iterdir()) == ["gguf"]
 
 
+def test_export_gguf_scratch_elsewhere(tmp_path: Path) -> None:
+    out, scratch = tmp_path / "working" / "gguf", tmp_path / "temp" / "export"
+    gguf = export_gguf(FakeUnsloth(), None, out, scratch_root=scratch)
+    assert gguf.parent == out
+    assert sorted(p.name for p in (tmp_path / "working").iterdir()) == ["gguf"]
+    assert list(scratch.iterdir()) == []
+
+
 def test_export_gguf_fails_loudly(tmp_path: Path) -> None:
     class NoOutput:
         def save_pretrained_gguf(

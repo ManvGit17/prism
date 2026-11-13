@@ -15,6 +15,7 @@ from __future__ import annotations
 import inspect
 import json
 import platform
+import shutil
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -190,7 +191,17 @@ def train(
         if "warmup_ratio" in inspect.signature(TrainingArguments.__init__).parameters
         else {"warmup_steps": cfg.warmup_ratio}
     )
-    optional = _supported({"group_by_length": True, "data_seed": cfg.seed})
+    # Length-grouped batches: less padding, and the longest batch comes first, so running out of
+    # GPU memory shows up in the first minutes, not hours in. transformers 5 renamed the option.
+    optional = _supported(
+        {
+            "group_by_length": True,
+            "train_sampling_strategy": "group_by_length",
+            "data_seed": cfg.seed,
+        }
+    )
+    if "group_by_length" not in optional and "train_sampling_strategy" not in optional:
+        print("warning: this transformers version cannot group batches by length", flush=True)
     args = TrainingArguments(
         output_dir=str(out_dir / "checkpoints"),
         num_train_epochs=cfg.epochs,
@@ -203,7 +214,11 @@ def train(
         **warmup,
         eval_strategy="steps" if valid_set else "no",
         eval_steps=cfg.eval_steps,
-        save_strategy="no",
+        # The adapter is checkpointed with each evaluation, so a run cut off part way still
+        # leaves the last one in checkpoints/ (only the newest is kept).
+        save_strategy="steps",
+        save_steps=cfg.eval_steps,
+        save_total_limit=1,
         logging_steps=cfg.logging_steps,
         fp16=on_gpu and not bf16,
         bf16=bf16,
@@ -223,6 +238,7 @@ def train(
     )
     result = trainer.train()
     adapter_dir = out_dir / "adapter"
+    shutil.rmtree(out_dir / "checkpoints", ignore_errors=True)
     model.save_pretrained(str(adapter_dir))
     tokenizer.save_pretrained(str(adapter_dir))
 

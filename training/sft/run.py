@@ -39,6 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-new-tokens", type=int, default=128)
     p.add_argument("--no-export", action="store_true", help="skip the GGUF export")
     p.add_argument("--quant", default="q4_k_m")
+    p.add_argument(
+        "--scratch", type=Path, default=None, help="where the export's ~6 GB scratch goes"
+    )
     for f in fields(TrainConfig):
         if f.name == "report_to":
             continue
@@ -101,7 +104,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
     if not args.no_export:
         started = time.perf_counter()
-        gguf = export_gguf(model, tokenizer, out / "gguf", args.quant)
+        gguf = export_gguf(model, tokenizer, out / "gguf", args.quant, args.scratch)
         metrics["gguf"] = {"file": gguf.name, "bytes": gguf.stat().st_size}
         stage("export", started)
     return metrics

@@ -35,15 +35,23 @@ def modelfile(gguf_name: str) -> str:
     )
 
 
-def export_gguf(model: Any, tokenizer: Any, out_dir: Path, quant: str = "q4_k_m") -> Path:
+def export_gguf(
+    model: Any,
+    tokenizer: Any,
+    out_dir: Path,
+    quant: str = "q4_k_m",
+    scratch_root: Path | None = None,
+) -> Path:
     """Write the quantized GGUF and its Modelfile to `out_dir`; return the GGUF path.
 
     Unsloth saves the merged 16-bit model (about 6 GB) in the folder it is given and puts the
     GGUF in a sibling folder named `<folder>_gguf`. Both are scratch: the GGUF is moved into
     `out_dir` and the rest is deleted, so a run under /kaggle/working keeps only what is needed.
+    `scratch_root` (default: next to `out_dir`) is where those scratch folders go.
     """
-    scratch = out_dir.parent / f"{out_dir.name}_merged"
+    scratch = (scratch_root or out_dir.parent) / f"{out_dir.name}_merged"
     scratch_gguf = scratch.parent / f"{scratch.name}_gguf"
+    scratch.parent.mkdir(parents=True, exist_ok=True)
     model.save_pretrained_gguf(str(scratch), tokenizer, quantization_method=quant)
     ggufs = sorted(
         (p for d in (scratch_gguf, scratch) if d.is_dir() for p in d.rglob("*.gguf")),

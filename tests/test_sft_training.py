@@ -62,6 +62,7 @@ def test_pipeline(tmp_path: Path) -> None:
     metrics = run(args)
 
     assert (tmp_path / "adapter" / "adapter_config.json").is_file()
+    assert not (tmp_path / "checkpoints").exists(), "checkpoints are removed after a full run"
     saved = json.loads((tmp_path / "metrics.json").read_text(encoding="utf-8"))
     assert set(saved["stages"]) == {"format", "train", "evaluate"}
     assert saved["train"]["train_examples"] == 12
