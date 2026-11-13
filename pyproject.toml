@@ -36,6 +36,7 @@ dev = [
 training = [
     "accelerate>=1.0",
     "onnx>=1.16",
+    "peft>=0.13",
     "scikit-learn>=1.5",
     "torch>=2.5",
     "transformers>=4.46",
@@ -76,7 +77,7 @@ exclude = ["^tests/fixtures/"]
 
 # The training packages are not installed in CI. Targeted: only these third-party modules.
 [[tool.mypy.overrides]]
-module = ["torch", "torch.*", "transformers", "transformers.*", "onnx", "onnx.*", "sklearn", "sklearn.*", "wandb", "onnxruntime", "onnxruntime.*"]
+module = ["torch", "torch.*", "transformers", "transformers.*", "onnx", "onnx.*", "sklearn", "sklearn.*", "wandb", "onnxruntime", "onnxruntime.*", "peft", "peft.*", "unsloth", "unsloth.*"]
 ignore_missing_imports = true
 
 # Without torch installed, torch.nn.Module is Any, and the export wrapper subclasses it.

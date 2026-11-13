@@ -25,3 +25,5 @@ Both are frozen and forbid unknown fields.
   `ReviewComment`.
 - If the Phase 0 dataset inspection finds more labelled fields than a hunk and a comment, this is
   revisited (see `docs/datasets.md`).
+- Amended by ADR 0009: the dataset has no line labels, so the model writes the comment only and
+  `RawComment.line` is filled by `anchor_line`.
