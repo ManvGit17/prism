@@ -30,7 +30,7 @@ _STOP = frozenset(
     """the and for this that should with have from when what will would could there their about
     which these those than then also just like make need does into only here more some other
     because think change maybe using used return true false none null self this not can why
-    are was but you its use get set new var let def int str""".split()
+    are was but you its use get set new var let def int str""".split()  # noqa: SIM905
 )
 
 
