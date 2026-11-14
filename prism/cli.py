@@ -24,7 +24,7 @@ from prism.store.factory import StoreKind, Stores, StoreUnavailable, open_stores
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from prism.github.worker import AppWorker
+    from prism.github.worker import AppWorker, PullJob
     from prism.indexer.embedder import Embedder
     from prism.schemas import ContextMode
     from prism.store.base import VectorReader
@@ -583,7 +583,17 @@ def app_serve(
     if not s.github_webhook_secret.get_secret_value():
         typer.echo("set PRISM_GITHUB_WEBHOOK_SECRET in .env", err=True)
         raise typer.Exit(3)
-    web = create_app(worker, s.github_webhook_secret.get_secret_value())
+    enqueue = None
+    if s.app_queue == "celery":
+        from prism.github.queue import RedisCoordinator, enqueue_job, review_pull
+
+        coord = RedisCoordinator.from_url(s.redis_url)
+
+        def enqueue(job: "PullJob") -> None:
+            enqueue_job(coord, job, review_pull.delay)
+
+        typer.echo("reviews go to the Celery queue; run `prism app worker`", err=True)
+    web = create_app(worker, s.github_webhook_secret.get_secret_value(), enqueue)
 
     async def poller() -> None:
         while True:
@@ -631,3 +641,29 @@ def app_resume() -> None:
     worker, _ = _worker()
     for key, result in asyncio.run(worker.resume()).items():
         typer.echo(f"{key}: {result}")
+
+
+@app_cmd.command("worker")
+def app_worker(
+    concurrency: Annotated[int, typer.Option("--concurrency", min=1)] = 1,
+) -> None:
+    """Run a Celery worker for queued reviews (PRISM_APP_QUEUE=celery). On Windows it uses the
+    solo pool, since Celery's default prefork pool does not run there."""
+    import sys
+
+    from prism.github.queue import celery_app
+
+    pool = "solo" if sys.platform == "win32" else "prefork"
+    args = ["worker", "--loglevel=INFO", f"--pool={pool}", "-Q", "prism-reviews"]
+    if pool != "solo":
+        args.append(f"--concurrency={concurrency}")
+    celery_app.worker_main(args)
+
+
+@app_cmd.command("beat")
+def app_beat() -> None:
+    """Run Celery beat: posts answered held reviews every minute, and polls for open PRs when
+    PRISM_APP_POLL_WITH_BEAT is on."""
+    from prism.github.queue import celery_app
+
+    celery_app.start(["beat", "--loglevel=INFO", "--schedule", ".prism-work/celerybeat-schedule"])

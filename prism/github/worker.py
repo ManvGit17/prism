@@ -137,12 +137,17 @@ class AppWorker:
         self._lock = asyncio.Lock()
 
     async def handle(self, job: PullJob) -> Result:
+        """Review one PR head; errors are logged and returned as "error" (in-process use)."""
+        try:
+            return await self.process(job)
+        except (GitHubError, subprocess.SubprocessError, OSError) as exc:
+            log.error("review of %s#%d failed: %s", job.repo, job.number, exc)
+            return "error"
+
+    async def process(self, job: PullJob) -> Result:
+        """Review one PR head; errors raise, so a queue can retry them."""
         async with self._lock:
-            try:
-                return await self._handle(job)
-            except (GitHubError, subprocess.SubprocessError, OSError) as exc:
-                log.error("review of %s#%d failed: %s", job.repo, job.number, exc)
-                return "error"
+            return await self._handle(job)
 
     async def _handle(self, job: PullJob) -> Result:
         token = self.auth.installation_token(job.installation_id)
@@ -236,9 +241,9 @@ class AppWorker:
             out[f"{job.repo}#{job.number}@{job.head_sha[:7]}"] = await self.handle(job)
         return out
 
-    async def poll_once(self) -> dict[str, Result]:
-        """Review open PRs on every installed repo whose head commit has no review yet."""
-        out: dict[str, Result] = {}
+    async def find_unreviewed(self) -> list[PullJob]:
+        """Open, non-draft PRs on every installed repo whose head commit has no review yet."""
+        jobs: list[PullJob] = []
         for inst in await asyncio.to_thread(installations, self.auth):
             client = self.auth.client(inst)
             try:
@@ -251,8 +256,14 @@ class AppWorker:
                         seen = self.store.history(repo, int(pr["number"]), limit=20)
                         if any(r.head_sha == sha for r in seen):
                             continue
-                        job = PullJob(inst, repo, int(pr["number"]), sha)
-                        out[f"{repo}#{job.number}@{sha[:7]}"] = await self.handle(job)
+                        jobs.append(PullJob(inst, repo, int(pr["number"]), sha))
             finally:
                 client.close()
+        return jobs
+
+    async def poll_once(self) -> dict[str, Result]:
+        """Review, in this process, every open PR head that has no review yet."""
+        out: dict[str, Result] = {}
+        for job in await self.find_unreviewed():
+            out[f"{job.repo}#{job.number}@{job.head_sha[:7]}"] = await self.handle(job)
         return out

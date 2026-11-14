@@ -109,3 +109,14 @@ The smee channel is the App's webhook URL during local development; `--poll` alo
 tunnel. Reviews are held until their verification is answered (ADR 0017): a Claude Code session
 with PRism's MCP server finds them with `pending_reviews`, answers them, and the next poll or
 `prism app resume` posts the review with its inline comments.
+
+To run reviews on a queue instead of inside the web process (ADR 0018), set
+`PRISM_APP_QUEUE=celery` and start a worker and beat next to `prism app serve`:
+
+```bash
+uv run prism app worker      # on Windows this uses Celery's solo pool
+uv run prism app beat        # posts answered held reviews every minute
+```
+
+`docker compose --profile worker up -d --build` runs both in containers instead, on hosts where
+the worker can reach Ollama.

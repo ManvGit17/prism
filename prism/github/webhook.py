@@ -14,6 +14,7 @@ import hmac
 import json
 import logging
 from collections import deque
+from collections.abc import Callable
 from typing import Any
 
 from prism.github.worker import AppWorker, PullJob
@@ -28,7 +29,11 @@ def valid_signature(secret: str, body: bytes, header: str | None) -> bool:
     return hmac.compare_digest(expected, header)
 
 
-def create_app(worker: AppWorker, secret: str) -> Any:
+def create_app(
+    worker: AppWorker, secret: str, enqueue: Callable[[PullJob], None] | None = None
+) -> Any:
+    """The web app. With `enqueue` (the Celery queue) a review is queued; without, it runs in
+    this process after the response."""
     from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 
     app = FastAPI(title="PRism", docs_url=None, redoc_url=None)
@@ -60,7 +65,10 @@ def create_app(worker: AppWorker, secret: str) -> Any:
         job = PullJob.from_event(json.loads(body))
         if job is None:
             return {"status": "ignored", "event": x_github_event}
-        background.add_task(worker.handle, job)
+        if enqueue is not None:
+            enqueue(job)
+        else:
+            background.add_task(worker.handle, job)
         log.info("queued review of %s#%d at %s", job.repo, job.number, job.head_sha[:7])
         return {"status": "queued", "repo": job.repo, "pr": job.number, "sha": job.head_sha}
 

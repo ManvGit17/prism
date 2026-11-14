@@ -137,6 +137,13 @@ class Settings(BaseSettings):
     app_poll_interval_s: float = Field(default=30.0, ge=5)
     # Skip PRs with more changed lines than this (a review of a huge PR helps nobody).
     app_max_changed_lines: int = Field(default=3000, ge=1)
+    # "celery": the webhook queues reviews for `prism app worker` (ADR 0018); "inline": the web
+    # process reviews them itself, one at a time.
+    app_queue: Literal["inline", "celery"] = "inline"
+    # Reviews running at once for one installation (the per-installation limit).
+    app_reviews_per_installation: int = Field(default=1, ge=1)
+    # Let `prism app beat` also poll for open PRs, as a fallback for missed webhooks.
+    app_poll_with_beat: bool = False
 
     @property
     def postgres_dsn(self) -> str:
