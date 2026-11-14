@@ -143,6 +143,16 @@ def test_time_limit_lists_hunks_as_not_reviewed(tmp_path: Path) -> None:
     assert all(f.hunks_reviewed == 0 for f in result.files)
 
 
+def test_time_limit_fires_while_hunks_queue(tmp_path: Path) -> None:
+    # One slot, 0.1 s per call, 0.25 s limit: the first hunks run, the queued rest time out.
+    model = FakeModel(delay=0.1)
+    result, model = review(many_files(6), tmp_path, model=model, concurrency=1, time_limit_s=0.25)
+    reviewed = sum(f.hunks_reviewed for f in result.files)
+    assert 1 <= reviewed < 6
+    assert model.calls == reviewed
+    assert result.summary.count("(time)") == 6 - reviewed
+
+
 def test_comment_cap_and_verdict(tmp_path: Path) -> None:
     result, _ = review(many_files(5), tmp_path, max_comments=2)
     assert len(result.comments) == 2

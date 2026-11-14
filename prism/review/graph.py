@@ -104,21 +104,20 @@ def build_graph(
         file, deadline = state["file"], state["deadline"]
 
         async def one(task: HunkTask) -> Candidate | NotReviewed:
-            cached = cache.get(task.path, task.text) if cache else None
+            cached = cache.get(model.name, task.path, task.text) if cache else None
             if cached is not None:
                 if "not_reviewed" in cached:
                     return NotReviewed(task.path, task.hunk.header, cached["not_reviewed"])
                 raw = RawComment(line=cached["line"], comment=cached["comment"])
-                return Candidate(task=task, raw=raw, model=cached["model"])
-            if time.monotonic() > deadline:
-                outcome: HunkResult | None = None
-            else:
-                outcome = await review_hunk(model, task.text, limit, retries=options.retries)
-            if cache is not None:
-                cache.put(task.path, task.text, _cache_entry(outcome, model.name))
-            if outcome is None:
+                return Candidate(task=task, raw=raw, model=model.name)
+            result = await review_hunk(
+                model, task.text, limit, retries=options.retries, deadline=deadline
+            )
+            # A raised error (server down, timeout) is not cached, so a rerun tries again.
+            if cache is not None and result.status != "error":
+                cache.put(model.name, task.path, task.text, _cache_entry(result))
+            if result.status == "time":
                 return NotReviewed(task.path, task.hunk.header, "time")
-            result = outcome
             if result.comment is None:
                 return NotReviewed(task.path, task.hunk.header, "model_failed")
             return Candidate(task=task, raw=result.comment, model=model.name)
@@ -179,12 +178,12 @@ def build_graph(
     return g.compile()
 
 
-def _cache_entry(outcome: HunkResult | None, model: str) -> dict[str, Any]:
-    if outcome is None:
+def _cache_entry(outcome: HunkResult) -> dict[str, Any]:
+    if outcome.status == "time":
         return {"not_reviewed": "time"}
     if outcome.comment is None:
         return {"not_reviewed": "model_failed", "error": outcome.error}
-    return {"line": outcome.comment.line, "comment": outcome.comment.comment, "model": model}
+    return {"line": outcome.comment.line, "comment": outcome.comment.comment}
 
 
 def head_sha(repo: Path) -> str:

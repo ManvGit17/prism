@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 import httpx
 
@@ -57,29 +58,45 @@ class OllamaReviewer:
         await self._client.aclose()
 
 
+# ok: a comment came back. invalid: every reply was malformed. error: the last try raised (server
+# down, timeout), which may pass on a rerun. time: the deadline passed before a model slot was free.
+Status = Literal["ok", "invalid", "error", "time"]
+
+
 @dataclass(frozen=True)
 class HunkResult:
     comment: RawComment | None
     attempts: int
+    status: Status = "ok"
     error: str | None = None  # last error when no comment came back
 
 
 async def review_hunk(
-    model: ReviewerModel, hunk: str, limit: asyncio.Semaphore, *, retries: int = 2
+    model: ReviewerModel,
+    hunk: str,
+    limit: asyncio.Semaphore,
+    *,
+    retries: int = 2,
+    deadline: float | None = None,
 ) -> HunkResult:
+    """Review one hunk. The deadline is checked once a model slot is held, not before: all hunks
+    of a PR start at once and wait on the semaphore, so a check at start would always pass."""
     error: str | None = None
+    status: Status = "invalid"
     for attempt in range(retries + 1):
         try:
             async with limit:
+                if deadline is not None and time.monotonic() > deadline:
+                    return HunkResult(None, attempt, "time")
                 text = await model.reply(hunk, attempt)
         except (httpx.HTTPError, KeyError, ValueError) as exc:
-            error = f"{type(exc).__name__}: {exc}"
+            error, status = f"{type(exc).__name__}: {exc}", "error"
             log.warning("reviewer call failed (attempt %d): %s", attempt + 1, error)
             continue
         comment = to_raw_comment(hunk, text)
         if comment is not None:
             return HunkResult(comment, attempt + 1)
-        error = f"invalid reply: {text[:200]!r}"
+        error, status = f"invalid reply: {text[:200]!r}", "invalid"
         log.info("reviewer reply not valid JSON (attempt %d)", attempt + 1)
     log.warning("dropping hunk after %d attempts: %s", retries + 1, error)
-    return HunkResult(None, retries + 1, error)
+    return HunkResult(None, retries + 1, status, error)

@@ -8,7 +8,8 @@ There is no API key on the build machine, so the verifier works the way the Phas
 2. A Claude model (a Sonnet or Opus subagent) reads the rubric and writes one verdict per request
    into `DIR/verify/verdicts_NN.jsonl`.
 3. The same command run again finishes the review. Reviewer replies are cached in
-   `DIR/replies.json`, so the second run calls no model and plans the same hunks.
+   `DIR/replies.json` per model, so the second run calls no model and plans the same hunks. A
+   call that raised (server down, timeout) is not cached and is tried again.
 
 A verdict keeps a comment only if it says keep, its confidence is at least
 `PRISM_VERIFIER_MIN_CONFIDENCE`, and a security comment cites evidence.
@@ -105,7 +106,10 @@ class Verdict(BaseModel):
 
 
 def request_id(c: Candidate) -> str:
-    return f"{c.path}#{c.task.index}"
+    """`path#hunk index-hash`. The hash covers the hunk and the comment, so a verdict left in a
+    reused work directory never applies to a different comment."""
+    digest = hashlib.sha1(f"{c.task.text}|{c.raw.comment}".encode()).hexdigest()[:8]
+    return f"{c.path}#{c.task.index}-{digest}"
 
 
 def numbered_hunk(c: Candidate) -> str:
@@ -232,15 +236,15 @@ class ReplyCache:
             self.data = json.loads(path.read_text(encoding="utf-8"))
 
     @staticmethod
-    def key(path: str, hunk_text: str) -> str:
+    def key(model: str, path: str, hunk_text: str) -> str:
         digest = hashlib.sha1(hunk_text.encode("utf-8")).hexdigest()[:16]
-        return f"{path}:{digest}"
+        return f"{model}|{path}:{digest}"
 
-    def get(self, path: str, hunk_text: str) -> dict[str, Any] | None:
-        return self.data.get(self.key(path, hunk_text))
+    def get(self, model: str, path: str, hunk_text: str) -> dict[str, Any] | None:
+        return self.data.get(self.key(model, path, hunk_text))
 
-    def put(self, path: str, hunk_text: str, outcome: dict[str, Any]) -> None:
-        self.data[self.key(path, hunk_text)] = outcome
+    def put(self, model: str, path: str, hunk_text: str, outcome: dict[str, Any]) -> None:
+        self.data[self.key(model, path, hunk_text)] = outcome
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

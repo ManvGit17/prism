@@ -443,6 +443,7 @@ def review(
     import hashlib
     import logging
     from collections.abc import Sequence
+    from contextlib import nullcontext
 
     from prism.models.gate import GateError, load_gate
     from prism.retrieval.context import ContextOptions, build_context
@@ -490,10 +491,17 @@ def review(
     else:
         chosen = RuleVerifier()
 
-    with _context_sources(repo, rid, context_mode, store) as (graph, vectors, embedder):
+    # Only the handoff verifier reads context; the rules verifier must not need the stores.
+    needs_context = kind == "handoff" and context_mode is not ContextMode.NONE
+    sources = (
+        _context_sources(repo, rid, context_mode, store)
+        if needs_context
+        else nullcontext((InMemoryGraphStore(), None, None))
+    )
+    with sources as (graph, vectors, embedder):
 
         def contexts(tasks: Sequence[HunkTask]) -> dict[tuple[str, str], str]:
-            if kind == "rules" or context_mode is ContextMode.NONE:
+            if not needs_context:
                 return {}
             bundle = build_context(
                 repo,

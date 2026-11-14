@@ -6,6 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 
+import httpx
 from review_fakes import FakeModel, hunk_diff, task_for
 
 from prism.models.gate import PassAllGate
@@ -58,7 +59,9 @@ def test_first_run_writes_requests_then_rerun_applies_verdicts(tmp_path: Path) -
     assert verifier.pending == 3 and first.comments == ()
     assert (tmp_path / "verify" / "RUBRIC.md").is_file()
     reqs = requests(tmp_path)
-    assert [r["id"] for r in reqs] == ["app/a.py#0", "app/b.py#0", "app/c.py#0"]
+    ids = [str(r["id"]) for r in reqs]
+    assert [i.split("-")[0] for i in ids] == ["app/a.py#0", "app/b.py#0", "app/c.py#0"]
+    a_id, b_id, c_id = ids
     assert reqs[0]["context"] == "<ctx>"
     assert "    2 +total = price * qty" in str(reqs[0]["hunk"])
     calls = model.calls
@@ -67,7 +70,7 @@ def test_first_run_writes_requests_then_rerun_applies_verdicts(tmp_path: Path) -
         tmp_path,
         [
             {
-                "id": "app/a.py#0",
+                "id": a_id,
                 "keep": True,
                 "severity": "major",
                 "category": "bug",
@@ -75,9 +78,9 @@ def test_first_run_writes_requests_then_rerun_applies_verdicts(tmp_path: Path) -
                 "reason": "real",
                 "evidence": [{"source": "hunk", "detail": "l2"}],
             },
-            {"id": "app/b.py#0", "keep": False, "reason": "wrong claim"},
+            {"id": b_id, "keep": False, "reason": "wrong claim"},
             {
-                "id": "app/c.py#0",
+                "id": c_id,
                 "keep": True,
                 "severity": "critical",
                 "category": "security",
@@ -117,7 +120,7 @@ def test_verdict_rules() -> None:
 def test_bad_verdict_lines_are_reported_and_left_pending(tmp_path: Path) -> None:
     run(tmp_path, FakeModel())
     (tmp_path / "verify" / "verdicts_00.jsonl").write_text(
-        'not json\n{"id": "app/a.py#0", "keep": true, "confidence": 2}\n', encoding="utf-8"
+        'not json\n{"id": "app/a.py#0-x", "keep": true, "confidence": 2}\n', encoding="utf-8"
     )
     _, verifier = run(tmp_path, FakeModel())
     assert len(verifier.errors) == 2 and verifier.pending == 3
@@ -129,9 +132,30 @@ def test_untrusted_text_cannot_close_its_delimiter() -> None:
     assert wrapped.endswith("</untrusted_pull_request>")
 
 
-def test_cache_keeps_time_outcomes(tmp_path: Path) -> None:
+def test_cache_is_per_model_and_keeps_time_outcomes(tmp_path: Path) -> None:
     cache = ReplyCache(tmp_path / "replies.json")
-    cache.put("a.py", "@@ hunk", {"not_reviewed": "time"})
+    cache.put("m1", "a.py", "@@ hunk", {"not_reviewed": "time"})
     cache.save()
-    assert ReplyCache(tmp_path / "replies.json").get("a.py", "@@ hunk") == {"not_reviewed": "time"}
-    assert ReplyCache(tmp_path / "replies.json").get("a.py", "@@ other") is None
+    loaded = ReplyCache(tmp_path / "replies.json")
+    assert loaded.get("m1", "a.py", "@@ hunk") == {"not_reviewed": "time"}
+    assert loaded.get("m1", "a.py", "@@ other") is None
+    assert loaded.get("m2", "a.py", "@@ hunk") is None
+
+
+class DownModel(FakeModel):
+    """Ollama not running."""
+
+    async def reply(self, hunk: str, attempt: int) -> str:
+        self.calls += 1
+        raise httpx.ConnectError("connection refused")
+
+
+def test_server_errors_are_not_cached(tmp_path: Path) -> None:
+    down = DownModel()
+    first, verifier = run(tmp_path, down)
+    assert down.calls == 3 * 3 and verifier.pending == 0
+    assert "model_failed" in first.summary
+    up = FakeModel()
+    _, verifier = run(tmp_path, up)
+    assert up.calls == 3, "hunks that failed on a server error are tried again"
+    assert verifier.pending == 3
