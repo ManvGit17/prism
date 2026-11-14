@@ -191,6 +191,7 @@ class RuleVerifier:
         candidates: Sequence[Candidate],
         contexts: Mapping[tuple[str, str], str] | None = None,
         risk: Mapping[str, Sequence[str]] | None = None,
+        tools: Mapping[tuple[str, str], Sequence[str]] | None = None,
     ) -> list[Decision]:
         passing, dropped = apply_rules(candidates)
         return [*dropped, *(Decision(c, label(c), "kept") for c in passing)]

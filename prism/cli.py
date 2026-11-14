@@ -432,6 +432,9 @@ def review(
     ] = None,
     repo_id: RepoId = None,
     pr_number: Annotated[int | None, typer.Option("--pr", min=1)] = None,
+    no_sast: Annotated[
+        bool, typer.Option("--no-sast", help="Skip static analysis (PRISM_SAST_TOOLS).")
+    ] = False,
 ) -> None:
     """Review a diff and print a validated PRReview as JSON.
 
@@ -455,6 +458,7 @@ def review(
     from prism.review.handoff import HandoffVerifier, ReplyCache
     from prism.review.plan import HunkTask
     from prism.review.reviewer_client import OllamaReviewer
+    from prism.review.sast import SastReport, default_tools, run_sast
     from prism.schemas import ContextMode
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
@@ -482,7 +486,14 @@ def review(
         max_comments=s.review_max_comments,
         concurrency=s.model_concurrency,
         retries=s.reviewer_retries,
+        sast_comment_min_severity=s.sast_comment_min_severity,
     )
+    names = [] if no_sast else [n.strip() for n in s.sast_tools.split(",") if n.strip()]
+    tools = default_tools(names, s.semgrep_config, s.pmd_home)
+
+    def sast_fn(paths: Sequence[str]) -> SastReport:
+        return run_sast(repo, paths, tools, timeout_s=s.sast_timeout_s)
+
     chosen: Verifier
     handoff: HandoffVerifier | None = None
     if kind == "handoff":
@@ -537,6 +548,7 @@ def review(
                     pr_number=pr_number,
                     cache=ReplyCache(work / "replies.json"),
                     context_fn=contexts,
+                    sast_fn=sast_fn,
                 )
             finally:
                 await reviewer.aclose()

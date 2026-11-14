@@ -89,6 +89,16 @@ class Settings(BaseSettings):
     # A comment the verifier keeps below this confidence is dropped.
     verifier_min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
 
+    # Static analysis on the changed files (ADR 0012). Comma-separated; "" turns SAST off.
+    sast_tools: str = "bandit,semgrep,ruff,pmd"
+    # Semgrep downloads a registry ruleset on first use; a local rules file works too.
+    semgrep_config: str = "p/owasp-top-ten"
+    # PMD install directory (holds bin/pmd); unset skips PMD.
+    pmd_home: str = ""
+    sast_timeout_s: float = Field(default=300.0, gt=0)
+    # A finding on an added line at or above this becomes a comment for the verifier.
+    sast_comment_min_severity: Literal["high", "medium", "low"] = "medium"
+
     @property
     def postgres_dsn(self) -> str:
         return (
