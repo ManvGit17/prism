@@ -120,3 +120,8 @@ uv run prism app beat        # posts answered held reviews every minute
 
 `docker compose --profile worker up -d --build` runs both in containers instead, on hosts where
 the worker can reach Ollama.
+
+Reactions on PRism's comments feed back into Langfuse (ADR 0019): beat reads 👍/👎 every 15
+minutes, replies and resolved threads arrive by webhook (subscribe the App to "Pull request review
+comment" and "Pull request review thread"), and rated comments become scores on the review's
+trace and items in the `prism-comment-feedback` dataset. `prism app feedback` runs one pass.
