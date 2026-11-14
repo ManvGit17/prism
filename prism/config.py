@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     # A finding on an added line at or above this becomes a comment for the verifier.
     sast_comment_min_severity: Literal["high", "medium", "low"] = "medium"
 
+    # Routing (ADR 0013): security-sensitive and large hunks go to the frontier model (Claude,
+    # through the verifier) instead of the local reviewer. Needs a model verifier.
+    escalate: bool = True
+    escalate_min_lines: int = Field(default=60, ge=1)
+
     @property
     def postgres_dsn(self) -> str:
         return (

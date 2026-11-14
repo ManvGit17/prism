@@ -119,9 +119,8 @@ def test_verdict_rules() -> None:
 
 def test_bad_verdict_lines_are_reported_and_left_pending(tmp_path: Path) -> None:
     run(tmp_path, FakeModel())
-    (tmp_path / "verify" / "verdicts_00.jsonl").write_text(
-        'not json\n{"id": "app/a.py#0-x", "keep": true, "confidence": 2}\n', encoding="utf-8"
-    )
+    bad = json.dumps({"id": requests(tmp_path)[0]["id"], "keep": True, "confidence": 2})
+    (tmp_path / "verify" / "verdicts_00.jsonl").write_text(f"not json\n{bad}\n", encoding="utf-8")
     _, verifier = run(tmp_path, FakeModel())
     assert len(verifier.errors) == 2 and verifier.pending == 3
 

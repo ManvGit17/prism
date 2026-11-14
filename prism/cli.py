@@ -487,6 +487,9 @@ def review(
         concurrency=s.model_concurrency,
         retries=s.reviewer_retries,
         sast_comment_min_severity=s.sast_comment_min_severity,
+        # The rules verifier has no model to escalate to.
+        escalate=s.escalate and kind == "handoff",
+        escalate_min_lines=s.escalate_min_lines,
     )
     names = [] if no_sast else [n.strip() for n in s.sast_tools.split(",") if n.strip()]
     tools = default_tools(names, s.semgrep_config, s.pmd_home)
@@ -561,8 +564,9 @@ def review(
             typer.echo(f"bad verdict line {err}", err=True)
         if handoff.pending:
             typer.echo(
-                f"{handoff.pending} comment(s) need verdicts. Requests and rubric are in "
-                f"{handoff.dir}; write verdicts_NN.jsonl there and run the same command again.",
+                f"{handoff.pending} answer(s) needed from Claude in {handoff.dir}: verdicts_NN"
+                ".jsonl for requests_NN.jsonl (RUBRIC.md) and reviews_NN.jsonl for "
+                "escalations_NN.jsonl (REVIEW_RUBRIC.md). Then run the same command again.",
                 err=True,
             )
             raise typer.Exit(2)

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from prism.models.reviewer import identifiers
 from prism.review.plan import HunkTask
@@ -181,17 +181,32 @@ def label(candidate: Candidate, confidence: float = RULES_CONFIDENCE) -> ReviewC
     )
 
 
+@dataclass(frozen=True)
+class Escalation:
+    """A hunk routed to the frontier model, and why (ADR 0013)."""
+
+    task: HunkTask
+    reasons: tuple[str, ...]
+
+
+@dataclass
+class VerifyBatch:
+    """Everything the verifier gets for one review."""
+
+    candidates: Sequence[Candidate]
+    contexts: Mapping[tuple[str, str], str] = field(default_factory=dict)
+    risk: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    tools: Mapping[tuple[str, str], Sequence[str]] = field(default_factory=dict)
+    escalations: Sequence[Escalation] = ()
+
+
 class RuleVerifier:
-    """Deterministic checks and keyword labels; no model call."""
+    """Deterministic checks and keyword labels; no model call, so nothing is escalated."""
 
     name = "rules"
+    cost_usd = 0.0
+    summary_lines: list[str] = []  # noqa: RUF012
 
-    async def verify(
-        self,
-        candidates: Sequence[Candidate],
-        contexts: Mapping[tuple[str, str], str] | None = None,
-        risk: Mapping[str, Sequence[str]] | None = None,
-        tools: Mapping[tuple[str, str], Sequence[str]] | None = None,
-    ) -> list[Decision]:
-        passing, dropped = apply_rules(candidates)
+    async def verify(self, batch: VerifyBatch) -> list[Decision]:
+        passing, dropped = apply_rules(batch.candidates)
         return [*dropped, *(Decision(c, label(c), "kept") for c in passing)]

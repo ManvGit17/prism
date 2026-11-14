@@ -16,8 +16,15 @@ def rank_key(c: ReviewComment) -> tuple[int, int, float]:
 
 
 def cap(comments: Sequence[ReviewComment], limit: int) -> tuple[list[ReviewComment], int]:
-    """The `limit` most important comments, and how many were cut."""
-    ordered = sorted(comments, key=rank_key)
+    """The `limit` most important comments, and how many were cut.
+
+    Comments on the same line in the same category are one finding said twice (Claude and
+    Bandit both on an SQL injection): only the strongest is kept, and it is not counted as cut.
+    """
+    best: dict[tuple[str, int, Category], ReviewComment] = {}
+    for c in sorted(comments, key=rank_key):
+        best.setdefault((c.path, c.line, c.category), c)
+    ordered = sorted(best.values(), key=rank_key)
     return ordered[:limit], max(0, len(ordered) - limit)
 
 

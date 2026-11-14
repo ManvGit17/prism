@@ -10,6 +10,10 @@ however many files fan out. Their candidate comments are merged by an `operator.
 SAST runs as one more branch of the same fan-out, so the tools work while the model does.
 The context node retrieves code for the hunks that got a comment, ties SAST findings to hunks
 and turns the stronger ones into comments; only the verifier reads context and findings.
+
+The planner also routes (ADR 0013): a security-sensitive or large hunk skips the local model and
+goes to the frontier model through the verifier, which can escalate more hunks after it has
+judged the local comments.
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ import asyncio
 import operator
 import subprocess
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Protocol, TypedDict
@@ -29,24 +33,24 @@ from langgraph.types import Send
 from prism.models.gate import Gate
 from prism.retrieval.diff import FileDiff, parse_diff
 from prism.review.aggregate import cap, file_reviews, summary, verdict
-from prism.review.checks import Candidate, Decision, new_side_lines
+from prism.review.checks import Candidate, Decision, Escalation, VerifyBatch, new_side_lines
 from prism.review.handoff import ReplyCache
 from prism.review.plan import FilePlan, HunkTask, NotReviewed, ReviewPlan, git_churn, plan_review
 from prism.review.reviewer_client import HunkResult, ReviewerModel, review_hunk
+from prism.review.router import RouteKey, route
 from prism.review.sast import LEVEL_RANK, Finding, SastReport, at_least
 from prism.schemas import PRReview, RawComment
 
 
 class Verifier(Protocol):
     name: str
+    # Lines the verifier adds to the summary (routing), and what its model calls cost.
+    summary_lines: list[str]
 
-    async def verify(
-        self,
-        candidates: Sequence[Candidate],
-        contexts: Mapping[tuple[str, str], str] | None = None,
-        risk: Mapping[str, Sequence[str]] | None = None,
-        tools: Mapping[tuple[str, str], Sequence[str]] | None = None,
-    ) -> list[Decision]: ...
+    @property
+    def cost_usd(self) -> float: ...
+
+    async def verify(self, batch: VerifyBatch) -> list[Decision]: ...
 
 
 # Rendered context per (path, hunk header), for the hunks given. Built from the head checkout.
@@ -64,6 +68,9 @@ class ReviewOptions:
     retries: int = 2
     # A SAST finding on an added line at or above this becomes a comment of its own.
     sast_comment_min_severity: str = "medium"
+    # Send security-sensitive and large hunks to the frontier model instead of the local one.
+    escalate: bool = False
+    escalate_min_lines: int = 60
 
 
 class ReviewState(TypedDict, total=False):
@@ -71,6 +78,8 @@ class ReviewState(TypedDict, total=False):
     churn: dict[str, int]
     deadline: float
     plan: ReviewPlan
+    routes: dict[RouteKey, tuple[str, ...]]
+    escalations: Annotated[list[Escalation], operator.add]
     candidates: Annotated[list[Candidate], operator.add]
     unreviewed: Annotated[list[NotReviewed], operator.add]
     contexts: dict[tuple[str, str], str]
@@ -83,6 +92,7 @@ class ReviewState(TypedDict, total=False):
 class FileState(TypedDict):
     file: FilePlan
     deadline: float
+    routes: dict[RouteKey, tuple[str, ...]]
 
 
 class SastState(TypedDict):
@@ -106,11 +116,15 @@ def build_graph(
         plan = plan_review(
             state["files"], gate, max_hunks=options.max_hunks, churn=state.get("churn")
         )
-        return {"plan": plan}
+        routes = route(plan, enabled=options.escalate, min_lines=options.escalate_min_lines)
+        return {"plan": plan, "routes": routes}
 
     def fan_out(state: ReviewState) -> list[Send] | str:
         sends = [
-            Send("file_reviewer", FileState(file=f, deadline=state["deadline"]))
+            Send(
+                "file_reviewer",
+                FileState(file=f, deadline=state["deadline"], routes=state["routes"]),
+            )
             for f in state["plan"].files
             if f.tasks
         ]
@@ -125,9 +139,12 @@ def build_graph(
         return {"sast": await asyncio.to_thread(sast_fn, state["paths"])}
 
     async def file_reviewer(state: FileState) -> dict[str, Any]:
-        file, deadline = state["file"], state["deadline"]
+        file, deadline, routes = state["file"], state["deadline"], state["routes"]
 
-        async def one(task: HunkTask) -> Candidate | NotReviewed:
+        async def one(task: HunkTask) -> Candidate | NotReviewed | Escalation:
+            reasons = routes.get((task.path, task.index))
+            if reasons:
+                return Escalation(task, reasons)
             cached = cache.get(model.name, task.path, task.text) if cache else None
             if cached is not None:
                 if "not_reviewed" in cached:
@@ -150,6 +167,7 @@ def build_graph(
         return {
             "candidates": [o for o in outcomes if isinstance(o, Candidate)],
             "unreviewed": [o for o in outcomes if isinstance(o, NotReviewed)],
+            "escalations": [o for o in outcomes if isinstance(o, Escalation)],
         }
 
     def ordered(state: ReviewState) -> list[Candidate]:
@@ -167,17 +185,27 @@ def build_graph(
             options.sast_comment_min_severity,
         )
         tasks: dict[tuple[str, int], HunkTask] = {}
-        for c in [*ordered(state), *extra]:
+        items: list[Candidate | Escalation] = [*ordered(state), *extra, *escalated(state)]
+        for c in items:
             tasks.setdefault((c.task.path, c.task.index), c.task)
         contexts = context_fn(list(tasks.values())) if context_fn is not None and tasks else {}
         return {"contexts": contexts, "tools": tools, "candidates": extra}
 
-    async def verify(state: ReviewState) -> dict[str, Any]:
-        risk = {f.path: f.reasons for f in state["plan"].files if f.reasons}
-        decisions = await verifier.verify(
-            ordered(state), state.get("contexts", {}), risk, state.get("tools", {})
+    def escalated(state: ReviewState) -> list[Escalation]:
+        order = {(t.path, t.index): i for i, t in enumerate(state["plan"].tasks)}
+        return sorted(
+            state.get("escalations", []), key=lambda e: order[(e.task.path, e.task.index)]
         )
-        return {"decisions": decisions}
+
+    async def verify(state: ReviewState) -> dict[str, Any]:
+        batch = VerifyBatch(
+            candidates=ordered(state),
+            contexts=state.get("contexts", {}),
+            risk={f.path: f.reasons for f in state["plan"].files if f.reasons},
+            tools=state.get("tools", {}),
+            escalations=escalated(state),
+        )
+        return {"decisions": await verifier.verify(batch)}
 
     def aggregator(state: ReviewState) -> dict[str, Any]:
         plan = state["plan"]
@@ -190,12 +218,17 @@ def build_graph(
         report = state.get("sast")
         if report is not None:
             text += "\n" + report.summary()
+        local = len(plan.tasks) - len(state.get("escalations", []))
+        text += f"\nRouting: {local} hunk(s) to {model.name}."
+        for line in verifier.summary_lines:
+            text += "\n" + line
         text += f"\nVerifier: {verifier.name}; {dropped} comment(s) dropped."
         return {
             "result": {
                 "summary": text,
                 "verdict": v,
                 "files": file_reviews(plan, comments, not_reviewed),
+                "cost_usd": verifier.cost_usd,
             }
         }
 
@@ -305,6 +338,7 @@ async def run_review(
         summary=result["summary"],
         verdict=result["verdict"],
         files=result["files"],
+        cost_usd=round(result["cost_usd"], 6),
         duration_s=round(time.monotonic() - started, 2),
     )
     return review, state
