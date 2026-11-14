@@ -1,4 +1,4 @@
-.PHONY: sync up down ps logs test unit train-test lint format typecheck check stats
+.PHONY: sync up down langfuse-up langfuse-down ps logs test unit train-test lint format typecheck check stats
 
 sync:
 	uv sync
@@ -8,6 +8,13 @@ up:
 
 down:
 	docker compose down
+
+# Self-hosted Langfuse for traces and prompts (ADR 0014). UI at http://localhost:3001.
+langfuse-up:
+	docker compose --profile langfuse up -d --wait
+
+langfuse-down:
+	docker compose --profile langfuse stop langfuse-web langfuse-worker langfuse-clickhouse langfuse-minio langfuse-redis langfuse-postgres
 
 ps:
 	docker compose ps

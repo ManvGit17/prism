@@ -17,7 +17,7 @@ from typing import Literal, Protocol
 
 import httpx
 
-from prism.models.reviewer import review_messages, to_raw_comment
+from prism.models.reviewer import SYSTEM_PROMPT, review_messages, to_raw_comment
 from prism.schemas import RawComment
 
 log = logging.getLogger(__name__)
@@ -32,8 +32,11 @@ class ReviewerModel(Protocol):
 
 
 class OllamaReviewer:
-    def __init__(self, url: str, model: str, *, timeout_s: float = 180.0) -> None:
+    def __init__(
+        self, url: str, model: str, *, timeout_s: float = 180.0, system: str = SYSTEM_PROMPT
+    ) -> None:
         self.name = model
+        self.system = system
         self._url = url.rstrip("/")
         self._client = httpx.AsyncClient(timeout=timeout_s)
 
@@ -46,7 +49,7 @@ class OllamaReviewer:
             f"{self._url}/api/chat",
             json={
                 "model": self.name,
-                "messages": review_messages(hunk),
+                "messages": review_messages(hunk, self.system),
                 "stream": False,
                 "options": options,
             },
@@ -69,6 +72,9 @@ class HunkResult:
     attempts: int
     status: Status = "ok"
     error: str | None = None  # last error when no comment came back
+    # Time spent waiting for a model slot, summed over attempts. A trace shows it apart from
+    # the call itself: with every hunk queued at once, most of a span can be waiting.
+    wait_s: float = 0.0
 
 
 async def review_hunk(
@@ -83,11 +89,14 @@ async def review_hunk(
     of a PR start at once and wait on the semaphore, so a check at start would always pass."""
     error: str | None = None
     status: Status = "invalid"
+    wait = 0.0
     for attempt in range(retries + 1):
         try:
+            queued = time.monotonic()
             async with limit:
+                wait += time.monotonic() - queued
                 if deadline is not None and time.monotonic() > deadline:
-                    return HunkResult(None, attempt, "time")
+                    return HunkResult(None, attempt, "time", wait_s=wait)
                 text = await model.reply(hunk, attempt)
         except (httpx.HTTPError, KeyError, ValueError) as exc:
             error, status = f"{type(exc).__name__}: {exc}", "error"
@@ -95,8 +104,8 @@ async def review_hunk(
             continue
         comment = to_raw_comment(hunk, text)
         if comment is not None:
-            return HunkResult(comment, attempt + 1)
+            return HunkResult(comment, attempt + 1, wait_s=wait)
         error, status = f"invalid reply: {text[:200]!r}", "invalid"
         log.info("reviewer reply not valid JSON (attempt %d)", attempt + 1)
     log.warning("dropping hunk after %d attempts: %s", retries + 1, error)
-    return HunkResult(None, retries + 1, status, error)
+    return HunkResult(None, retries + 1, status, error, wait_s=wait)

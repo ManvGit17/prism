@@ -22,7 +22,10 @@ from prism.store import GraphReader, GraphStats, InMemoryGraphStore, Related
 from prism.store.factory import StoreKind, Stores, StoreUnavailable, open_stores
 
 if TYPE_CHECKING:
+    from prism.config import Settings
     from prism.indexer.embedder import Embedder
+    from prism.observability.prompts import PromptSource
+    from prism.observability.tracing import Tracer
     from prism.schemas import ContextMode
     from prism.store.base import VectorReader
 
@@ -449,6 +452,7 @@ def review(
     from contextlib import nullcontext
 
     from prism.models.gate import GateError, load_gate
+    from prism.observability.prompts import REVIEW, REVIEWER, VERIFY
     from prism.retrieval.context import ContextOptions, build_context
     from prism.retrieval.render import render_hunk
     from prism.retrieval.rerank import make_reranker
@@ -497,11 +501,21 @@ def review(
     def sast_fn(paths: Sequence[str]) -> SastReport:
         return run_sast(repo, paths, tools, timeout_s=s.sast_timeout_s)
 
+    try:
+        tracer, prompts = _observability(s)
+    except ImportError as exc:
+        typer.echo("PRISM_TRACING=langfuse needs `uv sync --group observability`", err=True)
+        raise typer.Exit(3) from exc
+    reviewer_prompt = prompts.get(REVIEWER)
+    rubrics = {"rubric": prompts.get(VERIFY).text, "review_rubric": prompts.get(REVIEW).text}
+
     chosen: Verifier
     handoff: HandoffVerifier | None = None
     claude: ClaudeVerifier | None = None
     if kind == "handoff":
-        handoff = claude = HandoffVerifier(work, min_confidence=s.verifier_min_confidence)
+        handoff = claude = HandoffVerifier(
+            work, min_confidence=s.verifier_min_confidence, **rubrics
+        )
         chosen = handoff
     elif kind == "api":
         try:
@@ -518,7 +532,7 @@ def review(
                 "--verifier api needs the frontier group: uv sync --group frontier", err=True
             )
             raise typer.Exit(3) from exc
-        claude = ClaudeVerifier(backend, min_confidence=s.verifier_min_confidence)
+        claude = ClaudeVerifier(backend, min_confidence=s.verifier_min_confidence, **rubrics)
         chosen = claude
     else:
         chosen = RuleVerifier()
@@ -555,7 +569,10 @@ def review(
 
         async def go() -> str:
             reviewer = OllamaReviewer(
-                s.ollama_url, model or s.reviewer_model, timeout_s=s.reviewer_timeout_s
+                s.ollama_url,
+                model or s.reviewer_model,
+                timeout_s=s.reviewer_timeout_s,
+                system=reviewer_prompt.text,
             )
             try:
                 result, _ = await run_review(
@@ -570,12 +587,20 @@ def review(
                     cache=ReplyCache(work / "replies.json"),
                     context_fn=contexts,
                     sast_fn=sast_fn,
+                    tracer=tracer,
+                    reviewer_prompt=reviewer_prompt.client,
                 )
             finally:
                 await reviewer.aclose()
             return result.model_dump_json(indent=2)
 
         payload = asyncio.run(go())
+
+    if prompts.summary():
+        typer.echo(prompts.summary(), err=True)
+    url = tracer.trace_url()
+    if url:
+        typer.echo(f"trace: {url}", err=True)
 
     if claude is not None:
         for err in claude.errors:
@@ -596,3 +621,40 @@ def review(
     if out is not None:
         out.write_text(payload + "\n", encoding="utf-8")
     typer.echo(payload)
+
+
+def _observability(s: "Settings") -> "tuple[Tracer, PromptSource]":
+    """The tracer and the prompt source the settings ask for."""
+    from prism.observability.prompts import PromptSource
+    from prism.observability.tracing import LangfuseTracer, NoopTracer
+
+    tracer: Tracer = NoopTracer()
+    client = None
+    if s.tracing == "langfuse" or s.prompt_source == "langfuse":
+        lf = LangfuseTracer.from_settings(s)
+        client = lf.client
+        if s.tracing == "langfuse":
+            tracer = lf
+    return tracer, PromptSource(client if s.prompt_source == "langfuse" else None, s.prompt_label)
+
+
+prompts_app = typer.Typer(help="Prompts in Langfuse prompt management.", no_args_is_help=True)
+app.add_typer(prompts_app, name="prompts")
+
+
+@prompts_app.command("push")
+def prompts_push(
+    label: Annotated[
+        str, typer.Option("--label", help="Label for the new versions, e.g. staging.")
+    ] = "staging",
+) -> None:
+    """Copy the prompts in the code to Langfuse as new versions with LABEL."""
+    from prism.observability.prompts import push
+    from prism.observability.tracing import LangfuseTracer
+
+    client = LangfuseTracer.from_settings(get_settings()).client
+    if not client.auth_check():
+        typer.echo("Langfuse rejected the keys; check PRISM_LANGFUSE_* and the server.", err=True)
+        raise typer.Exit(3)
+    for line in push(client, label):
+        typer.echo(line)

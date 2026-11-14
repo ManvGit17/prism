@@ -110,6 +110,18 @@ class Settings(BaseSettings):
     escalate: bool = True
     escalate_min_lines: int = Field(default=60, ge=1)
 
+    # Tracing and prompt management (ADR 0014). "langfuse" needs `uv sync --group observability`
+    # and the `langfuse` Compose profile; the keys below are the profile's local defaults.
+    tracing: Literal["off", "langfuse"] = "off"
+    langfuse_host: str = "http://127.0.0.1:3001"
+    langfuse_project_id: str = "prism"
+    langfuse_public_key: str = "pk-lf-prism-local-dev"
+    langfuse_secret_key: SecretStr = SecretStr("sk-lf-prism-local-dev")
+    langfuse_environment: str = "development"
+    # "langfuse": read prompts from Langfuse by label, falling back to the code's text.
+    prompt_source: Literal["code", "langfuse"] = "code"
+    prompt_label: str = "production"
+
     @property
     def postgres_dsn(self) -> str:
         return (

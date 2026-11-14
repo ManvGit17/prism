@@ -31,6 +31,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
 from prism.models.gate import Gate
+from prism.observability.tracing import NoopSpan, NoopTracer, Span, Tracer
 from prism.retrieval.diff import FileDiff, parse_diff
 from prism.review.aggregate import cap, file_reviews, summary, verdict
 from prism.review.checks import Candidate, Decision, Escalation, VerifyBatch, new_side_lines
@@ -108,15 +109,42 @@ def build_graph(
     cache: ReplyCache | None = None,
     context_fn: ContextFn | None = None,
     sast_fn: SastFn | None = None,
+    root: Span | None = None,
+    reviewer_prompt: Any = None,
 ) -> Any:
-    """A compiled graph. One semaphore per graph: build a new graph for each review."""
+    """A compiled graph. One semaphore per graph: build a new graph for each review.
+
+    `root` is the review's trace; every node and every model call is a child of it.
+    `reviewer_prompt` is the Langfuse prompt the local model's calls are linked to, if any.
+    """
     limit = asyncio.Semaphore(options.concurrency)
+    trace: Span = root or NoopSpan()
 
     def planner(state: ReviewState) -> dict[str, Any]:
+        span = trace.child("planner", input={"files": len(state["files"])})
         plan = plan_review(
             state["files"], gate, max_hunks=options.max_hunks, churn=state.get("churn")
         )
         routes = route(plan, enabled=options.escalate, min_lines=options.escalate_min_lines)
+        span.end(
+            output={
+                "files": [
+                    {
+                        "path": f.path,
+                        "risk": f.risk,
+                        "reasons": list(f.reasons),
+                        "hunks": f.hunks_total,
+                        "selected": len(f.tasks),
+                        "skipped_by_gate": f.skipped_by_gate,
+                    }
+                    for f in plan.files
+                ],
+                "skipped_files": [list(x) for x in plan.skipped_files],
+                "over_budget": len(plan.not_reviewed),
+                "escalated": {f"{p}#{i}": list(r) for (p, i), r in routes.items()},
+            },
+            metadata={"gate": gate.name, "max_hunks": options.max_hunks},
+        )
         return {"plan": plan, "routes": routes}
 
     def fan_out(state: ReviewState) -> list[Send] | str:
@@ -135,24 +163,59 @@ def build_graph(
 
     async def sast(state: SastState) -> dict[str, Any]:
         assert sast_fn is not None
+        span = trace.child("sast", kind="tool", input={"paths": state["paths"]})
         # The tools are subprocesses; a thread keeps the model calls going meanwhile.
-        return {"sast": await asyncio.to_thread(sast_fn, state["paths"])}
+        report = await asyncio.to_thread(sast_fn, state["paths"])
+        span.end(
+            output={"findings": [f.describe() for f in report.findings]},
+            metadata={"ran": report.ran, "skipped": [list(x) for x in report.skipped]},
+        )
+        return {"sast": report}
 
     async def file_reviewer(state: FileState) -> dict[str, Any]:
         file, deadline, routes = state["file"], state["deadline"], state["routes"]
+        file_span = trace.child(
+            f"file {file.path}",
+            input={"hunks": len(file.tasks)},
+            metadata={"risk": file.risk, "reasons": list(file.reasons)},
+        )
 
         async def one(task: HunkTask) -> Candidate | NotReviewed | Escalation:
+            name = f"hunk {task.hunk.header}"
             reasons = routes.get((task.path, task.index))
             if reasons:
+                file_span.child(name, input=task.text).end(
+                    output="escalated to the frontier model", metadata={"reasons": list(reasons)}
+                )
                 return Escalation(task, reasons)
             cached = cache.get(model.name, task.path, task.text) if cache else None
             if cached is not None:
+                file_span.child(name, input=task.text).end(
+                    output=cached, metadata={"cached": True, "model": model.name}
+                )
                 if "not_reviewed" in cached:
                     return NotReviewed(task.path, task.hunk.header, cached["not_reviewed"])
                 raw = RawComment(line=cached["line"], comment=cached["comment"])
                 return Candidate(task=task, raw=raw, model=model.name)
+            gen = file_span.child(
+                name,
+                kind="generation",
+                model=model.name,
+                input=task.text,
+                prompt=reviewer_prompt,
+                metadata={"gate_score": task.gate_score},
+            )
             result = await review_hunk(
                 model, task.text, limit, retries=options.retries, deadline=deadline
+            )
+            gen.end(
+                output=result.comment.model_dump() if result.comment else result.error,
+                metadata={
+                    "status": result.status,
+                    "attempts": result.attempts,
+                    "wait_for_slot_s": round(result.wait_s, 3),
+                },
+                level="WARNING" if result.status not in ("ok", "time") else None,
             )
             # A raised error (server down, timeout) is not cached, so a rerun tries again.
             if cache is not None and result.status != "error":
@@ -164,6 +227,13 @@ def build_graph(
             return Candidate(task=task, raw=result.comment, model=model.name)
 
         outcomes = await asyncio.gather(*(one(t) for t in file.tasks))
+        file_span.end(
+            output={
+                "comments": sum(isinstance(o, Candidate) for o in outcomes),
+                "escalated": sum(isinstance(o, Escalation) for o in outcomes),
+                "not_reviewed": sum(isinstance(o, NotReviewed) for o in outcomes),
+            }
+        )
         return {
             "candidates": [o for o in outcomes if isinstance(o, Candidate)],
             "unreviewed": [o for o in outcomes if isinstance(o, NotReviewed)],
@@ -176,6 +246,7 @@ def build_graph(
         return sorted(state.get("candidates", []), key=lambda c: order[(c.task.path, c.task.index)])
 
     def context(state: ReviewState) -> dict[str, Any]:
+        span = trace.child("context", kind="retriever")
         if cache is not None:
             cache.save()
         report = state.get("sast")
@@ -189,6 +260,12 @@ def build_graph(
         for c in items:
             tasks.setdefault((c.task.path, c.task.index), c.task)
         contexts = context_fn(list(tasks.values())) if context_fn is not None and tasks else {}
+        span.end(
+            output={
+                "hunks_with_context": sum(1 for v in contexts.values() if v),
+                "tool_comments": len(extra),
+            },
+        )
         return {"contexts": contexts, "tools": tools, "candidates": extra}
 
     def escalated(state: ReviewState) -> list[Escalation]:
@@ -205,9 +282,30 @@ def build_graph(
             tools=state.get("tools", {}),
             escalations=escalated(state),
         )
-        return {"decisions": await verifier.verify(batch)}
+        span = trace.child(
+            "verifier",
+            kind="evaluator",
+            input={"comments": len(batch.candidates), "escalations": len(batch.escalations)},
+            metadata={"verifier": verifier.name},
+        )
+        decisions = await verifier.verify(batch)
+        span.end(
+            output=[
+                {
+                    "path": d.candidate.path,
+                    "line": d.candidate.raw.line,
+                    "author": d.candidate.model,
+                    "decision": d.reason,
+                    "severity": d.kept.severity.value if d.kept else None,
+                }
+                for d in decisions
+            ],
+            metadata={"pending": getattr(verifier, "pending", 0), "cost_usd": verifier.cost_usd},
+        )
+        return {"decisions": decisions}
 
     def aggregator(state: ReviewState) -> dict[str, Any]:
+        span = trace.child("aggregator")
         plan = state["plan"]
         kept = [d.kept for d in state["decisions"] if d.kept is not None]
         comments, cut = cap(kept, options.max_comments)
@@ -223,6 +321,7 @@ def build_graph(
         for line in verifier.summary_lines:
             text += "\n" + line
         text += f"\nVerifier: {verifier.name}; {dropped} comment(s) dropped."
+        span.end(output={"comments": len(comments), "cut": cut, "verdict": v.value})
         return {
             "result": {
                 "summary": text,
@@ -319,26 +418,57 @@ async def run_review(
     cache: ReplyCache | None = None,
     context_fn: ContextFn | None = None,
     sast_fn: SastFn | None = None,
+    tracer: Tracer | None = None,
+    reviewer_prompt: Any = None,
 ) -> tuple[PRReview, ReviewState]:
     """Review a diff whose head is checked out at `repo`. Returns the review and final state."""
     started = time.monotonic()
     files = parse_diff(diff_text)
     churn = git_churn(repo, [f.path for f in files])
-    graph = build_graph(
-        gate, model, verifier, options, cache=cache, context_fn=context_fn, sast_fn=sast_fn
-    )
-    state: ReviewState = await graph.ainvoke(
-        {"files": files, "churn": churn, "deadline": started + options.time_limit_s}
-    )
-    result = state["result"]
-    review = PRReview(
-        repo=repo_name or repo.resolve().name,
-        pr_number=pr_number,
-        head_sha=head_sha(repo),
-        summary=result["summary"],
-        verdict=result["verdict"],
-        files=result["files"],
-        cost_usd=round(result["cost_usd"], 6),
-        duration_s=round(time.monotonic() - started, 2),
-    )
+    name = repo_name or repo.resolve().name
+    sha = head_sha(repo)
+    tracer = tracer or NoopTracer()
+    tags = [f"repo:{name}", f"model:{model.name}", f"verifier:{verifier.name}"]
+    if pr_number is not None:
+        tags.append(f"pr:{pr_number}")
+    with tracer.review(
+        name="review",
+        tags=tags,
+        metadata={"repo": name, "pr": pr_number or "", "head_sha": sha, "model": model.name},
+        input={"files": [f.path for f in files], "diff_chars": len(diff_text)},
+    ) as root:
+        graph = build_graph(
+            gate,
+            model,
+            verifier,
+            options,
+            cache=cache,
+            context_fn=context_fn,
+            sast_fn=sast_fn,
+            root=root,
+            reviewer_prompt=reviewer_prompt,
+        )
+        state: ReviewState = await graph.ainvoke(
+            {"files": files, "churn": churn, "deadline": started + options.time_limit_s}
+        )
+        result = state["result"]
+        review = PRReview(
+            repo=name,
+            pr_number=pr_number,
+            head_sha=sha,
+            summary=result["summary"],
+            verdict=result["verdict"],
+            files=result["files"],
+            cost_usd=round(result["cost_usd"], 6),
+            duration_s=round(time.monotonic() - started, 2),
+        )
+        root.end(
+            output={
+                "verdict": review.verdict.value,
+                "comments": len(review.comments),
+                "summary": review.summary,
+            },
+            metadata={"duration_s": review.duration_s, "cost_usd": review.cost_usd},
+        )
+    tracer.flush()
     return review, state

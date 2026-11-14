@@ -414,8 +414,17 @@ def _parse(
 class ClaudeVerifier:
     """Verifies comments, reviews escalated hunks, and escalates a second round on its verdicts."""
 
-    def __init__(self, backend: ClaudeBackend, *, min_confidence: float = 0.6) -> None:
+    def __init__(
+        self,
+        backend: ClaudeBackend,
+        *,
+        min_confidence: float = 0.6,
+        rubric: str = RUBRIC,
+        review_rubric: str = REVIEW_RUBRIC,
+    ) -> None:
         self.backend = backend
+        self.rubric = rubric
+        self.review_rubric = review_rubric
         self.min_confidence = min_confidence
         self.name = backend.name
         self.pending = 0
@@ -430,7 +439,7 @@ class ClaudeVerifier:
         self.errors, self.summary_lines = [], []
         passing, decisions = apply_rules(batch.candidates)
         verify_reqs = [request(c, batch) for c in passing]
-        raw_verdicts, errs = self.backend.answer("verify", RUBRIC, verify_reqs)
+        raw_verdicts, errs = self.backend.answer("verify", self.rubric, verify_reqs)
         self.errors += errs
         verdicts: dict[str, Verdict] = _parse(Verdict, raw_verdicts, self.errors)
 
@@ -441,7 +450,9 @@ class ClaudeVerifier:
         escalations: list[tuple[Escalation, list[str]]] = [(e, []) for e in first] + second
         review_reqs = [review_request(e, batch, notes) for e, notes in escalations]
         raw_reviews, errs = (
-            self.backend.answer("review", REVIEW_RUBRIC, review_reqs) if review_reqs else ({}, [])
+            self.backend.answer("review", self.review_rubric, review_reqs)
+            if review_reqs
+            else ({}, [])
         )
         self.errors += errs
         reviews: dict[str, FrontierReview] = _parse(FrontierReview, raw_reviews, self.errors)
@@ -505,9 +516,19 @@ _TOOL_AUTHORS = frozenset({"bandit", "semgrep", "ruff", "pmd", "prism"})
 class HandoffVerifier(ClaudeVerifier):
     """`ClaudeVerifier` over files in `<work>/verify`."""
 
-    def __init__(self, work: Path, *, min_confidence: float = 0.6, name: str = "claude") -> None:
+    def __init__(
+        self,
+        work: Path,
+        *,
+        min_confidence: float = 0.6,
+        name: str = "claude",
+        rubric: str = RUBRIC,
+        review_rubric: str = REVIEW_RUBRIC,
+    ) -> None:
         backend = HandoffBackend(work / "verify", name)
-        super().__init__(backend, min_confidence=min_confidence)
+        super().__init__(
+            backend, min_confidence=min_confidence, rubric=rubric, review_rubric=review_rubric
+        )
         self.dir = backend.dir
         self.name = f"{name} (handoff)"
 
