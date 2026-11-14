@@ -91,13 +91,21 @@ class FakeGitHub:
             body = json.loads(request.content)
             self.reviews.append(body)
             return httpx.Response(200, json={"id": 900 + len(self.reviews)})
-        m = re.fullmatch(rf"/repos/{REPO}/pulls/{PR}/reviews/(\d+)/comments", path)
-        if m:
-            body = self.reviews[int(m.group(1)) - 901]
+        if re.fullmatch(rf"/repos/{REPO}/pulls/{PR}/reviews/(\d+)/comments", path):
+            # What GitHub really returns here: no line, only the old diff position.
+            return httpx.Response(200, json=[{"id": 1, "line": None, "position": 3}])
+        if path == f"/repos/{REPO}/pulls/{PR}/comments" and method == "GET":
             return httpx.Response(
                 200,
                 json=[
-                    {"id": 5000 + i, "path": c["path"], "line": c["line"], "body": c["body"]}
+                    {
+                        "id": 5000 + 100 * r + i,
+                        "pull_request_review_id": 901 + r,
+                        "path": c["path"],
+                        "line": c["line"],
+                        "body": c["body"],
+                    }
+                    for r, body in enumerate(self.reviews)
                     for i, c in enumerate(body["comments"])
                 ],
             )

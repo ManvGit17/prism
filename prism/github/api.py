@@ -220,12 +220,15 @@ class GitHubClient:
         return data, resp.headers.get("etag")
 
     def review_comments(self, repo: str, number: int, review_id: int) -> list[dict[str, Any]]:
+        """The comments of one review, with their lines.
+
+        Read from the PR's comment list, not `/reviews/{id}/comments`: that endpoint returns
+        `line: null` (only the old diff `position`), so comments cannot be matched to findings.
+        """
         data: list[dict[str, Any]] = self.request(
-            "GET",
-            f"/repos/{repo}/pulls/{number}/reviews/{review_id}/comments",
-            params={"per_page": 100},
+            "GET", f"/repos/{repo}/pulls/{number}/comments", params={"per_page": 100}
         ).json()
-        return data
+        return [c for c in data if c.get("pull_request_review_id") == review_id]
 
 
 def installations(auth: AppAuth) -> list[int]:
