@@ -152,3 +152,59 @@ after loading it.
    repository, and why?
 5. Validation PR-AUC peaked at epoch 2 while train loss kept falling. What is happening, and what
    would you change in the next run?
+
+## Phase 4: Reviewer fine-tuning (2026-11-14)
+
+**What was built.** A fine-tuned version of the reviewer model. Qwen2.5-Coder-3B was trained on
+40,000 hunk-and-comment pairs from CodeReviewer with QLoRA on one Kaggle T4, exported to GGUF and
+served by Ollama as `prism-reviewer:v2`. The model writes only the comment; the line is picked
+afterwards from the identifiers it names (ADR 0009). Base and tuned were compared on 500 test
+hunks with BLEU, ROUGE, valid JSON and a blinded A/B judge.
+
+**LoRA in one line.** The 3 billion base weights stay frozen. For each weight matrix W the
+model learns a small update BA, where B and A are thin matrices of rank 16, and uses W + BA.
+That is 30 million trained numbers instead of 3 billion. QLoRA also stores the frozen W in 4-bit
+NF4, a format with 16 levels spaced to match how weights are actually distributed (most of them
+near zero), so a 3B model fits a 16 GB T4 with room to train.
+
+**The first run lost.** It beat the base model on ROUGE and JSON, and the judge still preferred
+the base model's comments (tuned won 43.7% of decided pairs). Its most common comment was "This is
+not needed". The training data is full of short comments that point at nothing and of linter
+output pasted in as review comments, and the model learned those.
+
+**The second run filtered the data and tied.** Same settings and again 40,000 rows, but no linter
+output, no comment under 8 words that names nothing in the hunk, and no comment text more than 3
+times. The judge now calls it even with the base model (48.6%, interval 43 to 54). The data
+filter moved the result more than any training setting would have.
+
+**Why BLEU is weak here.** BLEU counts the word sequences a comment shares with the one comment
+a human left. A hunk can deserve many different good comments, and a correct comment in other
+words scores near zero. Run 1 scored lower than base on BLEU and higher on ROUGE, and neither
+matched what the judge said. That is why the judge decides.
+
+**Greedy decoding picks one opener.** 89% of run 2's comments start with "I think", and it almost
+never asks a question, while 44% of its training comments do. "I" is the most common first word
+in the data (tied with "this"), and greedy decoding takes the top choice every time. Questions are
+spread over many openers, so none of them is ever the top choice.
+
+**Overfitting signs.** Validation loss fell from 2.244 to 2.202 and was flat over the last 500
+steps; train and validation loss stayed close. No overfitting in one epoch, and a second epoch
+would add little. The model learned its data well; the data was the problem.
+
+**SFT, DPO, RLHF.** SFT trains on examples of the right answer. DPO trains on pairs, a preferred
+and a rejected answer, and pushes the model toward the first without a separate reward model.
+RLHF trains a reward model from human preferences and optimises against it with reinforcement
+learning. DPO on judge-labelled pairs is the obvious next step for the "I think" habit. Not
+tried.
+
+**Quiz**
+
+1. LoRA rank 16 on a 2048 x 11008 matrix: how many trained numbers is that, and how many in the
+   full matrix?
+2. Run 1 had higher ROUGE-L than the base model and lost with the judge. Give two reasons the two
+   can disagree.
+3. Why is the test split not filtered when the training split is?
+4. 44% of training comments contain a question, and the model asks one in 1% of its comments.
+   Explain why, and name two ways to change it.
+5. Sonnet and Opus agreed on 28 of 50 pairs. Does that make the 500-pair result useless? What
+   would you do to trust it more?

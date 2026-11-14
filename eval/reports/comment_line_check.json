@@ -1,0 +1,22 @@
+{
+  "split": "valid",
+  "rows": 10319,
+  "share": {
+    "no_shared_identifier": 0.5094485899796491,
+    "one_best_line": 0.2952805504409342,
+    "tie": 0.19527085957941662
+  },
+  "y_values": {
+    "1": 10319
+  },
+  "single_changed_line_share": 0.10039732532222115,
+  "hunk_lines": {
+    "median": 11,
+    "p90": 18,
+    "p99": 20
+  },
+  "comment_words": {
+    "median": 14,
+    "p90": 38
+  }
+}

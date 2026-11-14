@@ -1,0 +1,77 @@
+{
+  "base": {
+    "comments": 500,
+    "mean_words": 16.2,
+    "backtick": 75.8,
+    "question": 1.0,
+    "starts_i_think": 0.0,
+    "distinct": 500,
+    "most_common": [],
+    "bot_or_lint": 0.0,
+    "vague": 0.2
+  },
+  "run1": {
+    "comments": 500,
+    "mean_words": 10.6,
+    "backtick": 67.0,
+    "question": 2.8,
+    "starts_i_think": 77.0,
+    "distinct": 448,
+    "most_common": [
+      [
+        "this is not needed",
+        22
+      ],
+      [
+        "this is not needed anymore",
+        15
+      ],
+      [
+        "i think you can remove this line",
+        7
+      ]
+    ],
+    "bot_or_lint": 1.6,
+    "vague": 13.0
+  },
+  "run2": {
+    "comments": 500,
+    "mean_words": 12.0,
+    "backtick": 77.6,
+    "question": 1.0,
+    "starts_i_think": 89.0,
+    "distinct": 495,
+    "most_common": [
+      [
+        "i think you can remove this line as well",
+        3
+      ],
+      [
+        "i think we should be able to remove this import",
+        2
+      ],
+      [
+        "this is a breaking change. i think we should revert this change",
+        2
+      ]
+    ],
+    "bot_or_lint": 0.0,
+    "vague": 0.4
+  },
+  "human": {
+    "comments": 500,
+    "mean_words": 17.8,
+    "backtick": 37.4,
+    "question": 43.0,
+    "starts_i_think": 3.0,
+    "distinct": 499,
+    "most_common": [
+      [
+        "prefer double-quoted strings unless you need single quotes to avoid extra backslashes for escaping",
+        2
+      ]
+    ],
+    "bot_or_lint": 1.2,
+    "vague": 9.2
+  }
+}

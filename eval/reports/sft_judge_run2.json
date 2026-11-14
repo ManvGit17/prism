@@ -1,0 +1,46 @@
+{
+  "seed": 13,
+  "test_rows": 500,
+  "identical": 0,
+  "sonnet": {
+    "judged": 500,
+    "missing": 0,
+    "pairs": 500,
+    "tuned_wins": 156,
+    "base_wins": 165,
+    "ties": 179,
+    "tuned_win_rate": 31.2,
+    "base_win_rate": 33.0,
+    "tie_rate": 35.8,
+    "tuned_share_of_decided": 48.6,
+    "tuned_share_ci95": [
+      43.2,
+      54.0
+    ]
+  },
+  "opus": {
+    "judged": 50,
+    "missing": 450,
+    "pairs": 50,
+    "tuned_wins": 18,
+    "base_wins": 12,
+    "ties": 20,
+    "tuned_win_rate": 36.0,
+    "base_win_rate": 24.0,
+    "tie_rate": 40.0,
+    "tuned_share_of_decided": 60.0,
+    "tuned_share_ci95": [
+      42.3,
+      75.4
+    ]
+  },
+  "agreement": {
+    "judges": [
+      "sonnet",
+      "opus"
+    ],
+    "pairs": 50,
+    "agree": 28,
+    "rate": 56.0
+  }
+}

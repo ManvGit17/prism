@@ -2,8 +2,11 @@
 
 Two shapes are kept apart on purpose (PLAN.md section 2b):
 
-* `RawComment` is what a reviewer model emits: a line and a comment. The
-  fine-tuned model has training labels for nothing else.
+* `ReviewerReply` is what the reviewer model writes: a comment and nothing
+  else. CodeReviewer has no line labels (ADR 0009), so the model is not asked
+  for one.
+* `RawComment` is a reply placed on a line. The line is picked outside the
+  model (`prism.models.reviewer.anchor_line`).
 * `ReviewComment` is a comment the verifier has kept. The verifier adds the
   severity, the category and its confidence.
 
@@ -49,8 +52,14 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+class ReviewerReply(_Strict):
+    """What the reviewer model writes for one hunk: `{"comment": "..."}`."""
+
+    comment: NonEmptyStr
+
+
 class RawComment(_Strict):
-    """A reviewer model's output for one hunk, before verification."""
+    """A reviewer comment placed on a line, before verification."""
 
     line: LineNumber = Field(description="Line in the new version of the file.")
     comment: NonEmptyStr

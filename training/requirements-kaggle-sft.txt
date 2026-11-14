@@ -1,0 +1,6 @@
+# Installed by training/sft/sft_kaggle.ipynb after `pip install unsloth`.
+# Unsloth pins torch, transformers, peft, trl and bitsandbytes itself; these are only what the
+# PRism code imports on top (prism/models/reviewer.py and the gate module it reuses).
+pydantic>=2.7
+pydantic-settings>=2.3
+numpy>=1.26

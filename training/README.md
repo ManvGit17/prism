@@ -1,6 +1,7 @@
 # Training
 
-Phase 3 (the gate classifier) lives in `training/gate/`. Phase 4 will add the reviewer model here.
+Phase 3 (the gate classifier) lives in `training/gate/`, Phase 4 (the reviewer model) in
+`training/sft/`.
 Logic is in importable modules; the notebook only calls them.
 
 | Module | Job |
@@ -71,3 +72,37 @@ validation pass; 2 epochs are enough (see the model card).
 3. Fill `training/model_cards/gate.md` from `metrics.json`.
 4. `uv run python eval/gate_breakdown.py data/codereviewer/Diff_Quality_Estimation.zip` scores a
    sample of the test split by language and hunk length, for the model card's limits.
+
+## Reviewer model (Phase 4)
+
+| Module | Job |
+|---|---|
+| `sft/format.py` | Clean, dedupe and sample comment-generation rows into chat examples |
+| `sft/train.py` | QLoRA with Unsloth (or plain peft for the CPU test), loss on the reply only |
+| `sft/evaluate.py` | Greedy generation for base and tuned, BLEU-4, ROUGE-L, valid-JSON share |
+| `sft/metrics.py` | BLEU-4 and ROUGE-L in plain Python |
+| `sft/export.py` | GGUF Q4_K_M through Unsloth, and the Ollama Modelfile |
+| `sft/run.py` | The whole chain in one command |
+| `sft/sft_kaggle.ipynb` | Thin Kaggle notebook around `run.py` |
+
+The prompt, reply parsing and line placement are in `prism/models/reviewer.py` (ADR 0009), shared
+with serving. `make train-test` also runs the reviewer pipeline on a 16 MB random Qwen2.5.
+
+On Kaggle: same setup as the gate (secrets, GPU T4, Internet on), notebook
+`training/sft/sft_kaggle.ipynb`, `REF` set to the branch. Run the dry run first and note its
+`stage ... done in` lines. Unsloth uses one GPU, so the run is started with
+`CUDA_VISIBLE_DEVICES=0`. Output goes straight to `/kaggle/working/sft_out`: `adapter/` (LoRA
+weights, saved right after training), `eval/generations.jsonl`, `gguf/` and `metrics.json`.
+
+To use it locally, download `sft_out/gguf/` (the `.gguf` and `Modelfile`) into a folder, for
+example `models/reviewer2/gguf/`, then:
+
+```
+ollama create prism-reviewer:v2 -f Modelfile
+ollama run prism-reviewer:v2
+```
+
+`prism-reviewer:v2` is the default `PRISM_REVIEWER_MODEL`. Run 1 (`v1`) trained before the data
+filter and is kept only for the comparison. To judge a new run, see `eval/sft_judge.py` and the
+reproduce steps in `eval/reports/sft.md`; fill `training/model_cards/reviewer.md` from its
+`metrics.json`.

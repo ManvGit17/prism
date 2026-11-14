@@ -38,11 +38,13 @@ Fields:
 
 ### What this means for the plan
 
-1. **There is no line number.** A row is a hunk and a comment. The plan has the model output
-   `{line, comment}`, so the `line` label has to be derived. The usual reading is that the hunk is
-   cut at the line the comment was left on, which makes the last line of `patch` the target. This
-   needs to be checked on a sample before Phase 4 formats the training data. If it does not hold,
-   the model should output the comment only and the line gets picked some other way.
+1. **There is no line number, and it cannot be read off the hunk.** A row is a whole diff hunk
+   (ending in its trailing context lines) and a comment that can be about any line in it. The
+   guess that the hunk is cut at the commented line was checked in Phase 4 and is wrong. On the
+   valid split (`eval/comment_line_check.py`), the comment shares identifiers with exactly one
+   changed line in 30% of rows, ties between several in 20%, and shares none in 51%; 10% of hunks
+   have a single changed line. So the reviewer is trained to write the comment only, and the line
+   is picked afterwards (ADR 0009).
 2. **`oldf` is most of the size.** The 3.6 GB train file is mostly whole source files. Training on
    hunk and comment only means dropping `oldf`, which brings the data down to something a Colab
    session handles easily.
@@ -51,7 +53,22 @@ Fields:
    "hunk plus surrounding file" variant.
 4. **Train has no `lang` or `proj`.** Filtering train to Python and Java would need language
    detection from the code. Valid and test can be filtered directly.
-5. Confirm that `y` is always 1 here, and what it means, before using it.
+5. `y` is 1 in all 10,319 valid rows: every row here is a hunk that got a comment. It is not used.
+6. **Cleaning (Phase 4, `training/sft/format.py`).** Of 117,739 train rows, 8,439 are exact
+   duplicates (same hunk and comment), 226 have comments over 120 words, 26 hunks are over 4,000
+   characters and 20 comments are mostly non-ASCII; 109,028 are left. No comment is under 3 words
+   and no train hunk also appears in valid or test, so those filters removed nothing.
+7. **Many comments are linter output or say nothing about the hunk.** The first reviewer trained
+   on the cleaned data learned "This is not needed" and wrote it on 7% of test hunks
+   (`eval/reports/sft.md`). The second run also drops, from train and valid only: 3,354 train
+   comments that are linter or bot output (RuboCop cops, checkpatch "(style)", line length,
+   whitespace, quote style), 10,937 that are under 8 words and name nothing in the hunk, and
+   320 repeats of a comment text already kept 3 times. 95,284 train rows are left. The test split
+   keeps all of these, so every model is scored on the same rows.
+8. **Comments start in many different ways.** In the filtered train set the most common first
+   words are "this" and "I" (9.6% each), then "why" (4.3%); 44% of comments contain a question.
+   With greedy decoding, a model trained on this picks the single most common opener every time:
+   the tuned reviewer starts 89% of comments with "I think" and asks almost no questions.
 
 ## Quality estimation
 

@@ -4,8 +4,9 @@ A repo-aware AI code reviewer. It parses a repository into a code knowledge grap
 callers, callees and tests for each changed function, and reviews pull-request hunks with a small
 local model whose comments a verifier then checks.
 
-**Status:** Phases 1 and 2 done (code graph for Python and Java, context retrieval for a diff). Nothing reviews
-code yet. The plan is in [PLAN.md](PLAN.md).
+**Status:** Phases 1 to 4 done: code graph for Python and Java, context retrieval for a diff, a
+gate classifier and a fine-tuned reviewer model ([results](eval/reports/sft.md)). Nothing reviews
+code end to end yet. The plan is in [PLAN.md](PLAN.md).
 
 ## Run the services
 
@@ -21,6 +22,10 @@ make test
 ```
 
 `make unit` runs the tests that need no services.
+
+The default reviewer is the fine-tuned `prism-reviewer:v2`, built from a GGUF that is not
+published yet ([model card](training/model_cards/reviewer.md)). Without it, put
+`PRISM_REVIEWER_MODEL=qwen2.5-coder:3b` in `.env`; the two score the same with the judge.
 
 ## Index a repo
 
