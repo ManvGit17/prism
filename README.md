@@ -92,3 +92,20 @@ Then ask Claude Code to review your uncommitted changes with PRism. `review_diff
 them with `submit_answers` and asks again. `explain_finding`, `sast_evidence`, `impacted_tests`,
 `review_history` and `pending_reviews` cover the rest. It works without Docker: retrieval indexes
 the checkout in memory and reviews are kept for the session when Postgres is down.
+
+## Run it as a GitHub App
+
+Register an App on your account (permissions: Pull requests read and write, Contents read-only;
+event: Pull request), install it on a repo, and put its id, the path to its private key and the
+webhook secret in `.env` (see `.env.example`). Then:
+
+```bash
+uv sync --group app --group sast --group mcp
+uv run prism app serve --port 8080 --poll     # webhooks on 127.0.0.1:8080/webhook, plus polling
+npx smee-client --url https://smee.io/<your channel> --target http://127.0.0.1:8080/webhook
+```
+
+The smee channel is the App's webhook URL during local development; `--poll` alone works with no
+tunnel. Reviews are held until their verification is answered (ADR 0017): a Claude Code session
+with PRism's MCP server finds them with `pending_reviews`, answers them, and the next poll or
+`prism app resume` posts the review with its inline comments.
