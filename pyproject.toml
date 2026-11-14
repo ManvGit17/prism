@@ -108,7 +108,7 @@ disallow_subclassing_any = false
 
 # FastMCP's and FastAPI's decorators are untyped when their optional groups are not installed (CI).
 [[tool.mypy.overrides]]
-module = ["prism.mcp_server", "prism.github.webhook"]
+module = ["prism.mcp_server", "prism.github.webhook", "prism.dashboard"]
 disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]

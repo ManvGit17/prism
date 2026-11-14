@@ -677,3 +677,23 @@ def app_feedback() -> None:
     worker, _ = _worker()
     counts = feedback_collector(worker, get_settings()).collect()
     typer.echo(", ".join(f"{k} {v}" for k, v in counts.items()))
+
+
+@app.command("dashboard")
+def dashboard(
+    port: Annotated[int, typer.Option("--port")] = 8090,
+) -> None:
+    """Serve the dashboard on 127.0.0.1:PORT (needs `uv sync --group app`, and the page built
+    with `npm ci && npm run build` in dashboard/)."""
+    import uvicorn
+
+    from prism.dashboard import DashboardData, create_dashboard
+    from prism.mcp_server import PrismTools
+
+    root = Path(__file__).resolve().parent.parent
+    store = PrismTools(get_settings()).store  # Postgres when it is up, else empty in memory
+    web = create_dashboard(
+        DashboardData(store, root / "eval" / "reports"), root / "dashboard" / "dist"
+    )
+    typer.echo(f"dashboard on http://127.0.0.1:{port}", err=True)
+    uvicorn.run(web, host="127.0.0.1", port=port, log_level="warning")

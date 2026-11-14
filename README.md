@@ -125,3 +125,14 @@ Reactions on PRism's comments feed back into Langfuse (ADR 0019): beat reads ðŸ‘
 minutes, replies and resolved threads arrive by webhook (subscribe the App to "Pull request review
 comment" and "Pull request review thread"), and rated comments become scores on the review's
 trace and items in the `prism-comment-feedback` dataset. `prism app feedback` runs one pass.
+
+## Dashboard
+
+```bash
+cd dashboard && npm ci && npm run build && cd ..
+uv run prism dashboard                         # http://127.0.0.1:8090
+```
+
+Reviews with their cost, time, comments posted out of considered and reactions; each review's
+comments, posted and dropped, with the verifier's reasons; who wrote the posted comments and
+where hunks were routed; and the eval reports (ADR 0020). Read-only.
