@@ -1404,6 +1404,9 @@ dev = [
 frontier = [
     { name = "anthropic" },
 ]
+mcp = [
+    { name = "mcp" },
+]
 observability = [
     { name = "langfuse" },
 ]
@@ -1449,6 +1452,7 @@ dev = [
     { name = "ruff", specifier = ">=0.6" },
 ]
 frontier = [{ name = "anthropic", specifier = ">=2.8.0" }]
+mcp = [{ name = "mcp", specifier = ">=1.29.0" }]
 observability = [{ name = "langfuse", specifier = ">=4.15.6" }]
 sast = [
     { name = "bandit", specifier = ">=1.9.4" },

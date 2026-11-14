@@ -77,3 +77,18 @@ PRISM_TRACING=langfuse PRISM_PROMPT_SOURCE=langfuse uv run prism review ...
 
 Each review is one trace with a span per file and hunk (ADR 0014). It needs about 2 GB of
 Docker memory; `make langfuse-down` stops it.
+
+## Use it from Claude Code
+
+PRism's review tools are an MCP server (ADR 0016):
+
+```bash
+uv sync --group mcp --group sast
+claude mcp add prism -- uv run --directory /path/to/prism --group mcp --group sast prism mcp
+```
+
+Then ask Claude Code to review your uncommitted changes with PRism. `review_diff` reviews
+`git diff HEAD`; when it needs verification it hands the requests to Claude Code, which answers
+them with `submit_answers` and asks again. `explain_finding`, `sast_evidence`, `impacted_tests`,
+`review_history` and `pending_reviews` cover the rest. It works without Docker: retrieval indexes
+the checkout in memory and reviews are kept for the session when Postgres is down.

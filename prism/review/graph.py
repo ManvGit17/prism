@@ -395,6 +395,7 @@ def head_sha(repo: Path) -> str:
     try:
         out = subprocess.run(
             ["git", "-C", str(repo), "rev-parse", "HEAD"],
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=10,

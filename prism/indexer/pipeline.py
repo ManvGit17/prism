@@ -127,6 +127,7 @@ def commit_sha_for(root: Path) -> str:
     try:
         result = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=10,

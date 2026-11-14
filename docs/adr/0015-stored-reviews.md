@@ -14,7 +14,7 @@ Two tables in the Compose Postgres (migration 2): `reviews` and `review_findings
 every comment the pipeline considered, from the local model, a SAST tool or Claude, with whether
 it was posted, the decision ("kept" or why it was dropped), the verifier's own words, severity,
 category, confidence, evidence, the suggested fix, the hunk and the SAST findings in that hunk.
-Dropped comments are kept on purpose: "why did PRISM say nothing about this line?" is a question
+Dropped comments are kept on purpose: "why did PRism say nothing about this line?" is a question
 `explain_finding` should answer, and the dashboard's accept rate needs them.
 
 A review is keyed by `repo#pr#head_sha#diff_hash` (`local` for a diff with no PR). Saving the same

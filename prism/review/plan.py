@@ -143,6 +143,7 @@ def git_churn(repo: Path, paths: Sequence[str], commits: int = 200) -> dict[str,
     try:
         out = subprocess.run(
             ["git", "-C", str(repo), "log", f"-{commits}", "--format=", "--name-only"],
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=30,

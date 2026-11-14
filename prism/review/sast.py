@@ -97,7 +97,13 @@ def rel(root: Path, path: str) -> str:
 
 def _run(args: list[str], root: Path, timeout_s: float) -> str:
     proc = subprocess.run(
-        args, cwd=root, capture_output=True, text=True, timeout=timeout_s, encoding="utf-8"
+        args,
+        cwd=root,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=timeout_s,
+        encoding="utf-8",
     )
     # Bandit, Ruff and Semgrep exit 1 when they find something; that is not a failure.
     if proc.returncode not in (0, 1) and not proc.stdout.strip():
@@ -216,7 +222,13 @@ class Pmd:
         args = [str(self._exe()), "check", "-R", self.RULESET, "-f", "json", "--no-progress"]
         args += ["--no-cache", "-d", ",".join(paths)]
         proc = subprocess.run(
-            args, cwd=root, capture_output=True, text=True, timeout=timeout_s, encoding="utf-8"
+            args,
+            cwd=root,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            encoding="utf-8",
         )
         if proc.returncode not in (0, 4) and not proc.stdout.strip():
             raise RuntimeError(f"exit {proc.returncode}: {proc.stderr.strip()[:300]}")

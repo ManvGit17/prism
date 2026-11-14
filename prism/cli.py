@@ -22,14 +22,9 @@ from prism.store import GraphReader, GraphStats, InMemoryGraphStore, Related
 from prism.store.factory import StoreKind, Stores, StoreUnavailable, open_stores
 
 if TYPE_CHECKING:
-    from prism.config import Settings
     from prism.indexer.embedder import Embedder
-    from prism.observability.prompts import PromptSource
-    from prism.observability.tracing import Tracer
-    from prism.review.graph import ReviewState
-    from prism.schemas import ContextMode, PRReview
+    from prism.schemas import ContextMode
     from prism.store.base import VectorReader
-    from prism.store.reviews import Status as ReviewStatus
 
 app = typer.Typer(help="PRism: repo-aware code review.", no_args_is_help=True)
 graph_app = typer.Typer(
@@ -448,213 +443,63 @@ def review(
     """Review a diff and print a validated PRReview as JSON.
 
     With the handoff verifier (the default) the first run stops with exit code 2 after writing
-    verifier requests into the work directory; a Claude model writes the verdicts (see
-    verify/RUBRIC.md there), and running the same command again finishes the review.
+    verifier requests into the work directory; a Claude model writes the answers (see the rubrics
+    there), and running the same command again finishes the review.
     """
     import asyncio
-    import hashlib
     import logging
-    from collections.abc import Sequence
-    from contextlib import nullcontext
 
-    from prism.models.gate import GateError, load_gate
-    from prism.observability.prompts import REVIEW, REVIEWER, VERIFY
-    from prism.retrieval.context import ContextOptions, build_context
-    from prism.retrieval.render import render_hunk
-    from prism.retrieval.rerank import make_reranker
-    from prism.retrieval.tokens import token_counter
-    from prism.review.checks import RuleVerifier
-    from prism.review.graph import ReviewOptions, ReviewState, Verifier, head_sha, run_review
-    from prism.review.handoff import ClaudeVerifier, HandoffVerifier, ReplyCache
-    from prism.review.plan import HunkTask
-    from prism.review.reviewer_client import OllamaReviewer
-    from prism.review.sast import SastReport, default_tools, run_sast
-    from prism.schemas import ContextMode, PRReview
-    from prism.store.reviews import review_key
+    from prism.review.service import ReviewError, ReviewRequest, review_async
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
-    s = get_settings()
-    text = Path(diff).read_text(encoding="utf-8")
-    try:
-        gate = load_gate(s)
-    except GateError as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(3) from exc
-    kind = verifier or s.verifier
-    if kind not in ("handoff", "api", "rules"):
-        raise typer.BadParameter(f"unknown verifier {kind!r}")
-    try:
-        context_mode = ContextMode(mode or s.context_mode)
-    except ValueError as exc:
-        raise typer.BadParameter(f"unknown mode {mode!r}") from exc
-    rid = repo_id or repo.resolve().name
-    if work is None:
-        digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
-        work = Path(s.review_work_dir) / f"{rid}-{head_sha(repo)[:12]}-{digest}"
-    options = ReviewOptions(
-        max_hunks=max_hunks or s.review_max_hunks,
-        time_limit_s=time_limit or s.review_time_limit_s,
-        max_comments=s.review_max_comments,
-        concurrency=s.model_concurrency,
-        retries=s.reviewer_retries,
-        sast_comment_min_severity=s.sast_comment_min_severity,
-        # The rules verifier has no model to escalate to.
-        escalate=s.escalate and kind != "rules",
-        escalate_min_lines=s.escalate_min_lines,
+
+    def note(msg: str) -> None:
+        typer.echo(msg, err=True)
+
+    request = ReviewRequest(
+        repo=repo,
+        diff_text=Path(diff).read_text(encoding="utf-8"),
+        repo_id=repo_id,
+        pr_number=pr_number,
+        work=work,
+        verifier=verifier,
+        model=model,
+        max_hunks=max_hunks,
+        time_limit_s=time_limit,
+        store=store,
+        mode=mode,
+        sast=not no_sast,
+        save=save,
     )
-    names = [] if no_sast else [n.strip() for n in s.sast_tools.split(",") if n.strip()]
-    tools = default_tools(names, s.semgrep_config, s.pmd_home)
-
-    def sast_fn(paths: Sequence[str]) -> SastReport:
-        return run_sast(repo, paths, tools, timeout_s=s.sast_timeout_s)
-
     try:
-        tracer, prompts = _observability(s)
-    except ImportError as exc:
-        typer.echo("PRISM_TRACING=langfuse needs `uv sync --group observability`", err=True)
-        raise typer.Exit(3) from exc
-    reviewer_prompt = prompts.get(REVIEWER)
-    rubrics = {"rubric": prompts.get(VERIFY).text, "review_rubric": prompts.get(REVIEW).text}
+        outcome = asyncio.run(review_async(request, notes=note))
+    except ReviewError as exc:
+        note(str(exc))
+        raise typer.Exit(exc.code) from exc
 
-    chosen: Verifier
-    handoff: HandoffVerifier | None = None
-    claude: ClaudeVerifier | None = None
-    if kind == "handoff":
-        handoff = claude = HandoffVerifier(
-            work, min_confidence=s.verifier_min_confidence, **rubrics
-        )
-        chosen = handoff
-    elif kind == "api":
-        try:
-            from prism.review.frontier_api import ApiBackend
-
-            backend = ApiBackend(
-                s.frontier_model,
-                effort=s.frontier_effort,
-                price_in_per_mtok=s.frontier_price_in_per_mtok,
-                price_out_per_mtok=s.frontier_price_out_per_mtok,
-            )
-        except ImportError as exc:
-            typer.echo(
-                "--verifier api needs the frontier group: uv sync --group frontier", err=True
-            )
-            raise typer.Exit(3) from exc
-        claude = ClaudeVerifier(backend, min_confidence=s.verifier_min_confidence, **rubrics)
-        chosen = claude
-    else:
-        chosen = RuleVerifier()
-
-    # Only the handoff verifier reads context; the rules verifier must not need the stores.
-    needs_context = kind != "rules" and context_mode is not ContextMode.NONE
-    sources = (
-        _context_sources(repo, rid, context_mode, store)
-        if needs_context
-        else nullcontext((InMemoryGraphStore(), None, None))
-    )
-    with sources as (graph, vectors, embedder):
-
-        def contexts(tasks: Sequence[HunkTask]) -> dict[tuple[str, str], str]:
-            if not needs_context:
-                return {}
-            bundle = build_context(
-                repo,
-                rid,
-                text,
-                graph,
-                ContextOptions.from_settings(mode=context_mode),
-                vectors=vectors,
-                embedder=embedder,
-                reranker=make_reranker(),
-                counter=token_counter(),
-            )
-            wanted = {(t.path, t.hunk.header) for t in tasks}
-            return {
-                (h.path, h.hunk_header): render_hunk(h)
-                for h in bundle.hunks
-                if (h.path, h.hunk_header) in wanted
-            }
-
-        async def go() -> tuple[PRReview, ReviewState]:
-            reviewer = OllamaReviewer(
-                s.ollama_url,
-                model or s.reviewer_model,
-                timeout_s=s.reviewer_timeout_s,
-                system=reviewer_prompt.text,
-            )
-            try:
-                result, state = await run_review(
-                    repo,
-                    text,
-                    gate=gate,
-                    model=reviewer,
-                    verifier=chosen,
-                    options=options,
-                    repo_name=rid,
-                    pr_number=pr_number,
-                    cache=ReplyCache(work / "replies.json"),
-                    context_fn=contexts,
-                    sast_fn=sast_fn,
-                    tracer=tracer,
-                    reviewer_prompt=reviewer_prompt.client,
-                )
-            finally:
-                await reviewer.aclose()
-            return result, state
-
-        result, state = asyncio.run(go())
-        payload = result.model_dump_json(indent=2)
-
-    if prompts.summary():
-        typer.echo(prompts.summary(), err=True)
-    url = tracer.trace_url()
-    if url:
-        typer.echo(f"trace: {url}", err=True)
-
-    pending = claude is not None and claude.pending > 0
-    if save:
-        _save_review(
-            s,
-            result,
-            state,
-            key=review_key(rid, pr_number, result.head_sha, text),
-            status="awaiting_verification" if pending else "complete",
-            trace_id=tracer.trace_id(),
-            work_dir=str(work),
-        )
-    if claude is not None:
-        for err in claude.errors:
-            typer.echo(f"verifier: {err}", err=True)
-    if claude is not None and handoff is None and claude.pending:
-        typer.echo(
-            f"{claude.pending} answer(s) missing from the API; see the errors above.", err=True
-        )
+    if outcome.prompts:
+        note(outcome.prompts)
+    if outcome.trace_url:
+        note(f"trace: {outcome.trace_url}")
+    if outcome.stored is not None:
+        stored = outcome.stored
+        note(f"saved review {stored.id} ({stored.status}, {len(stored.findings)} findings)")
+    for err in outcome.errors:
+        note(f"verifier: {err}")
+    if outcome.status == "incomplete":
+        note(f"{outcome.pending} answer(s) missing from the API; see the errors above.")
         raise typer.Exit(4)
-    if handoff is not None and handoff.pending:
-        typer.echo(
-            f"{handoff.pending} answer(s) needed from Claude in {handoff.dir}: verdicts_NN"
+    if outcome.status == "awaiting_verification":
+        note(
+            f"{outcome.pending} answer(s) needed from Claude in {outcome.verify_dir}: verdicts_NN"
             ".jsonl for requests_NN.jsonl (RUBRIC.md) and reviews_NN.jsonl for "
-            "escalations_NN.jsonl (REVIEW_RUBRIC.md). Then run the same command again.",
-            err=True,
+            "escalations_NN.jsonl (REVIEW_RUBRIC.md). Then run the same command again."
         )
         raise typer.Exit(2)
+    payload = outcome.review.model_dump_json(indent=2)
     if out is not None:
         out.write_text(payload + "\n", encoding="utf-8")
     typer.echo(payload)
-
-
-def _observability(s: "Settings") -> "tuple[Tracer, PromptSource]":
-    """The tracer and the prompt source the settings ask for."""
-    from prism.observability.prompts import PromptSource
-    from prism.observability.tracing import LangfuseTracer, NoopTracer
-
-    tracer: Tracer = NoopTracer()
-    client = None
-    if s.tracing == "langfuse" or s.prompt_source == "langfuse":
-        lf = LangfuseTracer.from_settings(s)
-        client = lf.client
-        if s.tracing == "langfuse":
-            tracer = lf
-    return tracer, PromptSource(client if s.prompt_source == "langfuse" else None, s.prompt_label)
 
 
 prompts_app = typer.Typer(help="Prompts in Langfuse prompt management.", no_args_is_help=True)
@@ -679,40 +524,12 @@ def prompts_push(
         typer.echo(line)
 
 
-def _save_review(
-    s: "Settings",
-    review: "PRReview",
-    state: "ReviewState",
-    *,
-    key: str,
-    status: "ReviewStatus",
-    trace_id: str | None,
-    work_dir: str,
-) -> None:
-    """Store the review; a review never fails because Postgres is down."""
-    if s.review_store == "off":
-        return
-    import psycopg
-
-    from prism.store.reviews import PostgresReviewStore, stored_review
-
+@app.command("mcp")
+def mcp_server() -> None:
+    """Serve PRism's review tools over MCP on stdio (needs `uv sync --group mcp`)."""
     try:
-        store = PostgresReviewStore.from_settings()
-    except psycopg.Error as exc:
-        typer.echo(f"note: review not saved, Postgres unreachable ({type(exc).__name__})", err=True)
-        return
-    try:
-        saved = store.save(
-            stored_review(
-                review,
-                key=key,
-                status=status,
-                decisions=state.get("decisions", []),
-                tools=state.get("tools", {}),
-                trace_id=trace_id,
-                work_dir=work_dir,
-            )
-        )
-    finally:
-        store.close()
-    typer.echo(f"saved review {saved.id} ({status}, {len(saved.findings)} findings)", err=True)
+        from prism.mcp_server import main
+    except ImportError as exc:
+        typer.echo("prism mcp needs the mcp group: uv sync --group mcp", err=True)
+        raise typer.Exit(3) from exc
+    main()
