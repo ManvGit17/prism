@@ -1,0 +1,550 @@
+{"judge": "sonnet", "pair": 0, "winner": "base", "tuned_was": "B", "reason": "A at least targets the new parameter; B says remove line, which is unfounded."}
+{"judge": "sonnet", "pair": 1, "winner": "base", "tuned_was": "B", "reason": "B's getattr without default would raise AttributeError; A is vague but harmless."}
+{"judge": "sonnet", "pair": 2, "winner": "tie", "tuned_was": "B", "reason": "Both claims are false; the early return is not redundant or last statement."}
+{"judge": "sonnet", "pair": 3, "winner": "tie", "tuned_was": "B", "reason": "Neither addresses the empty package comment; both are baseless suggestions."}
+{"judge": "sonnet", "pair": 4, "winner": "base", "tuned_was": "A", "reason": "Unused new function is a plausible, specific concern; A's suggestion is already what the code does."}
+{"judge": "sonnet", "pair": 5, "winner": "tuned", "tuned_was": "B", "reason": "Boolean vs boolean is a valid, specific, actionable point."}
+{"judge": "sonnet", "pair": 6, "winner": "tuned", "tuned_was": "B", "reason": "Field of self-referential type StringifiedSymbol is wrong; B points to String."}
+{"judge": "sonnet", "pair": 7, "winner": "tuned", "tuned_was": "A", "reason": "Magic number 14 is a real issue; A is specific and actionable."}
+{"judge": "sonnet", "pair": 8, "winner": "base", "tuned_was": "A", "reason": "Correctly spots duplicate assignment of auth_thrift overriding the joined path."}
+{"judge": "sonnet", "pair": 9, "winner": "base", "tuned_was": "B", "reason": "B proposes a nonexistent commons-lang class; A is harmless."}
+{"judge": "sonnet", "pair": 10, "winner": "base", "tuned_was": "B", "reason": "A is bland but accurate; B's suggestion is nonsensical."}
+{"judge": "sonnet", "pair": 11, "winner": "tuned", "tuned_was": "A", "reason": "B is wrong; the returns prevent overwriting err. A is vague but not false."}
+{"judge": "sonnet", "pair": 12, "winner": "tie", "tuned_was": "A", "reason": "Neither notes the unused validateTxnBytes parameter; both low value."}
+{"judge": "sonnet", "pair": 13, "winner": "base", "tuned_was": "B", "reason": "A points at the implicit interface assumption; B's suggestion removes type safety."}
+{"judge": "sonnet", "pair": 14, "winner": "tuned", "tuned_was": "A", "reason": "B is wrong since the URL is identical; A is vague but harmless."}
+{"judge": "sonnet", "pair": 15, "winner": "tie", "tuned_was": "B", "reason": "Both say replace panic with error return; equivalent."}
+{"judge": "sonnet", "pair": 16, "winner": "tie", "tuned_was": "A", "reason": "Both say rename alias to rename, which ignores that alias is intentional."}
+{"judge": "sonnet", "pair": 17, "winner": "base", "tuned_was": "B", "reason": "Comment request is reasonable; B's move suggestion is unsupported."}
+{"judge": "sonnet", "pair": 18, "winner": "tie", "tuned_was": "B", "reason": "Both speculative and unverified."}
+{"judge": "sonnet", "pair": 19, "winner": "base", "tuned_was": "A", "reason": "Documenting Mode and its values is sensible; A makes no sense in Go."}
+{"judge": "sonnet", "pair": 20, "winner": "tie", "tuned_was": "A", "reason": "A is wrong, and B asks for a check the diff already adds."}
+{"judge": "sonnet", "pair": 21, "winner": "base", "tuned_was": "B", "reason": "A is roughly right that strcpy is fine here; B's safety claim is wrong."}
+{"judge": "sonnet", "pair": 22, "winner": "base", "tuned_was": "B", "reason": "Documenting the new field is reasonable; rename is arbitrary."}
+{"judge": "sonnet", "pair": 23, "winner": "tie", "tuned_was": "B", "reason": "Both are speculative naming comments."}
+{"judge": "sonnet", "pair": 24, "winner": "base", "tuned_was": "A", "reason": "Unused package-level variable is a plausible specific concern."}
+{"judge": "sonnet", "pair": 25, "winner": "base", "tuned_was": "A", "reason": "B correctly explains the purpose of the method; A's claim is false."}
+{"judge": "sonnet", "pair": 26, "winner": "base", "tuned_was": "B", "reason": "B's claim is nonsensical; A is vague but harmless."}
+{"judge": "sonnet", "pair": 27, "winner": "tie", "tuned_was": "A", "reason": "B is false, the variable is used; A is an unfounded API suggestion."}
+{"judge": "sonnet", "pair": 28, "winner": "tie", "tuned_was": "A", "reason": "A reverts the intended change; B says to make dynamic what already is."}
+{"judge": "sonnet", "pair": 29, "winner": "base", "tuned_was": "B", "reason": "A describes the change reasonably; B objects without justification."}
+{"judge": "sonnet", "pair": 30, "winner": "tie", "tuned_was": "B", "reason": "Both misread the diff; A is garbled and B reverts an intentional change."}
+{"judge": "sonnet", "pair": 31, "winner": "base", "tuned_was": "B", "reason": "A matches the change; B's tx.Hash suggestion is unrelated."}
+{"judge": "sonnet", "pair": 32, "winner": "tuned", "tuned_was": "B", "reason": "B offers a concrete change to the allowfullscreen ternary that passes the actual value."}
+{"judge": "sonnet", "pair": 33, "winner": "tie", "tuned_was": "A", "reason": "Both speculative; B's claim of a separate helper is unsupported too."}
+{"judge": "sonnet", "pair": 34, "winner": "base", "tuned_was": "A", "reason": "B notes the rename consistency; A is nonsensical."}
+{"judge": "sonnet", "pair": 35, "winner": "tie", "tuned_was": "A", "reason": "A is unclear and B restates incorrectly; neither useful."}
+{"judge": "sonnet", "pair": 36, "winner": "tie", "tuned_was": "B", "reason": "Both are unfounded guesses about the intentional removal of bold."}
+{"judge": "sonnet", "pair": 37, "winner": "base", "tuned_was": "B", "reason": "A is a valid if mild note; B is nonsensical self-replacement."}
+{"judge": "sonnet", "pair": 38, "winner": "tie", "tuned_was": "B", "reason": "Both restate the added case without insight."}
+{"judge": "sonnet", "pair": 39, "winner": "tie", "tuned_was": "A", "reason": "Both vague and unverified."}
+{"judge": "sonnet", "pair": 40, "winner": "tuned", "tuned_was": "A", "reason": "A addresses the added using namespace; B's include ordering claim is wrong."}
+{"judge": "sonnet", "pair": 41, "winner": "base", "tuned_was": "B", "reason": "B asks for what the diff already does; A is reasonable."}
+{"judge": "sonnet", "pair": 42, "winner": "tie", "tuned_was": "A", "reason": "A is wrong since url exists; B's claim is false."}
+{"judge": "sonnet", "pair": 43, "winner": "base", "tuned_was": "B", "reason": "A identifies the unexplained strtolower; B is baseless."}
+{"judge": "sonnet", "pair": 44, "winner": "base", "tuned_was": "A", "reason": "Removed variable was unused; B is succinct and consistent."}
+{"judge": "sonnet", "pair": 45, "winner": "base", "tuned_was": "A", "reason": "A is wrong; the safe read is what is being avoided. B is vague but harmless."}
+{"judge": "sonnet", "pair": 46, "winner": "tie", "tuned_was": "B", "reason": "Neither correctly addresses the prop rename to capitalized component names."}
+{"judge": "sonnet", "pair": 47, "winner": "tie", "tuned_was": "A", "reason": "Both unfounded."}
+{"judge": "sonnet", "pair": 48, "winner": "tie", "tuned_was": "A", "reason": "Both low value; the Use change is intentional and Short was added."}
+{"judge": "sonnet", "pair": 49, "winner": "base", "tuned_was": "B", "reason": "Documenting the constant is reasonable; B's NaN suggestion is unfounded."}
+{"judge": "sonnet", "pair": 50, "winner": "tie", "tuned_was": "A", "reason": "A is a minor type nit; B's unused claim is unverifiable from the hunk."}
+{"judge": "sonnet", "pair": 51, "winner": "tuned", "tuned_was": "A", "reason": "A at least targets the commented-out include; B's move advice conflicts with the define-before-include intent."}
+{"judge": "sonnet", "pair": 52, "winner": "base", "tuned_was": "B", "reason": "B is wrong: the removed '+' was a duplicate. A is vague but harmless."}
+{"judge": "sonnet", "pair": 53, "winner": "tuned", "tuned_was": "A", "reason": "B's claim is wrong about direction; A is vague but not false."}
+{"judge": "sonnet", "pair": 54, "winner": "tuned", "tuned_was": "A", "reason": "A is a sensible suggestion; B's negative values rationale is nonsensical."}
+{"judge": "sonnet", "pair": 55, "winner": "base", "tuned_was": "A", "reason": "A's Type_ rename is nonsense; B is at least coherent."}
+{"judge": "sonnet", "pair": 56, "winner": "tie", "tuned_was": "B", "reason": "Both are incorrect or vague about a harmless delegation refactor."}
+{"judge": "sonnet", "pair": 57, "winner": "tie", "tuned_was": "A", "reason": "Neither is helpful or specific."}
+{"judge": "sonnet", "pair": 58, "winner": "tuned", "tuned_was": "B", "reason": "B raises a concrete ordering question tied to OnHeadersSynced."}
+{"judge": "sonnet", "pair": 59, "winner": "base", "tuned_was": "B", "reason": "A is consistent with the change; B invents an unverified justification."}
+{"judge": "sonnet", "pair": 60, "winner": "tie", "tuned_was": "A", "reason": "Both are incorrect or meaningless."}
+{"judge": "sonnet", "pair": 61, "winner": "tie", "tuned_was": "A", "reason": "A dubious suggestion; B merely restates the diff."}
+{"judge": "sonnet", "pair": 62, "winner": "base", "tuned_was": "A", "reason": "A is irrelevant; B at least concerns the added comment."}
+{"judge": "sonnet", "pair": 63, "winner": "tie", "tuned_was": "B", "reason": "Both claims are inaccurate about the refactor."}
+{"judge": "sonnet", "pair": 64, "winner": "tie", "tuned_was": "B", "reason": "Both ignore that limit is intentionally a float64 now."}
+{"judge": "sonnet", "pair": 65, "winner": "base", "tuned_was": "B", "reason": "B is nonsense; A at least addresses the temporary code."}
+{"judge": "sonnet", "pair": 66, "winner": "base", "tuned_was": "A", "reason": "B correctly notes the reassignment is pointless; A gives a wrong reason."}
+{"judge": "sonnet", "pair": 67, "winner": "base", "tuned_was": "B", "reason": "B is wrong (Timer wouldn't poll); A is vague but harmless."}
+{"judge": "sonnet", "pair": 68, "winner": "base", "tuned_was": "B", "reason": "Same point, A explains the reason."}
+{"judge": "sonnet", "pair": 69, "winner": "tuned", "tuned_was": "A", "reason": "B's reordering claim is wrong; A is vague but not harmful."}
+{"judge": "sonnet", "pair": 70, "winner": "tie", "tuned_was": "B", "reason": "A is wrong since VK_INCOMPLETE is already handled; B is nonsense."}
+{"judge": "sonnet", "pair": 71, "winner": "tuned", "tuned_was": "B", "reason": "A is wrong about the regression test; B suggests a plausible test."}
+{"judge": "sonnet", "pair": 72, "winner": "tie", "tuned_was": "A", "reason": "Neither comment is accurate or useful."}
+{"judge": "sonnet", "pair": 73, "winner": "base", "tuned_was": "B", "reason": "A is accurate though trivial; B is vague."}
+{"judge": "sonnet", "pair": 74, "winner": "tie", "tuned_was": "B", "reason": "Both confused and not applicable."}
+{"judge": "sonnet", "pair": 75, "winner": "tuned", "tuned_was": "B", "reason": "B plausibly points at the needed enum definitions; A restates the diff."}
+{"judge": "sonnet", "pair": 76, "winner": "tuned", "tuned_was": "A", "reason": "B is nonsense; A at least concerns import placement."}
+{"judge": "sonnet", "pair": 77, "winner": "tie", "tuned_was": "B", "reason": "A is wrong about the test; B is vague."}
+{"judge": "sonnet", "pair": 78, "winner": "tie", "tuned_was": "B", "reason": "Neither is correct nor helpful."}
+{"judge": "sonnet", "pair": 79, "winner": "tie", "tuned_was": "B", "reason": "Both are unhelpful or mistaken."}
+{"judge": "sonnet", "pair": 80, "winner": "tie", "tuned_was": "B", "reason": "A is false since index_column is used; B is nonsense."}
+{"judge": "sonnet", "pair": 81, "winner": "tuned", "tuned_was": "B", "reason": "B raises a question about the logging level change; A restates the diff."}
+{"judge": "sonnet", "pair": 82, "winner": "tie", "tuned_was": "A", "reason": "A is dubious; B restates the diff."}
+{"judge": "sonnet", "pair": 83, "winner": "tuned", "tuned_was": "B", "reason": "B raises a reasonable configurability point; A is generic."}
+{"judge": "sonnet", "pair": 84, "winner": "tuned", "tuned_was": "B", "reason": "B correctly says it is only a copyright header change; A is nonsense."}
+{"judge": "sonnet", "pair": 85, "winner": "tie", "tuned_was": "B", "reason": "A is unsupported; B is empty."}
+{"judge": "sonnet", "pair": 86, "winner": "base", "tuned_was": "B", "reason": "B is nonsense; A is at least about the new method."}
+{"judge": "sonnet", "pair": 87, "winner": "tie", "tuned_was": "B", "reason": "A is false since the variable is used; B is nonsense."}
+{"judge": "sonnet", "pair": 88, "winner": "tie", "tuned_was": "B", "reason": "A is wrong about the effect; B contradicts the change with no basis."}
+{"judge": "sonnet", "pair": 89, "winner": "tie", "tuned_was": "A", "reason": "A is confusing; B is factually wrong about the code."}
+{"judge": "sonnet", "pair": 90, "winner": "base", "tuned_was": "A", "reason": "B identifies a plausible unused parameter; A is vague."}
+{"judge": "sonnet", "pair": 91, "winner": "tie", "tuned_was": "A", "reason": "Neither is valid."}
+{"judge": "sonnet", "pair": 92, "winner": "tuned", "tuned_was": "B", "reason": "B questions removal of deletion handling; A endorses it without reason."}
+{"judge": "sonnet", "pair": 93, "winner": "tie", "tuned_was": "A", "reason": "A is dubious; B is wrong about reassignment."}
+{"judge": "sonnet", "pair": 94, "winner": "tie", "tuned_was": "B", "reason": "Both are inaccurate or vague."}
+{"judge": "sonnet", "pair": 95, "winner": "tie", "tuned_was": "A", "reason": "Both minor and weak."}
+{"judge": "sonnet", "pair": 96, "winner": "tuned", "tuned_was": "A", "reason": "B is wrong since the docstring already mentions memoization; A raises a thread-safety question."}
+{"judge": "sonnet", "pair": 97, "winner": "tuned", "tuned_was": "B", "reason": "B is relevant to validation; A is unrelated to the change."}
+{"judge": "sonnet", "pair": 98, "winner": "tuned", "tuned_was": "A", "reason": "A suggests something new; B just restates the diff."}
+{"judge": "sonnet", "pair": 99, "winner": "tuned", "tuned_was": "B", "reason": "B points at a possible config key mismatch; A's ordering claim is unsupported."}
+{"judge": "sonnet", "pair": 100, "winner": "tie", "tuned_was": "A", "reason": "Both claims are wrong about next(indexGen); neither useful."}
+{"judge": "sonnet", "pair": 101, "winner": "tuned", "tuned_was": "A", "reason": "A gives a plausible suggestion; B asks for something the code already does."}
+{"judge": "sonnet", "pair": 102, "winner": "tie", "tuned_was": "B", "reason": "A just restates the diff; B's reasoning is dubious. Neither adds value."}
+{"judge": "sonnet", "pair": 103, "winner": "tie", "tuned_was": "A", "reason": "A is nonsensical; B's claim is already satisfied by the diff."}
+{"judge": "sonnet", "pair": 104, "winner": "tie", "tuned_was": "A", "reason": "Both generic and unsupported by the hunk."}
+{"judge": "sonnet", "pair": 105, "winner": "base", "tuned_was": "B", "reason": "A correctly notes localeCompare numeric is right and asks about purpose; B is wrong."}
+{"judge": "sonnet", "pair": 106, "winner": "base", "tuned_was": "B", "reason": "A points to unchecked Call errors, a plausible issue; B mentions unsafe, irrelevant."}
+{"judge": "sonnet", "pair": 107, "winner": "tie", "tuned_was": "A", "reason": "A refers to a nonexistent else; B's suggestion is vague and misses behavior change."}
+{"judge": "sonnet", "pair": 108, "winner": "base", "tuned_was": "A", "reason": "B hints at the precedence problem in the condition; A is irrelevant."}
+{"judge": "sonnet", "pair": 109, "winner": "base", "tuned_was": "B", "reason": "A is accurate though vague; B is confused about the change."}
+{"judge": "sonnet", "pair": 110, "winner": "tie", "tuned_was": "A", "reason": "Both wrong or meaningless for a docstring-only hunk."}
+{"judge": "sonnet", "pair": 111, "winner": "tie", "tuned_was": "A", "reason": "A is dubious; B's unused claim is unverifiable in the hunk."}
+{"judge": "sonnet", "pair": 112, "winner": "base", "tuned_was": "B", "reason": "A is a reasonable note; B makes an unsupported claim."}
+{"judge": "sonnet", "pair": 113, "winner": "tuned", "tuned_was": "A", "reason": "A questions the double type for a version; B is factually wrong."}
+{"judge": "sonnet", "pair": 114, "winner": "tuned", "tuned_was": "A", "reason": "A flags the stray commented-out decorator; B's reasoning is confused."}
+{"judge": "sonnet", "pair": 115, "winner": "tie", "tuned_was": "A", "reason": "Both vague; the hunk already internationalizes the strings."}
+{"judge": "sonnet", "pair": 116, "winner": "tie", "tuned_was": "A", "reason": "Both claims unsupported and likely wrong."}
+{"judge": "sonnet", "pair": 117, "winner": "tuned", "tuned_was": "B", "reason": "B gives a concrete rename nit; A makes a false claim about undefined variable."}
+{"judge": "sonnet", "pair": 118, "winner": "tuned", "tuned_was": "B", "reason": "A is already handled by change_column_null; B is vague but closer to a valid point."}
+{"judge": "sonnet", "pair": 119, "winner": "tie", "tuned_was": "B", "reason": "A is off-base advice; B asks for a warning that already exists."}
+{"judge": "sonnet", "pair": 120, "winner": "base", "tuned_was": "A", "reason": "B correctly describes the guard; A's suggestion is poor."}
+{"judge": "sonnet", "pair": 121, "winner": "tuned", "tuned_was": "B", "reason": "B addresses the message wording; A's claim is vague."}
+{"judge": "sonnet", "pair": 122, "winner": "tuned", "tuned_was": "B", "reason": "B points at the documentation of legacy_digits; A suggests an unwarranted rename."}
+{"judge": "sonnet", "pair": 123, "winner": "tie", "tuned_was": "B", "reason": "Both claim redundancy that is false for a simple reorder."}
+{"judge": "sonnet", "pair": 124, "winner": "tie", "tuned_was": "B", "reason": "Both unsupported and unrelated to the change."}
+{"judge": "sonnet", "pair": 125, "winner": "base", "tuned_was": "A", "reason": "B is harmless and plausible; A is irrelevant."}
+{"judge": "sonnet", "pair": 126, "winner": "tuned", "tuned_was": "A", "reason": "B falsely says the import is unused; A at least does not mislead."}
+{"judge": "sonnet", "pair": 127, "winner": "base", "tuned_was": "B", "reason": "A flags the leaking test allocation loop reasonably; B mentions a nonexistent function."}
+{"judge": "sonnet", "pair": 128, "winner": "tie", "tuned_was": "A", "reason": "Both vague or unfounded."}
+{"judge": "sonnet", "pair": 129, "winner": "base", "tuned_was": "B", "reason": "A is consistent with the change; B is nonsensical."}
+{"judge": "sonnet", "pair": 130, "winner": "tie", "tuned_was": "B", "reason": "Both weak; neither notes the doc comment convention."}
+{"judge": "sonnet", "pair": 131, "winner": "base", "tuned_was": "B", "reason": "A is neutral; B proposes inconsistent naming with W3C_ commands."}
+{"judge": "sonnet", "pair": 132, "winner": "base", "tuned_was": "B", "reason": "A suggests a sensible test for the fallback; B ignores the purpose."}
+{"judge": "sonnet", "pair": 133, "winner": "base", "tuned_was": "A", "reason": "B's documentation request is reasonable; A is confused."}
+{"judge": "sonnet", "pair": 134, "winner": "tie", "tuned_was": "A", "reason": "B is false, A is wrong; neither notes the typos."}
+{"judge": "sonnet", "pair": 135, "winner": "tie", "tuned_was": "B", "reason": "A is false; B is a pointless nit."}
+{"judge": "sonnet", "pair": 136, "winner": "tie", "tuned_was": "A", "reason": "Both vague and not tied to the try/catch change."}
+{"judge": "sonnet", "pair": 137, "winner": "base", "tuned_was": "B", "reason": "A describes the guard accurately; B suggests an unrelated API."}
+{"judge": "sonnet", "pair": 138, "winner": "tuned", "tuned_was": "B", "reason": "B raises a plausible concern about the gogo jsonpb dependency."}
+{"judge": "sonnet", "pair": 139, "winner": "base", "tuned_was": "B", "reason": "A's unused-property point is plausible; B's readonly suggestion is already satisfied."}
+{"judge": "sonnet", "pair": 140, "winner": "base", "tuned_was": "A", "reason": "B is accurate though trivial; A is wrong."}
+{"judge": "sonnet", "pair": 141, "winner": "tie", "tuned_was": "A", "reason": "A is a poor suggestion; B is false since description is used."}
+{"judge": "sonnet", "pair": 142, "winner": "base", "tuned_was": "B", "reason": "A is vague but not wrong; B is nonsensical."}
+{"judge": "sonnet", "pair": 143, "winner": "tie", "tuned_was": "A", "reason": "A invents an API; B ignores that the style is already dynamic."}
+{"judge": "sonnet", "pair": 144, "winner": "base", "tuned_was": "B", "reason": "A raises a plausible regex escaping concern; B's suggestion is confused."}
+{"judge": "sonnet", "pair": 145, "winner": "base", "tuned_was": "B", "reason": "A is a plausible docstring nit; B is nonsensical for Python bindings."}
+{"judge": "sonnet", "pair": 146, "winner": "tuned", "tuned_was": "B", "reason": "B is plausible about imports; A is irrelevant."}
+{"judge": "sonnet", "pair": 147, "winner": "base", "tuned_was": "A", "reason": "B raises unused-code concern; A is meaningless."}
+{"judge": "sonnet", "pair": 148, "winner": "tuned", "tuned_was": "A", "reason": "A gives a concrete rename; B is self-contradictory."}
+{"judge": "sonnet", "pair": 149, "winner": "tuned", "tuned_was": "A", "reason": "A is a reasonable question about config location; B is a doubtful deprecation claim."}
+{"judge": "sonnet", "pair": 150, "winner": "tuned", "tuned_was": "B", "reason": "A's claim is nonsensical; B is vague but more plausible."}
+{"judge": "sonnet", "pair": 151, "winner": "tuned", "tuned_was": "B", "reason": "B gives concrete naming suggestion; A is vague."}
+{"judge": "sonnet", "pair": 152, "winner": "tuned", "tuned_was": "B", "reason": "A just restates diff; B offers a design suggestion."}
+{"judge": "sonnet", "pair": 153, "winner": "tuned", "tuned_was": "A", "reason": "B's claim about Object.is is factually wrong."}
+{"judge": "sonnet", "pair": 154, "winner": "tuned", "tuned_was": "A", "reason": "B ignores that code already uses ?? ''; A is plausible."}
+{"judge": "sonnet", "pair": 155, "winner": "base", "tuned_was": "B", "reason": "B says use queueFunction which is already used; A offers alternative."}
+{"judge": "sonnet", "pair": 156, "winner": "base", "tuned_was": "A", "reason": "A is wrong; B raises a relevant question about library.yaml."}
+{"judge": "sonnet", "pair": 157, "winner": "tuned", "tuned_was": "A", "reason": "Using get instead of match is a valid, specific suggestion."}
+{"judge": "sonnet", "pair": 158, "winner": "base", "tuned_was": "A", "reason": "A is poor advice; B redundant but harmless."}
+{"judge": "sonnet", "pair": 159, "winner": "tie", "tuned_was": "A", "reason": "Both are incorrect or useless."}
+{"judge": "sonnet", "pair": 160, "winner": "tuned", "tuned_was": "B", "reason": "A's claim is false; B raises plausible regression concern."}
+{"judge": "sonnet", "pair": 161, "winner": "tuned", "tuned_was": "B", "reason": "Empty javadoc needs description; B is correct and actionable."}
+{"judge": "sonnet", "pair": 162, "winner": "base", "tuned_was": "B", "reason": "Both weak; B's null check is irrelevant to the hunk."}
+{"judge": "sonnet", "pair": 163, "winner": "tuned", "tuned_was": "B", "reason": "B correctly says line is unneeded; A is wrong."}
+{"judge": "sonnet", "pair": 164, "winner": "tie", "tuned_was": "A", "reason": "A is unhelpful; B gives wrong rationale."}
+{"judge": "sonnet", "pair": 165, "winner": "tuned", "tuned_was": "B", "reason": "A restates the diff; B hints at other usages."}
+{"judge": "sonnet", "pair": 166, "winner": "tuned", "tuned_was": "A", "reason": "B restates change already made; A suggests alternative."}
+{"judge": "sonnet", "pair": 167, "winner": "base", "tuned_was": "A", "reason": "A would be wrong; B explains the change correctly."}
+{"judge": "sonnet", "pair": 168, "winner": "tie", "tuned_was": "A", "reason": "Both are incorrect or irrelevant."}
+{"judge": "sonnet", "pair": 169, "winner": "base", "tuned_was": "B", "reason": "B's suggestion drops the IsNil logic and is wrong."}
+{"judge": "sonnet", "pair": 170, "winner": "tuned", "tuned_was": "A", "reason": "B's duplicate claim is false; A at least is harmless."}
+{"judge": "sonnet", "pair": 171, "winner": "tuned", "tuned_was": "A", "reason": "B restates the existing change; A offers a view."}
+{"judge": "sonnet", "pair": 172, "winner": "tuned", "tuned_was": "B", "reason": "A is wrong; B is a valid simplification."}
+{"judge": "sonnet", "pair": 173, "winner": "tuned", "tuned_was": "A", "reason": "Suggesting logging over print is specific and reasonable."}
+{"judge": "sonnet", "pair": 174, "winner": "base", "tuned_was": "B", "reason": "A raises a plausible unused-field concern; B is vague."}
+{"judge": "sonnet", "pair": 175, "winner": "base", "tuned_was": "A", "reason": "A is nonsensical; B gives plausible rationale."}
+{"judge": "sonnet", "pair": 176, "winner": "base", "tuned_was": "A", "reason": "A is baseless; B is vague but harmless."}
+{"judge": "sonnet", "pair": 177, "winner": "base", "tuned_was": "A", "reason": "A's reasoning is dubious; B at least refers to the condition."}
+{"judge": "sonnet", "pair": 178, "winner": "base", "tuned_was": "A", "reason": "B correct about unused import removal; A unfounded."}
+{"judge": "sonnet", "pair": 179, "winner": "tuned", "tuned_was": "A", "reason": "Adding a testcase for the new scenario is actionable."}
+{"judge": "sonnet", "pair": 180, "winner": "tuned", "tuned_was": "B", "reason": "A is wrong since flexible is a Faker macro; B vague."}
+{"judge": "sonnet", "pair": 181, "winner": "tie", "tuned_was": "B", "reason": "Both are incorrect."}
+{"judge": "sonnet", "pair": 182, "winner": "tie", "tuned_was": "A", "reason": "Both are low value."}
+{"judge": "sonnet", "pair": 183, "winner": "base", "tuned_was": "B", "reason": "A flags the detached semantics sensibly; B is rambling."}
+{"judge": "sonnet", "pair": 184, "winner": "base", "tuned_was": "B", "reason": "B is pointless; A describes the change harmlessly."}
+{"judge": "sonnet", "pair": 185, "winner": "base", "tuned_was": "A", "reason": "B's guard concern is reasonable; A is likely wrong."}
+{"judge": "sonnet", "pair": 186, "winner": "tie", "tuned_was": "A", "reason": "Both say use <=, equally brief."}
+{"judge": "sonnet", "pair": 187, "winner": "tie", "tuned_was": "B", "reason": "Both are unhelpful."}
+{"judge": "sonnet", "pair": 188, "winner": "base", "tuned_was": "A", "reason": "A is nonsensical; B talks about naming consistency."}
+{"judge": "sonnet", "pair": 189, "winner": "base", "tuned_was": "B", "reason": "A points at the condition; B dismissive."}
+{"judge": "sonnet", "pair": 190, "winner": "base", "tuned_was": "B", "reason": "A is relevant to sorting; B's indexOf reasoning is nonsense."}
+{"judge": "sonnet", "pair": 191, "winner": "tie", "tuned_was": "A", "reason": "Both are speculative."}
+{"judge": "sonnet", "pair": 192, "winner": "tuned", "tuned_was": "B", "reason": "A is wrong; B is a concrete suggestion."}
+{"judge": "sonnet", "pair": 193, "winner": "tuned", "tuned_was": "A", "reason": "B is contradictory; A is coherent."}
+{"judge": "sonnet", "pair": 194, "winner": "tie", "tuned_was": "B", "reason": "Both are muddled."}
+{"judge": "sonnet", "pair": 195, "winner": "base", "tuned_was": "A", "reason": "A references nonexistent checkPositive; B explains check."}
+{"judge": "sonnet", "pair": 196, "winner": "tuned", "tuned_was": "A", "reason": "A suggests a meaningful assertion; B is cosmetic."}
+{"judge": "sonnet", "pair": 197, "winner": "base", "tuned_was": "A", "reason": "B flags unused function, specific to hunk."}
+{"judge": "sonnet", "pair": 198, "winner": "base", "tuned_was": "B", "reason": "A describes the opcode change; B is confused."}
+{"judge": "sonnet", "pair": 199, "winner": "base", "tuned_was": "A", "reason": "A references wrong field name; B is harmless."}
+{"judge": "sonnet", "pair": 200, "winner": "tuned", "tuned_was": "B", "reason": "Changelog suggestion is concrete; A is generic restatement."}
+{"judge": "sonnet", "pair": 201, "winner": "tuned", "tuned_was": "B", "reason": "A is nonsensical ordering claim; B suggests a plausible alternative location."}
+{"judge": "sonnet", "pair": 202, "winner": "tie", "tuned_was": "A", "reason": "A unjustified revert; B restates diff. Both useless."}
+{"judge": "sonnet", "pair": 203, "winner": "tuned", "tuned_was": "A", "reason": "B makes a wrong claim about the trait loop; A is vague but harmless."}
+{"judge": "sonnet", "pair": 204, "winner": "base", "tuned_was": "A", "reason": "A's claim is unfounded; B at least asks to verify new path."}
+{"judge": "sonnet", "pair": 205, "winner": "tie", "tuned_was": "B", "reason": "Both speculative claims about redundancy, neither clearly correct."}
+{"judge": "sonnet", "pair": 206, "winner": "base", "tuned_was": "A", "reason": "A is meaningless; B raises a concern, though speculative."}
+{"judge": "sonnet", "pair": 207, "winner": "base", "tuned_was": "B", "reason": "Accurate description of the rename; B is unrelated."}
+{"judge": "sonnet", "pair": 208, "winner": "base", "tuned_was": "A", "reason": "Reset already applies to all errors, so A is wrong; B is fine."}
+{"judge": "sonnet", "pair": 209, "winner": "base", "tuned_was": "A", "reason": "A is nonsensical; B is a reasonable documentation request."}
+{"judge": "sonnet", "pair": 210, "winner": "tie", "tuned_was": "B", "reason": "Neither comment is coherent about the narrowed mock verification."}
+{"judge": "sonnet", "pair": 211, "winner": "base", "tuned_was": "B", "reason": "A correctly explains the change; B is baseless."}
+{"judge": "sonnet", "pair": 212, "winner": "tuned", "tuned_was": "A", "reason": "B's claim is false; A raises a plausible related case."}
+{"judge": "sonnet", "pair": 213, "winner": "tie", "tuned_was": "A", "reason": "A likely wrong, B irrelevant."}
+{"judge": "sonnet", "pair": 214, "winner": "base", "tuned_was": "B", "reason": "Flags the questionable alias as removable; B is vague."}
+{"judge": "sonnet", "pair": 215, "winner": "base", "tuned_was": "A", "reason": "A is false; B correctly notes encapsulation risk."}
+{"judge": "sonnet", "pair": 216, "winner": "tuned", "tuned_was": "B", "reason": "A is a false claim; B is a minor but valid-sounding nit."}
+{"judge": "sonnet", "pair": 217, "winner": "tuned", "tuned_was": "A", "reason": "A relevant though redundant; B's claim is wrong."}
+{"judge": "sonnet", "pair": 218, "winner": "base", "tuned_was": "B", "reason": "A points at the header/local copy concern; B vague."}
+{"judge": "sonnet", "pair": 219, "winner": "tie", "tuned_was": "B", "reason": "A restates what diff does; B vague nonsense."}
+{"judge": "sonnet", "pair": 220, "winner": "tuned", "tuned_was": "A", "reason": "A raises a plausible removal concern; B misstates the diff."}
+{"judge": "sonnet", "pair": 221, "winner": "tie", "tuned_was": "A", "reason": "A is already satisfied by the label; B is wrong, text is translated."}
+{"judge": "sonnet", "pair": 222, "winner": "base", "tuned_was": "B", "reason": "Accurately describes the new parameter; B is unrelated."}
+{"judge": "sonnet", "pair": 223, "winner": "base", "tuned_was": "A", "reason": "Identifies unused variable; A is irrelevant."}
+{"judge": "sonnet", "pair": 224, "winner": "base", "tuned_was": "B", "reason": "Accurate and concise; B is nonsensical."}
+{"judge": "sonnet", "pair": 225, "winner": "tuned", "tuned_was": "A", "reason": "Relevant discussion; B is nonsense about semicolons in Go."}
+{"judge": "sonnet", "pair": 226, "winner": "tuned", "tuned_was": "A", "reason": "Notes removed maxTimeMS doc; B is false, fullResult is documented."}
+{"judge": "sonnet", "pair": 227, "winner": "base", "tuned_was": "B", "reason": "Vague but not wrong; B suggests logging something already logged."}
+{"judge": "sonnet", "pair": 228, "winner": "tuned", "tuned_was": "A", "reason": "B's claim is wrong since updates are run automatically; A is harmless."}
+{"judge": "sonnet", "pair": 229, "winner": "tie", "tuned_was": "A", "reason": "Both suggestions contradict the intended test setup."}
+{"judge": "sonnet", "pair": 230, "winner": "base", "tuned_was": "B", "reason": "Unused import is plausible issue; B is meaningless."}
+{"judge": "sonnet", "pair": 231, "winner": "tie", "tuned_was": "A", "reason": "Neither addresses the removed validation meaningfully."}
+{"judge": "sonnet", "pair": 232, "winner": "base", "tuned_was": "A", "reason": "A is nonsensical; B is a minor naming nit."}
+{"judge": "sonnet", "pair": 233, "winner": "tie", "tuned_was": "B", "reason": "A restates diff; B suggests a check already present."}
+{"judge": "sonnet", "pair": 234, "winner": "base", "tuned_was": "B", "reason": "A is reasonable; B is wrong since default is already used."}
+{"judge": "sonnet", "pair": 235, "winner": "base", "tuned_was": "B", "reason": "A plausible; B baseless removal."}
+{"judge": "sonnet", "pair": 236, "winner": "base", "tuned_was": "B", "reason": "Naming comment is at least about this hunk; B is irrelevant."}
+{"judge": "sonnet", "pair": 237, "winner": "tuned", "tuned_was": "A", "reason": "Plausibly flags the condition; B's claim is wrong."}
+{"judge": "sonnet", "pair": 238, "winner": "base", "tuned_was": "B", "reason": "Sensible note on builder use; B is unfounded style claim."}
+{"judge": "sonnet", "pair": 239, "winner": "tie", "tuned_was": "B", "reason": "A is wrong about interface name; B irrelevant."}
+{"judge": "sonnet", "pair": 240, "winner": "base", "tuned_was": "B", "reason": "Concrete cleanup suggestion on the example; B is scope creep."}
+{"judge": "sonnet", "pair": 241, "winner": "base", "tuned_was": "A", "reason": "A is wrong to remove a needed import; B is accurate."}
+{"judge": "sonnet", "pair": 242, "winner": "tuned", "tuned_was": "B", "reason": "A is false since tlsConfig is used; B is speculative."}
+{"judge": "sonnet", "pair": 243, "winner": "tuned", "tuned_was": "A", "reason": "Questions setting Available to Total; B misreads diff."}
+{"judge": "sonnet", "pair": 244, "winner": "tie", "tuned_was": "B", "reason": "A makes a wrong claim; B is meaningless."}
+{"judge": "sonnet", "pair": 245, "winner": "tie", "tuned_was": "B", "reason": "A incoherent; B incorrect suggestion."}
+{"judge": "sonnet", "pair": 246, "winner": "base", "tuned_was": "A", "reason": "B is at least about the test expectations; A is vague."}
+{"judge": "sonnet", "pair": 247, "winner": "base", "tuned_was": "B", "reason": "Accurate description; B's claim is dubious."}
+{"judge": "sonnet", "pair": 248, "winner": "base", "tuned_was": "B", "reason": "Notes the helper is unused in the hunk; B is wrong."}
+{"judge": "sonnet", "pair": 249, "winner": "tuned", "tuned_was": "B", "reason": "Raises a default question; A is nonsensical."}
+{"judge": "sonnet", "pair": 250, "winner": "tuned", "tuned_was": "B", "reason": "B correctly identifies the separator change; A's Kubernetes lowercase claim is irrelevant."}
+{"judge": "sonnet", "pair": 251, "winner": "tie", "tuned_was": "A", "reason": "A speculative alternative, B merely restates the diff; neither useful."}
+{"judge": "sonnet", "pair": 252, "winner": "base", "tuned_was": "B", "reason": "B's claim is wrong since split can yield empty strings; A is consistent with the guard."}
+{"judge": "sonnet", "pair": 253, "winner": "tie", "tuned_was": "B", "reason": "Neither addresses the abstract-to-concrete change meaningfully."}
+{"judge": "sonnet", "pair": 254, "winner": "tie", "tuned_was": "A", "reason": "Both unhelpful; A ignores existing true-case test, B is generic."}
+{"judge": "sonnet", "pair": 255, "winner": "base", "tuned_was": "B", "reason": "B wrongly prefers float for money; A at least raises a naming point."}
+{"judge": "sonnet", "pair": 256, "winner": "tie", "tuned_was": "B", "reason": "A's claim is dubious, B is incoherent."}
+{"judge": "sonnet", "pair": 257, "winner": "tuned", "tuned_was": "A", "reason": "B is wrong since super is already called; A is vague but harmless."}
+{"judge": "sonnet", "pair": 258, "winner": "tuned", "tuned_was": "A", "reason": "B's claim about starting twice is false; A is vague but not wrong."}
+{"judge": "sonnet", "pair": 259, "winner": "tie", "tuned_was": "A", "reason": "Both speculative with little justification."}
+{"judge": "sonnet", "pair": 260, "winner": "tie", "tuned_was": "A", "reason": "Both vague and weakly connected to the hunk."}
+{"judge": "sonnet", "pair": 261, "winner": "tuned", "tuned_was": "B", "reason": "Duplicate copyright block; removing the second is correct and actionable."}
+{"judge": "sonnet", "pair": 262, "winner": "base", "tuned_was": "B", "reason": "B's suggestion would crash on NULL delta_from_revision; A is vague but safe."}
+{"judge": "sonnet", "pair": 263, "winner": "tuned", "tuned_was": "B", "reason": "B correct that h is unused; A cites nonexistent componentDidUnmount."}
+{"judge": "sonnet", "pair": 264, "winner": "tie", "tuned_was": "B", "reason": "Both unhelpful for a doc comment fix."}
+{"judge": "sonnet", "pair": 265, "winner": "tie", "tuned_was": "B", "reason": "Both weak; neither notes the string 'false' oddity clearly."}
+{"judge": "sonnet", "pair": 266, "winner": "tie", "tuned_was": "B", "reason": "Both speculative without evidence."}
+{"judge": "sonnet", "pair": 267, "winner": "tie", "tuned_was": "B", "reason": "Both restate the diff."}
+{"judge": "sonnet", "pair": 268, "winner": "tie", "tuned_was": "B", "reason": "A confused, B irrelevant."}
+{"judge": "sonnet", "pair": 269, "winner": "tie", "tuned_was": "A", "reason": "Both unhelpful."}
+{"judge": "sonnet", "pair": 270, "winner": "tie", "tuned_was": "A", "reason": "B wrong since constant is already exported; A speculative."}
+{"judge": "sonnet", "pair": 271, "winner": "tuned", "tuned_was": "A", "reason": "B asks for the check already present; A raises a plausible multibyte length point."}
+{"judge": "sonnet", "pair": 272, "winner": "tie", "tuned_was": "A", "reason": "Both weak and speculative."}
+{"judge": "sonnet", "pair": 273, "winner": "base", "tuned_was": "B", "reason": "B references a nonexistent function; A is generic but relevant."}
+{"judge": "sonnet", "pair": 274, "winner": "tuned", "tuned_was": "B", "reason": "A claims the error is unchecked though it is handled; B engages with returned value."}
+{"judge": "sonnet", "pair": 275, "winner": "tie", "tuned_was": "B", "reason": "Both vague."}
+{"judge": "sonnet", "pair": 276, "winner": "tie", "tuned_was": "B", "reason": "Neither spots the 2019tNV typo."}
+{"judge": "sonnet", "pair": 277, "winner": "base", "tuned_was": "A", "reason": "Correctly notes the metrics/health queue variable fix; A is nonsense."}
+{"judge": "sonnet", "pair": 278, "winner": "tuned", "tuned_was": "B", "reason": "Plausibly flags the JUnit 3 import and unused assertion."}
+{"judge": "sonnet", "pair": 279, "winner": "tuned", "tuned_was": "A", "reason": "B's claim is false since the seed is an Integer; A is at least coherent."}
+{"judge": "sonnet", "pair": 280, "winner": "tuned", "tuned_was": "A", "reason": "B's claim is false; A gives a plausible structural suggestion."}
+{"judge": "sonnet", "pair": 281, "winner": "tuned", "tuned_was": "B", "reason": "A is incoherent; B points at the naming mismatch between join and apply."}
+{"judge": "sonnet", "pair": 282, "winner": "tie", "tuned_was": "A", "reason": "A contradicts intent, B restates the comment."}
+{"judge": "sonnet", "pair": 283, "winner": "base", "tuned_was": "A", "reason": "Comment request is reasonable; A's naming is arbitrary."}
+{"judge": "sonnet", "pair": 284, "winner": "tie", "tuned_was": "B", "reason": "A restates diff, B unexplained."}
+{"judge": "sonnet", "pair": 285, "winner": "tie", "tuned_was": "A", "reason": "Both low value."}
+{"judge": "sonnet", "pair": 286, "winner": "tie", "tuned_was": "B", "reason": "Both say remove without justification."}
+{"judge": "sonnet", "pair": 287, "winner": "base", "tuned_was": "A", "reason": "B accurately describes the rename; A is unclear."}
+{"judge": "sonnet", "pair": 288, "winner": "base", "tuned_was": "B", "reason": "Addresses the unused-field todo in the hunk."}
+{"judge": "sonnet", "pair": 289, "winner": "tie", "tuned_was": "B", "reason": "Both unverified claims."}
+{"judge": "sonnet", "pair": 290, "winner": "tie", "tuned_was": "A", "reason": "Both wrong; field is optional by design."}
+{"judge": "sonnet", "pair": 291, "winner": "tie", "tuned_was": "A", "reason": "Both irrelevant."}
+{"judge": "sonnet", "pair": 292, "winner": "tie", "tuned_was": "A", "reason": "Neither is useful."}
+{"judge": "sonnet", "pair": 293, "winner": "base", "tuned_was": "A", "reason": "Raises a concrete safety check; A is meaningless."}
+{"judge": "sonnet", "pair": 294, "winner": "tie", "tuned_was": "B", "reason": "Both weak."}
+{"judge": "sonnet", "pair": 295, "winner": "tie", "tuned_was": "A", "reason": "Both restate or are vague."}
+{"judge": "sonnet", "pair": 296, "winner": "base", "tuned_was": "B", "reason": "Notes the empty, unused listener class; B is speculative."}
+{"judge": "sonnet", "pair": 297, "winner": "tie", "tuned_was": "B", "reason": "Both speculative."}
+{"judge": "sonnet", "pair": 298, "winner": "tie", "tuned_was": "A", "reason": "Both just restate the change."}
+{"judge": "sonnet", "pair": 299, "winner": "tie", "tuned_was": "A", "reason": "A is incorrect about intent, B is irrelevant."}
+{"judge": "sonnet", "pair": 300, "winner": "tuned", "tuned_was": "B", "reason": "B gives specific plausible claim about intent; A is generic doc request."}
+{"judge": "sonnet", "pair": 301, "winner": "tuned", "tuned_was": "B", "reason": "A wrongly claims a remaining duplicate; B flags the real behavior change, though confused."}
+{"judge": "sonnet", "pair": 302, "winner": "base", "tuned_was": "B", "reason": "B's comment is self-contradictory nonsense; A correctly states the purpose."}
+{"judge": "sonnet", "pair": 303, "winner": "tuned", "tuned_was": "A", "reason": "A specifically points out the second overload is missing the deprecation marker."}
+{"judge": "sonnet", "pair": 304, "winner": "tie", "tuned_was": "B", "reason": "Both correctly identify the same typo/inconsistency equally well."}
+{"judge": "sonnet", "pair": 305, "winner": "tuned", "tuned_was": "B", "reason": "A's 'double assignment' claim is factually wrong; B is vague but not incorrect."}
+{"judge": "sonnet", "pair": 306, "winner": "base", "tuned_was": "B", "reason": "B's claim about FileAppender is a non-sequitur; A gives a plausible actionable note."}
+{"judge": "sonnet", "pair": 307, "winner": "base", "tuned_was": "A", "reason": "B asks for clarification on ambiguous logic; A's fixed alternative is unsupported."}
+{"judge": "sonnet", "pair": 308, "winner": "tuned", "tuned_was": "B", "reason": "B gives a concrete default suggestion; A is generic doc request."}
+{"judge": "sonnet", "pair": 309, "winner": "tuned", "tuned_was": "B", "reason": "A nonsensically asks to add an import already in the diff; B questions if it's needed."}
+{"judge": "sonnet", "pair": 310, "winner": "tuned", "tuned_was": "A", "reason": "A correctly flags the return-value change as wrong in this error path; B endorses the bug."}
+{"judge": "sonnet", "pair": 311, "winner": "tie", "tuned_was": "A", "reason": "Both factually wrong: const maps aren't valid in Go, and the type is already exported."}
+{"judge": "sonnet", "pair": 312, "winner": "base", "tuned_was": "B", "reason": "B's naming nit is likely inapplicable; A accurately describes the change."}
+{"judge": "sonnet", "pair": 313, "winner": "base", "tuned_was": "A", "reason": "A wrongly suggests removing a necessary null check; B accurately describes it."}
+{"judge": "sonnet", "pair": 314, "winner": "tie", "tuned_was": "A", "reason": "Both merely restate the diff's purpose without added critique."}
+{"judge": "sonnet", "pair": 315, "winner": "tuned", "tuned_was": "A", "reason": "A gives a sharp, correct simplification; B confuses variable names/roles."}
+{"judge": "sonnet", "pair": 316, "winner": "base", "tuned_was": "A", "reason": "A's suggestion is duplicated/nonsensical text; B raises a real default-case concern."}
+{"judge": "sonnet", "pair": 317, "winner": "tuned", "tuned_was": "B", "reason": "A wrongly claims metav1 is missing when it's already added; B at least targets a real new import."}
+{"judge": "sonnet", "pair": 318, "winner": "base", "tuned_was": "B", "reason": "A raises a substantive naming/behavior concern; B's suggestion is confused/redundant."}
+{"judge": "sonnet", "pair": 319, "winner": "tuned", "tuned_was": "B", "reason": "A's 'unused' claim is likely false; B's milder removal suggestion is less risky."}
+{"judge": "sonnet", "pair": 320, "winner": "base", "tuned_was": "B", "reason": "B misreads the string (gcloud/ is already present); A's generic ask is at least not wrong."}
+{"judge": "sonnet", "pair": 321, "winner": "base", "tuned_was": "A", "reason": "B raises a plausible dead-code concern; A's substitution suggestion is unverifiable/speculative."}
+{"judge": "sonnet", "pair": 322, "winner": "tuned", "tuned_was": "A", "reason": "B's suggestion to update status after destroy is logically inconsistent; A is vague but not wrong."}
+{"judge": "sonnet", "pair": 323, "winner": "base", "tuned_was": "B", "reason": "B's text is incoherent/repetitive; A at least makes a coherent (if imperfect) claim."}
+{"judge": "sonnet", "pair": 324, "winner": "tie", "tuned_was": "A", "reason": "Both are shallow/speculative without strong grounding either way."}
+{"judge": "sonnet", "pair": 325, "winner": "tuned", "tuned_was": "A", "reason": "A raises a real backward-compatibility concern; B just restates the rename."}
+{"judge": "sonnet", "pair": 326, "winner": "tuned", "tuned_was": "A", "reason": "A catches a plausible key-name mismatch; B just restates that localization happened."}
+{"judge": "sonnet", "pair": 327, "winner": "tie", "tuned_was": "A", "reason": "Both are vague and don't target a concrete issue in the hunk."}
+{"judge": "sonnet", "pair": 328, "winner": "tuned", "tuned_was": "B", "reason": "B gives a specific wording-consistency suggestion; A is generic and already addressed by the diff."}
+{"judge": "sonnet", "pair": 329, "winner": "tuned", "tuned_was": "B", "reason": "A's comment misreads the diff direction; B offers a specific, plausible additional suggestion."}
+{"judge": "sonnet", "pair": 330, "winner": "tuned", "tuned_was": "A", "reason": "A accurately describes the skip's intent; B disagrees without justification."}
+{"judge": "sonnet", "pair": 331, "winner": "base", "tuned_was": "B", "reason": "A gives a constructive specific suggestion; B's dismissal is an unverified claim."}
+{"judge": "sonnet", "pair": 332, "winner": "tuned", "tuned_was": "B", "reason": "A's 'undefined' claim is unverifiable/likely wrong; B's minor note is safer."}
+{"judge": "sonnet", "pair": 333, "winner": "base", "tuned_was": "A", "reason": "A suggests text already present in the diff; B raises a real portability/format concern."}
+{"judge": "sonnet", "pair": 334, "winner": "tuned", "tuned_was": "A", "reason": "A questions a concrete naming/correctness issue; B's ask for a comment is less substantive."}
+{"judge": "sonnet", "pair": 335, "winner": "tuned", "tuned_was": "B", "reason": "A's causal claim about the assertion triggering clear is false; B is a reasonable neutral suggestion."}
+{"judge": "sonnet", "pair": 336, "winner": "tuned", "tuned_was": "A", "reason": "A raises a legitimate design question; B's 'misleading name' claim is inaccurate."}
+{"judge": "sonnet", "pair": 337, "winner": "tuned", "tuned_was": "B", "reason": "A just restates the new log string already in the diff; B offers a new actionable idea."}
+{"judge": "sonnet", "pair": 338, "winner": "tuned", "tuned_was": "B", "reason": "A misreads removal as a value change; B is closer to the actual diff despite being awkward."}
+{"judge": "sonnet", "pair": 339, "winner": "base", "tuned_was": "A", "reason": "A ignores that GroupByError already exists; B gives a valid, accurate suggestion."}
+{"judge": "sonnet", "pair": 340, "winner": "tuned", "tuned_was": "A", "reason": "B's naming complaint is weak/unwarranted; A's refactor idea is a reasonable alternative."}
+{"judge": "sonnet", "pair": 341, "winner": "tuned", "tuned_was": "A", "reason": "B recommends the wrong dependency section; A's statement matches the actual placement."}
+{"judge": "sonnet", "pair": 342, "winner": "tuned", "tuned_was": "A", "reason": "B's suggestion reverts the very fix (graceful OOM handling) the diff introduces; A is speculative but not regressive."}
+{"judge": "sonnet", "pair": 343, "winner": "tuned", "tuned_was": "B", "reason": "A misreads mutually-exclusive #if branches as duplicate overrides; B's version-specific claim is plausible."}
+{"judge": "sonnet", "pair": 344, "winner": "base", "tuned_was": "B", "reason": "A accurately describes the fix (redundant though); B's alternative condition is unclear/incomplete."}
+{"judge": "sonnet", "pair": 345, "winner": "tuned", "tuned_was": "B", "reason": "A merely restates the include; B raises a real reuse-of-existing-macro question."}
+{"judge": "sonnet", "pair": 346, "winner": "tuned", "tuned_was": "A", "reason": "A gives a forward-looking, distinct suggestion; B just restates what the diff already does."}
+{"judge": "sonnet", "pair": 347, "winner": "base", "tuned_was": "A", "reason": "A suggests removing deliberate fallback logic without reason; B asks for a reasonable doc improvement."}
+{"judge": "sonnet", "pair": 348, "winner": "tuned", "tuned_was": "B", "reason": "A describes the pre-diff bug as if unresolved; B gives a forward-looking consistency suggestion."}
+{"judge": "sonnet", "pair": 349, "winner": "tuned", "tuned_was": "A", "reason": "A gives a valid specific style fix (stderr vs stdout); B just restates what the diff already adds."}
+{"judge": "sonnet", "pair": 350, "winner": "tuned", "tuned_was": "B", "reason": "A is false, access is used; B offers a plausible default-access suggestion."}
+{"judge": "sonnet", "pair": 351, "winner": "base", "tuned_was": "B", "reason": "Consistent with the diff; B contradicts the change without justification."}
+{"judge": "sonnet", "pair": 352, "winner": "tie", "tuned_was": "B", "reason": "Both vague, and the log call is already in the diff."}
+{"judge": "sonnet", "pair": 353, "winner": "tuned", "tuned_was": "B", "reason": "Hardcoding replaces resource lookup; B points to the original approach, A is generic."}
+{"judge": "sonnet", "pair": 354, "winner": "base", "tuned_was": "A", "reason": "Unused-method claim is concrete and plausible; A's rename suggestion contradicts existing focusElement_ usage."}
+{"judge": "sonnet", "pair": 355, "winner": "tie", "tuned_was": "A", "reason": "A suggests something unneeded; B just restates the diff."}
+{"judge": "sonnet", "pair": 356, "winner": "tie", "tuned_was": "A", "reason": "A asks for what the diff already adds; B's rename suggestion is unfounded."}
+{"judge": "sonnet", "pair": 357, "winner": "tuned", "tuned_was": "A", "reason": "A is specific and plausible; B is generic restating."}
+{"judge": "sonnet", "pair": 358, "winner": "tuned", "tuned_was": "A", "reason": "Fields are already documented, so B is wrong; A gives a concrete naming nit."}
+{"judge": "sonnet", "pair": 359, "winner": "tie", "tuned_was": "A", "reason": "Both are muddled; neither clearly addresses the commented-out mode change."}
+{"judge": "sonnet", "pair": 360, "winner": "tuned", "tuned_was": "A", "reason": "A flags the suspicious return value change; B misreads the condition."}
+{"judge": "sonnet", "pair": 361, "winner": "tie", "tuned_was": "A", "reason": "A is vague, and B misreads the commented-out argument."}
+{"judge": "sonnet", "pair": 362, "winner": "tie", "tuned_was": "B", "reason": "A restates the diff; B wrongly defends a misspelled property."}
+{"judge": "sonnet", "pair": 363, "winner": "tuned", "tuned_was": "A", "reason": "B is wrong, the assignment is already in main; A is vague but harmless."}
+{"judge": "sonnet", "pair": 364, "winner": "tuned", "tuned_was": "A", "reason": "A questions the magic timeout change; B is generic."}
+{"judge": "sonnet", "pair": 365, "winner": "tuned", "tuned_was": "A", "reason": "A is specific to the test helper; B misreads the test."}
+{"judge": "sonnet", "pair": 366, "winner": "base", "tuned_was": "B", "reason": "B contradicts the diff; A at least is consistent though trivial."}
+{"judge": "sonnet", "pair": 367, "winner": "tie", "tuned_was": "A", "reason": "A is a minor nit; B merely restates the diff."}
+{"judge": "sonnet", "pair": 368, "winner": "tie", "tuned_was": "B", "reason": "Both suggest a rename the diff already makes."}
+{"judge": "sonnet", "pair": 369, "winner": "tuned", "tuned_was": "A", "reason": "B cites a nonexistent unused variable; A is at least about the test."}
+{"judge": "sonnet", "pair": 370, "winner": "tie", "tuned_was": "A", "reason": "A is hedgy and B is nonsensical for a docs example."}
+{"judge": "sonnet", "pair": 371, "winner": "tuned", "tuned_was": "B", "reason": "Questioning removal of attributes is reasonable; A makes an unsupported claim."}
+{"judge": "sonnet", "pair": 372, "winner": "base", "tuned_was": "B", "reason": "A raises a real semantic question; B is nonsense."}
+{"judge": "sonnet", "pair": 373, "winner": "base", "tuned_was": "A", "reason": "Class renamed base to Dialog is a relevant naming consistency point; A is contradicted by diff."}
+{"judge": "sonnet", "pair": 374, "winner": "tuned", "tuned_was": "A", "reason": "A raises a concrete concern about removed fields; B restates diff."}
+{"judge": "sonnet", "pair": 375, "winner": "base", "tuned_was": "A", "reason": "Matches the actual Debug to Debugf fix; A is irrelevant."}
+{"judge": "sonnet", "pair": 376, "winner": "tie", "tuned_was": "A", "reason": "A asks for an existing method; B's claim is wrong."}
+{"judge": "sonnet", "pair": 377, "winner": "base", "tuned_was": "B", "reason": "A is the idiomatic simplification matching the diff; B's reasoning is confused."}
+{"judge": "sonnet", "pair": 378, "winner": "tuned", "tuned_was": "A", "reason": "B misreads the removed branch; A is vague but not wrong."}
+{"judge": "sonnet", "pair": 379, "winner": "base", "tuned_was": "B", "reason": "Both suggest a foreign key; A states the reason."}
+{"judge": "sonnet", "pair": 380, "winner": "tie", "tuned_was": "B", "reason": "A ignores existing comments; B's rename of a bool is odd."}
+{"judge": "sonnet", "pair": 381, "winner": "base", "tuned_was": "A", "reason": "Concrete naming suggestion tied to the spec; A is vague."}
+{"judge": "sonnet", "pair": 382, "winner": "tuned", "tuned_was": "A", "reason": "A questions the behavioural change; B misdescribes the diff."}
+{"judge": "sonnet", "pair": 383, "winner": "base", "tuned_was": "A", "reason": "Unused-helper concern is specific; A is speculative."}
+{"judge": "sonnet", "pair": 384, "winner": "tie", "tuned_was": "B", "reason": "A is wrong, line already removed; B is vague."}
+{"judge": "sonnet", "pair": 385, "winner": "tuned", "tuned_was": "A", "reason": "B is nonsense JSON; A at least engages with the rename."}
+{"judge": "sonnet", "pair": 386, "winner": "tie", "tuned_was": "A", "reason": "A is unclear; B just restates the change."}
+{"judge": "sonnet", "pair": 387, "winner": "tie", "tuned_was": "B", "reason": "Both are speculative about the boolean argument."}
+{"judge": "sonnet", "pair": 388, "winner": "base", "tuned_was": "A", "reason": "Clear, accurate description of the improvement; A is confused."}
+{"judge": "sonnet", "pair": 389, "winner": "tie", "tuned_was": "B", "reason": "A is already done; B wrongly claims include throws."}
+{"judge": "sonnet", "pair": 390, "winner": "tuned", "tuned_was": "A", "reason": "Calling System.exit(0) on error is a real problem; B is unhelpful."}
+{"judge": "sonnet", "pair": 391, "winner": "base", "tuned_was": "B", "reason": "A is a plausible validation suggestion; B is a meaningless identical swap."}
+{"judge": "sonnet", "pair": 392, "winner": "tie", "tuned_was": "A", "reason": "Both speculative and weakly supported."}
+{"judge": "sonnet", "pair": 393, "winner": "tie", "tuned_was": "B", "reason": "Both say the using directive is unneeded; equivalent."}
+{"judge": "sonnet", "pair": 394, "winner": "base", "tuned_was": "A", "reason": "B restates the diff accurately; A is irrelevant."}
+{"judge": "sonnet", "pair": 395, "winner": "tie", "tuned_was": "A", "reason": "A is unfounded; B gives a dubious justification."}
+{"judge": "sonnet", "pair": 396, "winner": "base", "tuned_was": "B", "reason": "Concrete advice to remove the dead commented line."}
+{"judge": "sonnet", "pair": 397, "winner": "tuned", "tuned_was": "B", "reason": "Specific test-coverage suggestion; A is vague."}
+{"judge": "sonnet", "pair": 398, "winner": "tuned", "tuned_was": "A", "reason": "A is a plausible locking suggestion; B is garbled."}
+{"judge": "sonnet", "pair": 399, "winner": "tuned", "tuned_was": "B", "reason": "B makes a concrete behavioural claim about return types; A is vague."}
+{"judge": "sonnet", "pair": 400, "winner": "tuned", "tuned_was": "B", "reason": "B asks relevant question about removed tpush; A is off-topic about trace string."}
+{"judge": "sonnet", "pair": 401, "winner": "tuned", "tuned_was": "A", "reason": "A proposes a specific helper; B is vague generic caution."}
+{"judge": "sonnet", "pair": 402, "winner": "base", "tuned_was": "A", "reason": "A's claim about a Processor interface is unfounded; B is harmless."}
+{"judge": "sonnet", "pair": 403, "winner": "base", "tuned_was": "B", "reason": "B's determinism test likely wrong for jittered function; A vague but not wrong."}
+{"judge": "sonnet", "pair": 404, "winner": "tuned", "tuned_was": "B", "reason": "B raises plausible compatibility concern; A just restates the change."}
+{"judge": "sonnet", "pair": 405, "winner": "base", "tuned_was": "B", "reason": "A is reasonable if generic; B's Optional field suggestion is unidiomatic."}
+{"judge": "sonnet", "pair": 406, "winner": "tuned", "tuned_was": "B", "reason": "B addresses the swallowed error in the empty catch; A misreads promise catch as blob try-catch."}
+{"judge": "sonnet", "pair": 407, "winner": "tie", "tuned_was": "B", "reason": "A is off-topic; B's str(pid) is pointless since format handles it."}
+{"judge": "sonnet", "pair": 408, "winner": "base", "tuned_was": "A", "reason": "A makes a wrong claim; B is vague but harmless."}
+{"judge": "sonnet", "pair": 409, "winner": "tie", "tuned_was": "A", "reason": "Both miss that ctx was just moved; A remove-test and B unused claim both poor."}
+{"judge": "sonnet", "pair": 410, "winner": "tie", "tuned_was": "B", "reason": "Both weak and not clearly useful."}
+{"judge": "sonnet", "pair": 411, "winner": "tie", "tuned_was": "A", "reason": "Neither is meaningful for an alias using directive."}
+{"judge": "sonnet", "pair": 412, "winner": "tie", "tuned_was": "A", "reason": "A references nonexistent issue_with_stack; B ignores that plan name is already included."}
+{"judge": "sonnet", "pair": 413, "winner": "base", "tuned_was": "B", "reason": "A notes a possibly unused field, plausible; B's Uri suggestion misfits HttpListener prefixes."}
+{"judge": "sonnet", "pair": 414, "winner": "base", "tuned_was": "A", "reason": "A suggests wrong initial value; B is harmless."}
+{"judge": "sonnet", "pair": 415, "winner": "base", "tuned_was": "A", "reason": "A is wrong; B describes the test accurately."}
+{"judge": "sonnet", "pair": 416, "winner": "tie", "tuned_was": "A", "reason": "A is bogus and B is wrong since wildcard static import exists."}
+{"judge": "sonnet", "pair": 417, "winner": "tie", "tuned_was": "A", "reason": "A speculative, B merely restates."}
+{"judge": "sonnet", "pair": 418, "winner": "base", "tuned_was": "A", "reason": "A wrongly says remove; these definitions are needed pre-C++17."}
+{"judge": "sonnet", "pair": 419, "winner": "tuned", "tuned_was": "A", "reason": "A is a plausible specific point on null handling; B mischaracterizes sanitize."}
+{"judge": "sonnet", "pair": 420, "winner": "base", "tuned_was": "B", "reason": "A notes mutual exclusivity; B suggests an unneeded Remote field."}
+{"judge": "sonnet", "pair": 421, "winner": "tuned", "tuned_was": "A", "reason": "B is factually wrong about booleans; A is vague but not wrong."}
+{"judge": "sonnet", "pair": 422, "winner": "tuned", "tuned_was": "A", "reason": "B's claim is nonsensical; A is vague but harmless."}
+{"judge": "sonnet", "pair": 423, "winner": "base", "tuned_was": "A", "reason": "B questions the magic number condition and guard; A is vague."}
+{"judge": "sonnet", "pair": 424, "winner": "tie", "tuned_was": "A", "reason": "A speculative addition, B restates."}
+{"judge": "sonnet", "pair": 425, "winner": "base", "tuned_was": "B", "reason": "A is accurate if bland; B is nonsense."}
+{"judge": "sonnet", "pair": 426, "winner": "base", "tuned_was": "A", "reason": "B correctly flags the empty method body."}
+{"judge": "sonnet", "pair": 427, "winner": "base", "tuned_was": "B", "reason": "A is sensible; B is meaningless."}
+{"judge": "sonnet", "pair": 428, "winner": "tuned", "tuned_was": "B", "reason": "B hints at consolidating logic; A is unhelpful since logging already added."}
+{"judge": "sonnet", "pair": 429, "winner": "tie", "tuned_was": "B", "reason": "A is confused, B wrongly opposes an intentional change."}
+{"judge": "sonnet", "pair": 430, "winner": "tuned", "tuned_was": "A", "reason": "A is acceptable; B just restates the diff."}
+{"judge": "sonnet", "pair": 431, "winner": "base", "tuned_was": "B", "reason": "B references code not in hunk; A is trivial but harmless."}
+{"judge": "sonnet", "pair": 432, "winner": "tuned", "tuned_was": "A", "reason": "B makes a false claim about existing null check; A plausible."}
+{"judge": "sonnet", "pair": 433, "winner": "tie", "tuned_was": "A", "reason": "Both incorrect or meaningless."}
+{"judge": "sonnet", "pair": 434, "winner": "tuned", "tuned_was": "A", "reason": "A questions the disable_constant hack; B copies the code comment."}
+{"judge": "sonnet", "pair": 435, "winner": "tie", "tuned_was": "A", "reason": "A speculative, B restates code."}
+{"judge": "sonnet", "pair": 436, "winner": "tie", "tuned_was": "A", "reason": "A wrong, B trivial nitpick already satisfied."}
+{"judge": "sonnet", "pair": 437, "winner": "tuned", "tuned_was": "A", "reason": "A questions default semantic; B merely restates."}
+{"judge": "sonnet", "pair": 438, "winner": "tie", "tuned_was": "B", "reason": "A is confused restatement; B refers to code not in the diff."}
+{"judge": "sonnet", "pair": 439, "winner": "tuned", "tuned_was": "B", "reason": "A's rename suggestion is poor; B at least points at reuse."}
+{"judge": "sonnet", "pair": 440, "winner": "tie", "tuned_was": "A", "reason": "Both suggest the same rename."}
+{"judge": "sonnet", "pair": 441, "winner": "tie", "tuned_was": "B", "reason": "A restates, B speculative path change."}
+{"judge": "sonnet", "pair": 442, "winner": "tie", "tuned_was": "A", "reason": "Both low value."}
+{"judge": "sonnet", "pair": 443, "winner": "tuned", "tuned_was": "B", "reason": "A is false as spyAll moved to helpers; B is harmless."}
+{"judge": "sonnet", "pair": 444, "winner": "tuned", "tuned_was": "A", "reason": "B contradicts intent of validation; A offers plausible extra check."}
+{"judge": "sonnet", "pair": 445, "winner": "tie", "tuned_was": "A", "reason": "Neither notices the off-by-one in the comparison."}
+{"judge": "sonnet", "pair": 446, "winner": "tie", "tuned_was": "B", "reason": "Both marginal."}
+{"judge": "sonnet", "pair": 447, "winner": "tuned", "tuned_was": "B", "reason": "B plausibly flags unneeded import; A claim is unfounded."}
+{"judge": "sonnet", "pair": 448, "winner": "base", "tuned_was": "A", "reason": "B accurately describes behavior; A's error return not feasible."}
+{"judge": "sonnet", "pair": 449, "winner": "tie", "tuned_was": "B", "reason": "Both weak and unclear."}
+{"judge": "sonnet", "pair": 450, "winner": "tie", "tuned_was": "A", "reason": "Both vague about the copyright change; neither clearly better."}
+{"judge": "sonnet", "pair": 451, "winner": "tuned", "tuned_was": "B", "reason": "A is nonsensical about capitalization; B at least questions the except block."}
+{"judge": "sonnet", "pair": 452, "winner": "tuned", "tuned_was": "A", "reason": "A makes a specific type suggestion; B is generic."}
+{"judge": "sonnet", "pair": 453, "winner": "tie", "tuned_was": "A", "reason": "Both dubious; Rails migrations are already transactional and created_at is non-null."}
+{"judge": "sonnet", "pair": 454, "winner": "tie", "tuned_was": "B", "reason": "Both misread the import change; neither useful."}
+{"judge": "sonnet", "pair": 455, "winner": "tie", "tuned_was": "B", "reason": "Neither addresses the removed throws clause; both irrelevant."}
+{"judge": "sonnet", "pair": 456, "winner": "tie", "tuned_was": "A", "reason": "Neither addresses import grouping; both off-target."}
+{"judge": "sonnet", "pair": 457, "winner": "base", "tuned_was": "A", "reason": "B correctly notes assertion on a constant is meaningless; A is truncated."}
+{"judge": "sonnet", "pair": 458, "winner": "tuned", "tuned_was": "B", "reason": "B plausibly questions removing prefix; A wrongly critiques a name being removed."}
+{"judge": "sonnet", "pair": 459, "winner": "base", "tuned_was": "A", "reason": "A suggests reverting to wp globals wrongly; B at least harmless."}
+{"judge": "sonnet", "pair": 460, "winner": "tuned", "tuned_was": "A", "reason": "A is consistent with the change; B's rename is unjustified."}
+{"judge": "sonnet", "pair": 461, "winner": "tuned", "tuned_was": "B", "reason": "B gives a correct, concrete simplification with Any."}
+{"judge": "sonnet", "pair": 462, "winner": "tie", "tuned_was": "B", "reason": "A restates existing code; B irrelevant; neither flags the likely inverted logic."}
+{"judge": "sonnet", "pair": 463, "winner": "tie", "tuned_was": "B", "reason": "Both generic and weakly relevant."}
+{"judge": "sonnet", "pair": 464, "winner": "base", "tuned_was": "A", "reason": "A suggests a rename already done; B at least describes the change."}
+{"judge": "sonnet", "pair": 465, "winner": "tuned", "tuned_was": "A", "reason": "A suggests a plausible additional check; B just restates diff."}
+{"judge": "sonnet", "pair": 466, "winner": "base", "tuned_was": "B", "reason": "A is coherent about positions; B is speculative."}
+{"judge": "sonnet", "pair": 467, "winner": "base", "tuned_was": "A", "reason": "A asks for something already present; B at least raises a default."}
+{"judge": "sonnet", "pair": 468, "winner": "tie", "tuned_was": "B", "reason": "Both weak and unclear."}
+{"judge": "sonnet", "pair": 469, "winner": "tie", "tuned_was": "A", "reason": "A is redundant, B makes a wrong claim; neither useful."}
+{"judge": "sonnet", "pair": 470, "winner": "tie", "tuned_was": "A", "reason": "A asks for what was done; B vague."}
+{"judge": "sonnet", "pair": 471, "winner": "tie", "tuned_was": "A", "reason": "A redundant; B restates diff."}
+{"judge": "sonnet", "pair": 472, "winner": "tie", "tuned_was": "B", "reason": "A restates; B unjustified; both weak."}
+{"judge": "sonnet", "pair": 473, "winner": "tuned", "tuned_was": "A", "reason": "A makes a plausible trailing comma nit; B restates the diff."}
+{"judge": "sonnet", "pair": 474, "winner": "tie", "tuned_was": "B", "reason": "Neither identifies the double space correctly."}
+{"judge": "sonnet", "pair": 475, "winner": "base", "tuned_was": "A", "reason": "B questions the changed condition directly; A's reasoning is speculative."}
+{"judge": "sonnet", "pair": 476, "winner": "base", "tuned_was": "A", "reason": "B names a specific unused import."}
+{"judge": "sonnet", "pair": 477, "winner": "tie", "tuned_was": "A", "reason": "Neither is convincing about the removed test."}
+{"judge": "sonnet", "pair": 478, "winner": "tie", "tuned_was": "A", "reason": "A is non-review; B is likely wrong."}
+{"judge": "sonnet", "pair": 479, "winner": "base", "tuned_was": "B", "reason": "B asks for ordering already present; A at least describes the check."}
+{"judge": "sonnet", "pair": 480, "winner": "base", "tuned_was": "B", "reason": "A gives the right direction for sys.exit; B is wrong."}
+{"judge": "sonnet", "pair": 481, "winner": "tuned", "tuned_was": "B", "reason": "B is relevant to the new method; A's rename is unjustified."}
+{"judge": "sonnet", "pair": 482, "winner": "tie", "tuned_was": "B", "reason": "Both off-target."}
+{"judge": "sonnet", "pair": 483, "winner": "tie", "tuned_was": "A", "reason": "Both weak."}
+{"judge": "sonnet", "pair": 484, "winner": "tie", "tuned_was": "B", "reason": "A claims a double load that is not in the hunk; B irrelevant."}
+{"judge": "sonnet", "pair": 485, "winner": "tie", "tuned_was": "A", "reason": "A dubious; B wrong since comment already updated."}
+{"judge": "sonnet", "pair": 486, "winner": "base", "tuned_was": "B", "reason": "A is more specific about the warning content."}
+{"judge": "sonnet", "pair": 487, "winner": "tuned", "tuned_was": "A", "reason": "A is a plausible naming nit; B restates diff."}
+{"judge": "sonnet", "pair": 488, "winner": "base", "tuned_was": "B", "reason": "A is about the changed test line; B irrelevant."}
+{"judge": "sonnet", "pair": 489, "winner": "base", "tuned_was": "A", "reason": "B flags unused constants; A is nonsense."}
+{"judge": "sonnet", "pair": 490, "winner": "base", "tuned_was": "A", "reason": "A is confused; B is a reasonable ask."}
+{"judge": "sonnet", "pair": 491, "winner": "tie", "tuned_was": "A", "reason": "Both low value."}
+{"judge": "sonnet", "pair": 492, "winner": "tuned", "tuned_was": "A", "reason": "A offers a plausible alternative; B's ordering claim is baseless."}
+{"judge": "sonnet", "pair": 493, "winner": "tie", "tuned_was": "B", "reason": "Both low value."}
+{"judge": "sonnet", "pair": 494, "winner": "tuned", "tuned_was": "A", "reason": "A is coherent; B is confused."}
+{"judge": "sonnet", "pair": 495, "winner": "tuned", "tuned_was": "B", "reason": "B argues to keep the check, plausible; A is confused."}
+{"judge": "sonnet", "pair": 496, "winner": "tie", "tuned_was": "B", "reason": "Both weak."}
+{"judge": "sonnet", "pair": 497, "winner": "tie", "tuned_was": "A", "reason": "A wrong name; B wrong, option is documented."}
+{"judge": "sonnet", "pair": 498, "winner": "tie", "tuned_was": "B", "reason": "A restates diff; B vague."}
+{"judge": "sonnet", "pair": 499, "winner": "tie", "tuned_was": "B", "reason": "A is false about deprecation; B unsupported."}
+{"judge": "opus", "pair": 350, "winner": "tuned", "tuned_was": "B", "reason": "A falsely claims access is unused; it is passed to FileStream. B gives a concrete default suggestion."}
+{"judge": "opus", "pair": 351, "winner": "tie", "tuned_was": "B", "reason": "A restates the diff; B suggests reverting without reason. Neither helpful."}
+{"judge": "opus", "pair": 352, "winner": "tie", "tuned_was": "B", "reason": "Both ask to log dropped items, which the diff already does."}
+{"judge": "opus", "pair": 353, "winner": "tuned", "tuned_was": "B", "reason": "B specifically flags the hardcoded version replacing resource lookup; A is generic."}
+{"judge": "opus", "pair": 354, "winner": "tie", "tuned_was": "A", "reason": "A's rename is baseless; B's unused claim is unverifiable. Both weak."}
+{"judge": "opus", "pair": 355, "winner": "tuned", "tuned_was": "A", "reason": "A suggests avoiding the cast with a dedicated method; B merely restates the diff."}
+{"judge": "opus", "pair": 356, "winner": "tie", "tuned_was": "A", "reason": "A asks to add what's already added; B's rename of an existing command is off-target."}
+{"judge": "opus", "pair": 357, "winner": "tie", "tuned_was": "A", "reason": "A is vague about an already-used path; B is generic boilerplate."}
+{"judge": "opus", "pair": 358, "winner": "tuned", "tuned_was": "A", "reason": "B falsely says fields are undocumented; A gives a concrete naming suggestion."}
+{"judge": "opus", "pair": 359, "winner": "tuned", "tuned_was": "A", "reason": "A addresses the leftover commented line; B wrongly mentions debug."}
+{"judge": "opus", "pair": 360, "winner": "tuned", "tuned_was": "A", "reason": "A questions the return value flip; B's suggested condition inverts the logic wrongly."}
+{"judge": "opus", "pair": 361, "winner": "base", "tuned_was": "A", "reason": "B addresses the hardcoded false versus commented intent; A is vague."}
+{"judge": "opus", "pair": 362, "winner": "tie", "tuned_was": "B", "reason": "A restates the diff; B's concern is moot since writeable is misspelled and defaults false."}
+{"judge": "opus", "pair": 363, "winner": "tuned", "tuned_was": "A", "reason": "B falsely says assignment should move inside main where it already is."}
+{"judge": "opus", "pair": 364, "winner": "tie", "tuned_was": "A", "reason": "A reverts without reason; B is generic. Neither useful."}
+{"judge": "opus", "pair": 365, "winner": "tuned", "tuned_was": "A", "reason": "A makes a specific test-helper suggestion; B is not a review of this hunk."}
+{"judge": "opus", "pair": 366, "winner": "tuned", "tuned_was": "B", "reason": "B raises a specific concern about passing only name; A restates the diff."}
+{"judge": "opus", "pair": 367, "winner": "base", "tuned_was": "A", "reason": "A wrongly suggests now for a date field; B restates harmlessly."}
+{"judge": "opus", "pair": 368, "winner": "tie", "tuned_was": "B", "reason": "Both suggest a rename the diff already performs."}
+{"judge": "opus", "pair": 369, "winner": "tuned", "tuned_was": "A", "reason": "B is wrong: welcome_mail is used. A points to redundant clear."}
+{"judge": "opus", "pair": 370, "winner": "tie", "tuned_was": "A", "reason": "A is incoherent hedging; B misreads intended placeholder. Both weak."}
+{"judge": "opus", "pair": 371, "winner": "base", "tuned_was": "B", "reason": "A explains why the attributes can be dropped, suggesting removal over commenting; B only objects."}
+{"judge": "opus", "pair": 372, "winner": "base", "tuned_was": "B", "reason": "A raises a specific semantic concern; B suggests replacing code with identical code."}
+{"judge": "opus", "pair": 373, "winner": "base", "tuned_was": "A", "reason": "B gives a concrete rename consistent with the change; A just contradicts it."}
+{"judge": "opus", "pair": 374, "winner": "tuned", "tuned_was": "A", "reason": "A raises a concrete concern about removing fields; B restates the diff."}
+{"judge": "opus", "pair": 375, "winner": "tie", "tuned_was": "A", "reason": "A is irrelevant; B restates with wrong performance rationale."}
+{"judge": "opus", "pair": 376, "winner": "tie", "tuned_was": "A", "reason": "A asks for an existing method; B's rename reasoning is confused."}
+{"judge": "opus", "pair": 377, "winner": "tuned", "tuned_was": "B", "reason": "A wrongly claims ordering issue; B restates harmlessly."}
+{"judge": "opus", "pair": 378, "winner": "base", "tuned_was": "A", "reason": "B at least addresses the removed falsy-footerText branch; A's reason is meaningless."}
+{"judge": "opus", "pair": 379, "winner": "tie", "tuned_was": "B", "reason": "Both make the same foreign key suggestion for funder_id."}
+{"judge": "opus", "pair": 380, "winner": "tuned", "tuned_was": "B", "reason": "A asks for a comment that already exists; B offers a specific naming idea."}
+{"judge": "opus", "pair": 381, "winner": "base", "tuned_was": "A", "reason": "B gives a specific rename tied to the spec; A is vague."}
+{"judge": "opus", "pair": 382, "winner": "tuned", "tuned_was": "A", "reason": "B wrongly calls the removed line commented-out; A questions the visibility change."}
+{"judge": "opus", "pair": 383, "winner": "tuned", "tuned_was": "A", "reason": "A suggests a concrete alternative; B's unused claim is unverifiable for a new public method."}
+{"judge": "opus", "pair": 384, "winner": "base", "tuned_was": "B", "reason": "A correctly explains the redundancy; B is ambiguous."}
+{"judge": "opus", "pair": 385, "winner": "tie", "tuned_was": "A", "reason": "A reverts a correct typo fix; B is JSON-wrapped and wrong. Both bad."}
+{"judge": "opus", "pair": 386, "winner": "tie", "tuned_was": "A", "reason": "A names a nonexistent function; B restates the diff."}
+{"judge": "opus", "pair": 387, "winner": "tie", "tuned_was": "B", "reason": "A speculative restatement; B unexplained assertion. Neither clearly better."}
+{"judge": "opus", "pair": 388, "winner": "base", "tuned_was": "A", "reason": "A is nonsensical; B harmlessly restates the change."}
+{"judge": "opus", "pair": 389, "winner": "base", "tuned_was": "B", "reason": "B falsely claims include throws an exception; A is redundant but not wrong."}
+{"judge": "opus", "pair": 390, "winner": "tuned", "tuned_was": "A", "reason": "A correctly objects to System.exit on failure; B's try-catch idea is nonsensical."}
+{"judge": "opus", "pair": 391, "winner": "tie", "tuned_was": "B", "reason": "A asks for an existing check; B is a trivial quote-style nit."}
+{"judge": "opus", "pair": 392, "winner": "tie", "tuned_was": "A", "reason": "A is vague; B's unused claim is unverifiable. Both weak."}
+{"judge": "opus", "pair": 393, "winner": "tie", "tuned_was": "B", "reason": "Both claim the newly added using is removable without evidence."}
+{"judge": "opus", "pair": 394, "winner": "tie", "tuned_was": "A", "reason": "A is meaningless; B calls the import wrong then suggests the same code."}
+{"judge": "opus", "pair": 395, "winner": "tie", "tuned_was": "A", "reason": "A misreads docstring; B restates with dubious reasoning."}
+{"judge": "opus", "pair": 396, "winner": "base", "tuned_was": "B", "reason": "A gives a clear actionable fix: remove commented-out code. B hedges."}
+{"judge": "opus", "pair": 397, "winner": "tuned", "tuned_was": "B", "reason": "B suggests a specific additional test case; A is generic."}
+{"judge": "opus", "pair": 398, "winner": "tuned", "tuned_was": "A", "reason": "B is nonsensical; A gives a concrete if minor alternative."}
+{"judge": "opus", "pair": 399, "winner": "base", "tuned_was": "B", "reason": "B confidently states return types reversed; A is vague but not wrong."}
