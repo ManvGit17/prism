@@ -58,6 +58,17 @@ Fields:
    duplicates (same hunk and comment), 226 have comments over 120 words, 26 hunks are over 4,000
    characters and 20 comments are mostly non-ASCII; 109,028 are left. No comment is under 3 words
    and no train hunk also appears in valid or test, so those filters removed nothing.
+7. **Many comments are linter output or say nothing about the hunk.** The first reviewer trained
+   on the cleaned data learned "This is not needed" and wrote it on 7% of test hunks
+   (`eval/reports/sft.md`). The second run also drops, from train and valid only: 3,354 train
+   comments that are linter or bot output (RuboCop cops, checkpatch "(style)", line length,
+   whitespace, quote style), 10,937 that are under 8 words and name nothing in the hunk, and
+   320 repeats of a comment text already kept 3 times. 95,284 train rows are left. The test split
+   keeps all of these, so every model is scored on the same rows.
+8. **Comments start in many different ways.** In the filtered train set the most common first
+   words are "this" and "I" (9.6% each), then "why" (4.3%); 44% of comments contain a question.
+   With greedy decoding, a model trained on this picks the single most common opener every time:
+   the tuned reviewer starts 89% of comments with "I think" and asks almost no questions.
 
 ## Quality estimation
 

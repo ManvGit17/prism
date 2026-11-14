@@ -1,6 +1,7 @@
 # ADR 0009: Reviewer fine-tuning writes the comment only; the line is picked afterwards
 
-Date: 2026-11-13. Status: accepted (the model itself is not trained yet).
+Date: 2026-11-13. Status: accepted. Trained twice; run 2 (the data filter below) is the default
+reviewer, `prism-reviewer:v2`. Results in `eval/reports/sft.md`.
 
 ## Context
 
@@ -51,6 +52,15 @@ over 120 words, comments that are mostly non-ASCII, and hunks over 60 lines or 4
 Train rows whose hunk appears in valid or test are dropped. Hunks go through the gate's
 `normalize_hunk`, the same as at serving time.
 
+**Run 2: specific comments only.** Run 1 used only the cleaning above and lost to the base model
+with the judge (tuned won 43.7% of decided pairs). Its most common comment was "This is not
+needed". Run 2 also drops, from train and valid but not test (`FilterConfig.specific_only`):
+linter and bot output (a regex for RuboCop cops, checkpatch, line length, whitespace and quote
+style), comments under 8 words that share no identifier with the hunk and contain no code-like
+token, and any comment text seen more than 3 times. Nothing else changed. Run 2 ties with the base
+model (48.6%, 95% interval 43.2 to 54.0) and is the default because its replies are shorter and
+almost always valid JSON. `qwen2.5-coder:3b` stays a supported setting.
+
 **Evaluation.** 500 rows from the dataset's test split, never trained on. Base and tuned are the
 same loaded model with the adapter switched off and on, with greedy decoding and the same prompt.
 Metrics: smoothed BLEU-4 and ROUGE-L (our implementation, close to but not the paper's script,
@@ -58,7 +68,7 @@ so only comparable across our runs), share of replies that are valid JSON, and a
 LLM-judge win rate done locally from the saved generations.
 
 **Serving.** Unsloth merges the adapter and writes a Q4_K_M GGUF. A Modelfile registers it in
-Ollama as `prism-reviewer:v1` with greedy decoding.
+Ollama as `prism-reviewer:v1` (run 1) or `prism-reviewer:v2` (run 2) with greedy decoding.
 
 ## Consequences
 
@@ -70,3 +80,8 @@ Ollama as `prism-reviewer:v1` with greedy decoding.
 - The 3B model is under the Qwen research licence (non-commercial). The tuned weights are not
   pushed to Hugging Face until the licence terms are checked.
 - Unsloth runs on one GPU, so the second Kaggle T4 sits idle.
+- Greedy decoding makes the tuned model open 89% of comments with "I think" and ask almost no
+  questions, though 44% of its training comments are questions. Sampling or DPO could change
+  that; neither is tried.
+- The default model is built from a local GGUF, so a fresh clone without it has to set
+  `PRISM_REVIEWER_MODEL=qwen2.5-coder:3b`.

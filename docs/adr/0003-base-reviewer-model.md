@@ -1,6 +1,7 @@
 # ADR 0003: Qwen2.5-Coder 3B as the base reviewer model
 
-Date: 2026-11-11. Status: accepted for the pipeline work, open for fine-tuning.
+Date: 2026-11-11. Status: accepted for the pipeline work. The default is now the fine-tuned
+`prism-reviewer:v2` (ADR 0009); this model stays a supported setting.
 
 ## Context
 

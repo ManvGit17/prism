@@ -80,7 +80,7 @@ def main() -> None:
         "--hunks", type=Path, default=Path("models/reviewer/eval/generations.jsonl")
     )
     parser.add_argument("--n", type=int, default=24, help="hunks per level")
-    parser.add_argument("--model", default="prism-reviewer:v1")
+    parser.add_argument("--model", default="prism-reviewer:v2")
     parser.add_argument("--parallel", type=int, nargs="+", default=[1, 2, 4])
     args = parser.parse_args()
 

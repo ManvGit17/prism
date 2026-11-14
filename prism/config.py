@@ -31,7 +31,9 @@ class Settings(BaseSettings):
 
     # Ollama runs on the host, not in Compose.
     ollama_url: str = "http://127.0.0.1:11434"
-    reviewer_model: str = "qwen2.5-coder:3b"
+    # The fine-tuned reviewer (ADR 0009). It is built locally from the Kaggle GGUF; the untuned
+    # `qwen2.5-coder:3b` scores the same with the judge and works with a plain `ollama pull`.
+    reviewer_model: str = "prism-reviewer:v2"
 
     # Graph queries leave out CALLS and TESTS edges below this confidence (ADR 0004).
     call_confidence_threshold: float = Field(default=0.5, ge=0.0, le=1.0)

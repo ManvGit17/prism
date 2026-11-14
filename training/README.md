@@ -94,9 +94,15 @@ On Kaggle: same setup as the gate (secrets, GPU T4, Internet on), notebook
 `CUDA_VISIBLE_DEVICES=0`. Output goes straight to `/kaggle/working/sft_out`: `adapter/` (LoRA
 weights, saved right after training), `eval/generations.jsonl`, `gguf/` and `metrics.json`.
 
-To use it locally, download `sft_out/gguf/` (the `.gguf` and `Modelfile`) into a folder, then:
+To use it locally, download `sft_out/gguf/` (the `.gguf` and `Modelfile`) into a folder, for
+example `models/reviewer2/gguf/`, then:
 
 ```
-ollama create prism-reviewer:v1 -f Modelfile
-ollama run prism-reviewer:v1
+ollama create prism-reviewer:v2 -f Modelfile
+ollama run prism-reviewer:v2
 ```
+
+`prism-reviewer:v2` is the default `PRISM_REVIEWER_MODEL`. Run 1 (`v1`) trained before the data
+filter and is kept only for the comparison. To judge a new run, see `eval/sft_judge.py` and the
+reproduce steps in `eval/reports/sft.md`; fill `training/model_cards/reviewer.md` from its
+`metrics.json`.
