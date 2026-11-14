@@ -369,3 +369,80 @@ def context(
             )
         for d in h.dropped:
             typer.echo(f"   - dropped {d.kind.value} {d.qualified_name}: {d.reason}")
+
+
+@app.command()
+def review(
+    repo: Annotated[
+        Path,
+        typer.Option(
+            "--repo",
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            help="Checkout of the PR head commit.",
+        ),
+    ],
+    diff: Annotated[str, typer.Option("--diff", help="Unified diff file, or - for stdin.")],
+    out: Annotated[
+        Path | None, typer.Option("--out", help="Write the PRReview JSON here too.")
+    ] = None,
+    model: Annotated[
+        str | None, typer.Option("--model", help="Reviewer model. Default PRISM_REVIEWER_MODEL.")
+    ] = None,
+    max_hunks: Annotated[
+        int | None, typer.Option("--max-hunks", min=1, help="Default PRISM_REVIEW_MAX_HUNKS.")
+    ] = None,
+    time_limit: Annotated[
+        float | None,
+        typer.Option("--time-limit", min=1, help="Seconds. Default PRISM_REVIEW_TIME_LIMIT_S."),
+    ] = None,
+    pr_number: Annotated[int | None, typer.Option("--pr", min=1)] = None,
+) -> None:
+    """Review a diff and print a validated PRReview as JSON."""
+    import asyncio
+    import logging
+
+    from prism.models.gate import GateError, load_gate
+    from prism.review.checks import RuleVerifier
+    from prism.review.graph import ReviewOptions, run_review
+    from prism.review.reviewer_client import OllamaReviewer
+
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    s = get_settings()
+    text = sys.stdin.read() if diff == "-" else Path(diff).read_text(encoding="utf-8")
+    try:
+        gate = load_gate(s)
+    except GateError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(3) from exc
+    options = ReviewOptions(
+        max_hunks=max_hunks or s.review_max_hunks,
+        time_limit_s=time_limit or s.review_time_limit_s,
+        max_comments=s.review_max_comments,
+        concurrency=s.model_concurrency,
+        retries=s.reviewer_retries,
+    )
+
+    async def go() -> str:
+        reviewer = OllamaReviewer(
+            s.ollama_url, model or s.reviewer_model, timeout_s=s.reviewer_timeout_s
+        )
+        try:
+            result, _ = await run_review(
+                repo,
+                text,
+                gate=gate,
+                model=reviewer,
+                verifier=RuleVerifier(),
+                options=options,
+                pr_number=pr_number,
+            )
+        finally:
+            await reviewer.aclose()
+        return result.model_dump_json(indent=2)
+
+    payload = asyncio.run(go())
+    if out is not None:
+        out.write_text(payload + "\n", encoding="utf-8")
+    typer.echo(payload)

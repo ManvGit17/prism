@@ -71,6 +71,18 @@ class Settings(BaseSettings):
     gate: Literal["pass-all", "onnx"] = "pass-all"
     gate_model_dir: str = "models/gate"
 
+    # Review pipeline (Phase 5). Model calls in flight at once; more only queue in Ollama. Start
+    # value from the Phase 4 throughput runs with OLLAMA_NUM_PARALLEL=4.
+    model_concurrency: int = Field(default=4, ge=1)
+    reviewer_timeout_s: float = Field(default=180.0, gt=0)
+    # A reply that is not valid JSON is retried this many times, then dropped.
+    reviewer_retries: int = Field(default=2, ge=0)
+    # At most this many hunks of a PR go to a model; the rest are listed as not reviewed.
+    review_max_hunks: int = Field(default=40, ge=1)
+    # Hunks not started by then are listed as not reviewed.
+    review_time_limit_s: float = Field(default=600.0, gt=0)
+    review_max_comments: int = Field(default=20, ge=1)
+
     @property
     def postgres_dsn(self) -> str:
         return (
