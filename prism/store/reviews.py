@@ -67,6 +67,8 @@ class StoredReview(BaseModel):
     work_dir: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     findings: tuple[StoredFinding, ...] = ()
+    github_review_id: int | None = None
+    posted_at: datetime | None = None
 
 
 def review_key(repo: str, pr_number: int | None, head_sha: str, diff_text: str) -> str:
@@ -147,6 +149,14 @@ class ReviewStore(Protocol):
         """Newest first, findings included."""
         ...
 
+    def by_key(self, key: str) -> StoredReview | None: ...
+
+    def mark_posted(
+        self, review_id: int, github_review_id: int, comment_ids: Mapping[int, int]
+    ) -> None:
+        """Record the GitHub review and, per finding id, the GitHub comment id."""
+        ...
+
     def close(self) -> None: ...
 
 
@@ -167,7 +177,12 @@ class InMemoryReviewStore:
             self._next_finding += 1
         update: dict[str, Any] = {"id": rid, "findings": tuple(findings)}
         if old is not None:
-            update["created_at"] = old.created_at
+            # Like the Postgres upsert: a re-save keeps when and where the review was posted.
+            update |= {
+                "created_at": old.created_at,
+                "github_review_id": old.github_review_id,
+                "posted_at": old.posted_at,
+            }
         saved = review.model_copy(update=update)
         self._reviews[review.key] = saved
         return saved
@@ -192,13 +207,36 @@ class InMemoryReviewStore:
         ]
         return sorted(rows, key=lambda r: (r.created_at, r.id), reverse=True)[:limit]
 
+    def by_key(self, key: str) -> StoredReview | None:
+        return self._reviews.get(key)
+
+    def mark_posted(
+        self, review_id: int, github_review_id: int, comment_ids: Mapping[int, int]
+    ) -> None:
+        for key, r in self._reviews.items():
+            if r.id != review_id:
+                continue
+            findings = tuple(
+                f.model_copy(update={"github_comment_id": comment_ids[f.id]})
+                if f.id in comment_ids
+                else f
+                for f in r.findings
+            )
+            self._reviews[key] = r.model_copy(
+                update={
+                    "github_review_id": github_review_id,
+                    "posted_at": datetime.now(UTC),
+                    "findings": findings,
+                }
+            )
+
     def close(self) -> None:
         return None
 
 
 _REVIEW_COLS = (
     "id, key, repo, pr_number, head_sha, status, verdict, summary, cost_usd, duration_s, "
-    "trace_id, work_dir, created_at"
+    "trace_id, work_dir, created_at, github_review_id, posted_at"
 )
 _FINDING_COLS = (
     "id, path, line, hunk_header, hunk, author, comment, posted, decision, verifier_note, "
@@ -334,6 +372,27 @@ class PostgresReviewStore:
             {"repo": repo, "pr": pr_number, "limit": limit},
         ).fetchall()
         return [self._review(r) for r in rows]
+
+    def by_key(self, key: str) -> StoredReview | None:
+        row = self._conn.execute(
+            f"SELECT {_REVIEW_COLS} FROM reviews WHERE key = %s", (key,)
+        ).fetchone()
+        return None if row is None else self._review(row)
+
+    def mark_posted(
+        self, review_id: int, github_review_id: int, comment_ids: Mapping[int, int]
+    ) -> None:
+        with self._conn.transaction():
+            self._conn.execute(
+                "UPDATE reviews SET github_review_id = %s, posted_at = now() WHERE id = %s",
+                (github_review_id, review_id),
+            )
+            for finding_id, comment_id in comment_ids.items():
+                self._conn.execute(
+                    "UPDATE review_findings SET github_comment_id = %s "
+                    "WHERE id = %s AND review_id = %s",
+                    (comment_id, finding_id, review_id),
+                )
 
     def delete_repo(self, repo: str) -> None:
         """For tests: remove a repo's reviews (findings cascade)."""

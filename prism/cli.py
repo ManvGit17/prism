@@ -22,9 +22,13 @@ from prism.store import GraphReader, GraphStats, InMemoryGraphStore, Related
 from prism.store.factory import StoreKind, Stores, StoreUnavailable, open_stores
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from prism.github.worker import AppWorker
     from prism.indexer.embedder import Embedder
     from prism.schemas import ContextMode
     from prism.store.base import VectorReader
+    from prism.store.reviews import ReviewStore
 
 app = typer.Typer(help="PRism: repo-aware code review.", no_args_is_help=True)
 graph_app = typer.Typer(
@@ -533,3 +537,97 @@ def mcp_server() -> None:
         typer.echo("prism mcp needs the mcp group: uv sync --group mcp", err=True)
         raise typer.Exit(3) from exc
     main()
+
+
+app_cmd = typer.Typer(help="The GitHub App (needs `uv sync --group app`).", no_args_is_help=True)
+app.add_typer(app_cmd, name="app")
+
+
+def _worker() -> "tuple[AppWorker, ReviewStore]":
+    import logging
+
+    from prism.github.api import AppAuth, GitHubError
+    from prism.github.worker import AppWorker
+    from prism.mcp_server import PrismTools
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    s = get_settings()
+    try:
+        auth = AppAuth.from_settings(s)
+    except (GitHubError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(3) from exc
+    store = PrismTools(s).store  # Postgres when it is up, else in memory
+    return AppWorker(auth, s, store), store
+
+
+@app_cmd.command("serve")
+def app_serve(
+    port: Annotated[int, typer.Option("--port")] = 8080,
+    poll: Annotated[
+        bool,
+        typer.Option("--poll/--no-poll", help="Also poll open PRs (PRISM_APP_POLL_INTERVAL_S)."),
+    ] = False,
+) -> None:
+    """Receive webhooks on 127.0.0.1:PORT/webhook and review PRs; held reviews are posted once
+    their verification is answered (`prism app resume`, or every poll)."""
+    import asyncio
+    import contextlib
+
+    import uvicorn
+
+    from prism.github.webhook import create_app
+
+    worker, _ = _worker()
+    s = get_settings()
+    if not s.github_webhook_secret.get_secret_value():
+        typer.echo("set PRISM_GITHUB_WEBHOOK_SECRET in .env", err=True)
+        raise typer.Exit(3)
+    web = create_app(worker, s.github_webhook_secret.get_secret_value())
+
+    async def poller() -> None:
+        while True:
+            for key, result in (await worker.poll_once() | await worker.resume()).items():
+                typer.echo(f"{key}: {result}", err=True)
+            await asyncio.sleep(s.app_poll_interval_s)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_: object) -> "AsyncIterator[None]":
+        task = asyncio.create_task(poller()) if poll else None
+        yield
+        if task is not None:
+            task.cancel()
+
+    web.router.lifespan_context = lifespan
+    uvicorn.run(web, host="127.0.0.1", port=port, log_level="info")
+
+
+@app_cmd.command("poll")
+def app_poll(
+    once: Annotated[bool, typer.Option("--once", help="One pass, then exit.")] = False,
+) -> None:
+    """Review open PRs on the installed repos that have no review at their head commit."""
+    import asyncio
+
+    worker, _ = _worker()
+    s = get_settings()
+
+    async def run() -> None:
+        while True:
+            for key, result in (await worker.poll_once() | await worker.resume()).items():
+                typer.echo(f"{key}: {result}")
+            if once:
+                return
+            await asyncio.sleep(s.app_poll_interval_s)
+
+    asyncio.run(run())
+
+
+@app_cmd.command("resume")
+def app_resume() -> None:
+    """Post held reviews whose verification has been answered since."""
+    import asyncio
+
+    worker, _ = _worker()
+    for key, result in asyncio.run(worker.resume()).items():
+        typer.echo(f"{key}: {result}")

@@ -93,6 +93,14 @@ MIGRATIONS: tuple[tuple[int, str], ...] = (
         CREATE INDEX IF NOT EXISTS review_findings_review ON review_findings (review_id);
         """,
     ),
+    (
+        3,
+        """
+        -- Where a review was posted on GitHub (ADR 0017). NULL until the App posts it.
+        ALTER TABLE reviews ADD COLUMN IF NOT EXISTS github_review_id BIGINT;
+        ALTER TABLE reviews ADD COLUMN IF NOT EXISTS posted_at TIMESTAMPTZ;
+        """,
+    ),
 )
 
 _LOCK_KEY = 0x50524953  # "PRIS"

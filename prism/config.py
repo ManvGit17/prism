@@ -126,6 +126,18 @@ class Settings(BaseSettings):
     # still finishes when it is down.
     review_store: Literal["postgres", "off"] = "postgres"
 
+    # GitHub App (ADR 0017). The private key stays outside the repo; only its path goes here.
+    github_app_id: str = ""
+    github_private_key_path: str = ""
+    github_webhook_secret: SecretStr = SecretStr("")
+    github_api_url: str = "https://api.github.com"
+    # Shallow checkouts of PR heads, for SAST and retrieval.
+    app_checkout_dir: str = ".prism-work/checkouts"
+    # Polling mode: seconds between scans of the installed repos' open PRs.
+    app_poll_interval_s: float = Field(default=30.0, ge=5)
+    # Skip PRs with more changed lines than this (a review of a huge PR helps nobody).
+    app_max_changed_lines: int = Field(default=3000, ge=1)
+
     @property
     def postgres_dsn(self) -> str:
         return (
