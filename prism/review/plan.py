@@ -107,8 +107,10 @@ def skip_reason(file: FileDiff) -> str | None:
 
 
 def hunk_is_sensitive(hunk: Hunk) -> bool:
+    from prism.review.injection import INJECTION
+
     added = "\n".join(ln.text for ln in hunk.lines if ln.kind == "+")
-    return bool(_SENSITIVE_CODE.search(added))
+    return bool(_SENSITIVE_CODE.search(added) or INJECTION.search(added))
 
 
 def file_risk(

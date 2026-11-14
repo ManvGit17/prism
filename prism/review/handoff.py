@@ -27,6 +27,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from prism.review.checks import Candidate, Decision, apply_rules
+from prism.review.redact import redact
 from prism.schemas import Category, Evidence, ReviewComment, Severity
 
 log = logging.getLogger(__name__)
@@ -134,16 +135,17 @@ def wrap_untrusted(text: str) -> str:
 def request(
     c: Candidate, context: str, risk: Sequence[str], tools: Sequence[str] = ()
 ) -> dict[str, Any]:
+    """One verifier request. Every text field is redacted: the request leaves the machine."""
     return {
         "id": request_id(c),
         "author": c.model,
         "path": c.path,
         "line": c.raw.line,
-        "comment": wrap_untrusted(c.raw.comment),
-        "hunk": wrap_untrusted(numbered_hunk(c)),
-        "context": context,
+        "comment": wrap_untrusted(redact(c.raw.comment).text),
+        "hunk": wrap_untrusted(redact(numbered_hunk(c)).text),
+        "context": redact(context).text,
         # Tool messages can quote PR code, so they are wrapped like the hunk.
-        "tools": [wrap_untrusted(t) for t in tools],
+        "tools": [wrap_untrusted(redact(t).text) for t in tools],
         "risk": list(risk),
     }
 

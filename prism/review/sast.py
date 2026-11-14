@@ -245,7 +245,11 @@ def default_tools(names: Sequence[str], semgrep_config: str, pmd_home: str) -> l
         "ruff": Ruff(),
         "pmd": Pmd(pmd_home),
     }
-    return [made[n] for n in names if n in made]
+    tools = [made[n] for n in names if n in made]
+    # The injection scan is not optional: it costs nothing and guards the model prompts.
+    from prism.review.injection import InjectionScan
+
+    return [*tools, InjectionScan()]
 
 
 def run_sast(
