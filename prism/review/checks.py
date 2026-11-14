@@ -16,7 +16,7 @@ nothing has checked the claim itself.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from prism.models.reviewer import identifiers
@@ -186,6 +186,11 @@ class RuleVerifier:
 
     name = "rules"
 
-    async def verify(self, candidates: Sequence[Candidate]) -> list[Decision]:
+    async def verify(
+        self,
+        candidates: Sequence[Candidate],
+        contexts: Mapping[tuple[str, str], str] | None = None,
+        risk: Mapping[str, Sequence[str]] | None = None,
+    ) -> list[Decision]:
         passing, dropped = apply_rules(candidates)
         return [*dropped, *(Decision(c, label(c), "kept") for c in passing)]

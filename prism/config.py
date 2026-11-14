@@ -82,6 +82,12 @@ class Settings(BaseSettings):
     # Hunks not started by then are listed as not reviewed.
     review_time_limit_s: float = Field(default=600.0, gt=0)
     review_max_comments: int = Field(default=20, ge=1)
+    # Cached replies and verifier batches for `prism review` (ADR 0011).
+    review_work_dir: str = ".prism-work"
+    # "handoff": a Claude model writes verdicts into the work directory. "rules": no model check.
+    verifier: Literal["handoff", "rules"] = "handoff"
+    # A comment the verifier keeps below this confidence is dropped.
+    verifier_min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
 
     @property
     def postgres_dsn(self) -> str:

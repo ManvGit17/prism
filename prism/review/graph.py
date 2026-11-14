@@ -1,11 +1,12 @@
 """The review graph in LangGraph (PLAN.md Phase 5, ADR 0010).
 
-    planner ─► Send() per file ─► file_reviewer ─► verifier ─► aggregator
+    planner ─► Send() per file ─► file_reviewer ─► context ─► verifier ─► aggregator
 
 The planner runs the gate over every hunk first, because the hunk budget is per PR, not per
 file. Each `Send` then carries one file's selected hunks; the file reviewers run at the same
 time and share one semaphore, so the number of model calls in flight never exceeds the limit
 however many files fan out. Their candidate comments are merged by an `operator.add` reducer.
+The context node retrieves code for the hunks that got a comment; only the verifier reads it.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import asyncio
 import operator
 import subprocess
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Protocol, TypedDict
@@ -26,15 +27,25 @@ from prism.models.gate import Gate
 from prism.retrieval.diff import FileDiff, parse_diff
 from prism.review.aggregate import cap, file_reviews, summary, verdict
 from prism.review.checks import Candidate, Decision
-from prism.review.plan import FilePlan, NotReviewed, ReviewPlan, git_churn, plan_review
-from prism.review.reviewer_client import ReviewerModel, review_hunk
-from prism.schemas import PRReview
+from prism.review.handoff import ReplyCache
+from prism.review.plan import FilePlan, HunkTask, NotReviewed, ReviewPlan, git_churn, plan_review
+from prism.review.reviewer_client import HunkResult, ReviewerModel, review_hunk
+from prism.schemas import PRReview, RawComment
 
 
 class Verifier(Protocol):
     name: str
 
-    async def verify(self, candidates: Sequence[Candidate]) -> list[Decision]: ...
+    async def verify(
+        self,
+        candidates: Sequence[Candidate],
+        contexts: Mapping[tuple[str, str], str] | None = None,
+        risk: Mapping[str, Sequence[str]] | None = None,
+    ) -> list[Decision]: ...
+
+
+# Rendered context per (path, hunk header), for the hunks given. Built from the head checkout.
+ContextFn = Callable[[Sequence[HunkTask]], dict[tuple[str, str], str]]
 
 
 @dataclass
@@ -53,6 +64,7 @@ class ReviewState(TypedDict, total=False):
     plan: ReviewPlan
     candidates: Annotated[list[Candidate], operator.add]
     unreviewed: Annotated[list[NotReviewed], operator.add]
+    contexts: dict[tuple[str, str], str]
     decisions: list[Decision]
     result: dict[str, Any]
 
@@ -63,7 +75,13 @@ class FileState(TypedDict):
 
 
 def build_graph(
-    gate: Gate, model: ReviewerModel, verifier: Verifier, options: ReviewOptions
+    gate: Gate,
+    model: ReviewerModel,
+    verifier: Verifier,
+    options: ReviewOptions,
+    *,
+    cache: ReplyCache | None = None,
+    context_fn: ContextFn | None = None,
 ) -> Any:
     """A compiled graph. One semaphore per graph: build a new graph for each review."""
     limit = asyncio.Semaphore(options.concurrency)
@@ -80,15 +98,27 @@ def build_graph(
             for f in state["plan"].files
             if f.tasks
         ]
-        return sends or "verifier"
+        return sends or "context"
 
     async def file_reviewer(state: FileState) -> dict[str, Any]:
         file, deadline = state["file"], state["deadline"]
 
-        async def one(task: Any) -> Candidate | NotReviewed:
+        async def one(task: HunkTask) -> Candidate | NotReviewed:
+            cached = cache.get(task.path, task.text) if cache else None
+            if cached is not None:
+                if "not_reviewed" in cached:
+                    return NotReviewed(task.path, task.hunk.header, cached["not_reviewed"])
+                raw = RawComment(line=cached["line"], comment=cached["comment"])
+                return Candidate(task=task, raw=raw, model=cached["model"])
             if time.monotonic() > deadline:
+                outcome: HunkResult | None = None
+            else:
+                outcome = await review_hunk(model, task.text, limit, retries=options.retries)
+            if cache is not None:
+                cache.put(task.path, task.text, _cache_entry(outcome, model.name))
+            if outcome is None:
                 return NotReviewed(task.path, task.hunk.header, "time")
-            result = await review_hunk(model, task.text, limit, retries=options.retries)
+            result = outcome
             if result.comment is None:
                 return NotReviewed(task.path, task.hunk.header, "model_failed")
             return Candidate(task=task, raw=result.comment, model=model.name)
@@ -99,13 +129,23 @@ def build_graph(
             "unreviewed": [o for o in outcomes if isinstance(o, NotReviewed)],
         }
 
-    async def verify(state: ReviewState) -> dict[str, Any]:
+    def ordered(state: ReviewState) -> list[Candidate]:
         order = {(t.path, t.index): i for i, t in enumerate(state["plan"].tasks)}
         # Fan-in order depends on which file finished first; sort so results are repeatable.
-        cands = sorted(
-            state.get("candidates", []), key=lambda c: order[(c.task.path, c.task.index)]
-        )
-        return {"decisions": await verifier.verify(cands)}
+        return sorted(state.get("candidates", []), key=lambda c: order[(c.task.path, c.task.index)])
+
+    def context(state: ReviewState) -> dict[str, Any]:
+        if cache is not None:
+            cache.save()
+        tasks = [c.task for c in ordered(state)]
+        if context_fn is None or not tasks:
+            return {"contexts": {}}
+        return {"contexts": context_fn(tasks)}
+
+    async def verify(state: ReviewState) -> dict[str, Any]:
+        risk = {f.path: f.reasons for f in state["plan"].files if f.reasons}
+        decisions = await verifier.verify(ordered(state), state.get("contexts", {}), risk)
+        return {"decisions": decisions}
 
     def aggregator(state: ReviewState) -> dict[str, Any]:
         plan = state["plan"]
@@ -113,9 +153,12 @@ def build_graph(
         comments, cut = cap(kept, options.max_comments)
         not_reviewed = [*plan.not_reviewed, *state.get("unreviewed", [])]
         v = verdict(comments, plan, len(not_reviewed))
+        dropped = sum(1 for d in state["decisions"] if d.kept is None)
+        text = summary(comments, plan, not_reviewed, cut, v)
+        text += f"\nVerifier: {verifier.name}; {dropped} comment(s) dropped."
         return {
             "result": {
-                "summary": summary(comments, plan, not_reviewed, cut, v),
+                "summary": text,
                 "verdict": v,
                 "files": file_reviews(plan, comments, not_reviewed),
             }
@@ -124,14 +167,24 @@ def build_graph(
     g = StateGraph(ReviewState)
     g.add_node("planner", planner)
     g.add_node("file_reviewer", file_reviewer)
+    g.add_node("context", context)
     g.add_node("verifier", verify)
     g.add_node("aggregator", aggregator)
     g.add_edge(START, "planner")
-    g.add_conditional_edges("planner", fan_out, ["file_reviewer", "verifier"])
-    g.add_edge("file_reviewer", "verifier")
+    g.add_conditional_edges("planner", fan_out, ["file_reviewer", "context"])
+    g.add_edge("file_reviewer", "context")
+    g.add_edge("context", "verifier")
     g.add_edge("verifier", "aggregator")
     g.add_edge("aggregator", END)
     return g.compile()
+
+
+def _cache_entry(outcome: HunkResult | None, model: str) -> dict[str, Any]:
+    if outcome is None:
+        return {"not_reviewed": "time"}
+    if outcome.comment is None:
+        return {"not_reviewed": "model_failed", "error": outcome.error}
+    return {"line": outcome.comment.line, "comment": outcome.comment.comment, "model": model}
 
 
 def head_sha(repo: Path) -> str:
@@ -158,12 +211,14 @@ async def run_review(
     options: ReviewOptions,
     repo_name: str | None = None,
     pr_number: int | None = None,
+    cache: ReplyCache | None = None,
+    context_fn: ContextFn | None = None,
 ) -> tuple[PRReview, ReviewState]:
     """Review a diff whose head is checked out at `repo`. Returns the review and final state."""
     started = time.monotonic()
     files = parse_diff(diff_text)
     churn = git_churn(repo, [f.path for f in files])
-    graph = build_graph(gate, model, verifier, options)
+    graph = build_graph(gate, model, verifier, options, cache=cache, context_fn=context_fn)
     state: ReviewState = await graph.ainvoke(
         {"files": files, "churn": churn, "deadline": started + options.time_limit_s}
     )
