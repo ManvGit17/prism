@@ -48,6 +48,51 @@ MIGRATIONS: tuple[tuple[int, str], ...] = (
             ON index_runs (repo_id, started_at DESC);
         """,
     ),
+    (
+        2,
+        """
+        -- Reviews and every verifier decision in them (ADR 0015).
+        CREATE TABLE IF NOT EXISTS reviews (
+            id          BIGSERIAL PRIMARY KEY,
+            key         TEXT NOT NULL UNIQUE,  -- repo#pr#head_sha#diff_hash
+            repo        TEXT NOT NULL,
+            pr_number   INT,
+            head_sha    TEXT NOT NULL,
+            status      TEXT NOT NULL CHECK (status IN ('awaiting_verification', 'complete')),
+            verdict     TEXT,
+            summary     TEXT NOT NULL DEFAULT '',
+            cost_usd    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            duration_s  DOUBLE PRECISION NOT NULL DEFAULT 0,
+            trace_id    TEXT,
+            work_dir    TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS reviews_repo_pr ON reviews (repo, pr_number, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS review_findings (
+            id                BIGSERIAL PRIMARY KEY,
+            review_id         BIGINT NOT NULL REFERENCES reviews (id) ON DELETE CASCADE,
+            path              TEXT NOT NULL,
+            line              INT NOT NULL,
+            hunk_header       TEXT NOT NULL,
+            hunk              TEXT NOT NULL,
+            author            TEXT NOT NULL,
+            comment           TEXT NOT NULL,
+            posted            BOOLEAN NOT NULL,
+            decision          TEXT NOT NULL,
+            verifier_note     TEXT NOT NULL DEFAULT '',
+            severity          TEXT,
+            category          TEXT,
+            confidence        DOUBLE PRECISION,
+            evidence          JSONB NOT NULL DEFAULT '[]',
+            suggested_fix     TEXT,
+            tools             JSONB NOT NULL DEFAULT '[]',
+            github_comment_id BIGINT
+        );
+        CREATE INDEX IF NOT EXISTS review_findings_review ON review_findings (review_id);
+        """,
+    ),
 )
 
 _LOCK_KEY = 0x50524953  # "PRIS"

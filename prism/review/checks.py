@@ -86,6 +86,7 @@ class Decision:
     candidate: Candidate
     kept: ReviewComment | None
     reason: str  # "kept" or why it was dropped
+    note: str = ""  # the verifier's own words, kept or not (stored for explain_finding)
 
 
 def new_side_lines(task: HunkTask) -> set[int]:

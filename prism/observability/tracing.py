@@ -62,6 +62,8 @@ class Tracer(Protocol):
 
     def trace_url(self) -> str | None: ...
 
+    def trace_id(self) -> str | None: ...
+
 
 class NoopSpan:
     def child(self, name: str, **_: Any) -> NoopSpan:
@@ -82,6 +84,9 @@ class NoopTracer:
         return None
 
     def trace_url(self) -> str | None:
+        return None
+
+    def trace_id(self) -> str | None:
         return None
 
 
@@ -186,6 +191,9 @@ class LangfuseTracer:
 
     def flush(self) -> None:
         self.client.flush()
+
+    def trace_id(self) -> str | None:
+        return self._trace_id
 
     def trace_url(self) -> str | None:
         if self._trace_id is None:

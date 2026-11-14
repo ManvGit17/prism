@@ -122,6 +122,10 @@ class Settings(BaseSettings):
     prompt_source: Literal["code", "langfuse"] = "code"
     prompt_label: str = "production"
 
+    # Where `prism review` stores reviews (ADR 0015). "postgres" is the Compose Postgres; a review
+    # still finishes when it is down.
+    review_store: Literal["postgres", "off"] = "postgres"
+
     @property
     def postgres_dsn(self) -> str:
         return (

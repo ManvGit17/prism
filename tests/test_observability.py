@@ -65,6 +65,9 @@ class RecTracer:
     def trace_url(self) -> str | None:
         return None
 
+    def trace_id(self) -> str | None:
+        return None
+
 
 def test_review_produces_a_span_per_step_file_and_hunk(tmp_path: Path) -> None:
     diff = (

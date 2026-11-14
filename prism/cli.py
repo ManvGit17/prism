@@ -26,8 +26,10 @@ if TYPE_CHECKING:
     from prism.indexer.embedder import Embedder
     from prism.observability.prompts import PromptSource
     from prism.observability.tracing import Tracer
-    from prism.schemas import ContextMode
+    from prism.review.graph import ReviewState
+    from prism.schemas import ContextMode, PRReview
     from prism.store.base import VectorReader
+    from prism.store.reviews import Status as ReviewStatus
 
 app = typer.Typer(help="PRism: repo-aware code review.", no_args_is_help=True)
 graph_app = typer.Typer(
@@ -438,6 +440,10 @@ def review(
     no_sast: Annotated[
         bool, typer.Option("--no-sast", help="Skip static analysis (PRISM_SAST_TOOLS).")
     ] = False,
+    save: Annotated[
+        bool,
+        typer.Option("--save/--no-save", help="Store the review in Postgres (PRISM_REVIEW_STORE)."),
+    ] = True,
 ) -> None:
     """Review a diff and print a validated PRReview as JSON.
 
@@ -458,12 +464,13 @@ def review(
     from prism.retrieval.rerank import make_reranker
     from prism.retrieval.tokens import token_counter
     from prism.review.checks import RuleVerifier
-    from prism.review.graph import ReviewOptions, Verifier, head_sha, run_review
+    from prism.review.graph import ReviewOptions, ReviewState, Verifier, head_sha, run_review
     from prism.review.handoff import ClaudeVerifier, HandoffVerifier, ReplyCache
     from prism.review.plan import HunkTask
     from prism.review.reviewer_client import OllamaReviewer
     from prism.review.sast import SastReport, default_tools, run_sast
-    from prism.schemas import ContextMode
+    from prism.schemas import ContextMode, PRReview
+    from prism.store.reviews import review_key
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     s = get_settings()
@@ -567,7 +574,7 @@ def review(
                 if (h.path, h.hunk_header) in wanted
             }
 
-        async def go() -> str:
+        async def go() -> tuple[PRReview, ReviewState]:
             reviewer = OllamaReviewer(
                 s.ollama_url,
                 model or s.reviewer_model,
@@ -575,7 +582,7 @@ def review(
                 system=reviewer_prompt.text,
             )
             try:
-                result, _ = await run_review(
+                result, state = await run_review(
                     repo,
                     text,
                     gate=gate,
@@ -592,9 +599,10 @@ def review(
                 )
             finally:
                 await reviewer.aclose()
-            return result.model_dump_json(indent=2)
+            return result, state
 
-        payload = asyncio.run(go())
+        result, state = asyncio.run(go())
+        payload = result.model_dump_json(indent=2)
 
     if prompts.summary():
         typer.echo(prompts.summary(), err=True)
@@ -602,6 +610,17 @@ def review(
     if url:
         typer.echo(f"trace: {url}", err=True)
 
+    pending = claude is not None and claude.pending > 0
+    if save:
+        _save_review(
+            s,
+            result,
+            state,
+            key=review_key(rid, pr_number, result.head_sha, text),
+            status="awaiting_verification" if pending else "complete",
+            trace_id=tracer.trace_id(),
+            work_dir=str(work),
+        )
     if claude is not None:
         for err in claude.errors:
             typer.echo(f"verifier: {err}", err=True)
@@ -658,3 +677,42 @@ def prompts_push(
         raise typer.Exit(3)
     for line in push(client, label):
         typer.echo(line)
+
+
+def _save_review(
+    s: "Settings",
+    review: "PRReview",
+    state: "ReviewState",
+    *,
+    key: str,
+    status: "ReviewStatus",
+    trace_id: str | None,
+    work_dir: str,
+) -> None:
+    """Store the review; a review never fails because Postgres is down."""
+    if s.review_store == "off":
+        return
+    import psycopg
+
+    from prism.store.reviews import PostgresReviewStore, stored_review
+
+    try:
+        store = PostgresReviewStore.from_settings()
+    except psycopg.Error as exc:
+        typer.echo(f"note: review not saved, Postgres unreachable ({type(exc).__name__})", err=True)
+        return
+    try:
+        saved = store.save(
+            stored_review(
+                review,
+                key=key,
+                status=status,
+                decisions=state.get("decisions", []),
+                tools=state.get("tools", {}),
+                trace_id=trace_id,
+                work_dir=work_dir,
+            )
+        )
+    finally:
+        store.close()
+    typer.echo(f"saved review {saved.id} ({status}, {len(saved.findings)} findings)", err=True)
