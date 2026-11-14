@@ -138,3 +138,23 @@ def test_a_real_review_stores_every_decision(tmp_path: Path) -> None:
         result, key=key, status="awaiting_verification", decisions=state["decisions"]
     )
     assert pending.findings == () and pending.verdict is None
+
+
+def test_feedback_round_trip(store: ReviewStore) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from prism.store.reviews import Feedback
+
+    repo = repo_id("reviews-a")
+    saved = store.save(review(repo, 7, "abc", finding("bug here"), finding("nope", posted=False)))
+    fid = saved.findings[0].id
+    store.mark_posted(saved.id, 4242, {fid: 777}, installation_id=9)
+    assert store.finding_by_comment(777) == fid and store.finding_by_comment(1) is None
+    recent = store.posted_since(datetime.now(UTC) - timedelta(hours=1))
+    mine = [(r, f) for r, f in recent if r.repo == repo]
+    assert [(r.installation_id, f.github_comment_id) for r, f in mine] == [(9, 777)]
+    assert store.get_feedback(fid) is None
+    store.save_feedback(Feedback(finding_id=fid, thumbs_up=2, etag='W/"x"', sent="s"))
+    store.save_feedback(Feedback(finding_id=fid, thumbs_up=2, thumbs_down=1, etag='W/"y"'))
+    got = store.get_feedback(fid)
+    assert got is not None and (got.thumbs_down, got.etag, got.sent) == (1, 'W/"y"', None)

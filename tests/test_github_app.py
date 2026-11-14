@@ -386,3 +386,42 @@ def test_git_checkout_fetches_one_commit_and_keeps_no_token(tmp_path: Path) -> N
     assert run("git", "-C", str(out), "rev-parse", "HEAD").stdout.strip() == sha
     assert "ghs_secret_token" not in (out / ".git" / "config").read_text(encoding="utf-8")
     assert git_checkout(job, "ghs_secret_token", tmp_path / "co", web) == out  # reused
+
+
+def test_empty_review_is_posted_only_first(key: rsa.RSAPrivateKey, tmp_path: Path) -> None:
+    worker, gh, _, store = make_worker(key, tmp_path)
+    store.save(
+        StoredReview(
+            key="earlier",
+            repo=REPO,
+            pr_number=PR,
+            head_sha="e" * 40,
+            status="complete",
+            verdict="high",
+        )
+    )
+    earlier = store.by_key("earlier")
+    assert earlier is not None
+    store.mark_posted(earlier.id, 800, {})
+
+    async def nothing(req: Any, **kw: Any) -> ReviewOutcome:
+        out = await FakeReview(store, tmp_path)(req, **kw)
+        assert out.stored is not None
+        saved = store.save(out.stored.model_copy(update={"findings": ()}))
+        out.stored = saved
+        return out
+
+    worker.review_fn = nothing
+    assert asyncio.run(worker.handle(JOB)) == "nothing_to_say" and gh.reviews == []
+
+    worker2, gh2, _, store2 = make_worker(key, tmp_path / "fresh")
+
+    async def nothing2(req: Any, **kw: Any) -> ReviewOutcome:
+        out = await FakeReview(store2, tmp_path)(req, **kw)
+        assert out.stored is not None
+        out.stored = store2.save(out.stored.model_copy(update={"findings": ()}))
+        return out
+
+    worker2.review_fn = nothing2
+    assert asyncio.run(worker2.handle(JOB)) == "posted", "the first review is posted even if empty"
+    assert gh2.reviews[0]["comments"] == []

@@ -101,6 +101,26 @@ MIGRATIONS: tuple[tuple[int, str], ...] = (
         ALTER TABLE reviews ADD COLUMN IF NOT EXISTS posted_at TIMESTAMPTZ;
         """,
     ),
+    (
+        4,
+        """
+        -- Feedback on posted comments (ADR 0019): reactions, replies, resolved threads.
+        ALTER TABLE reviews ADD COLUMN IF NOT EXISTS installation_id BIGINT;
+        CREATE INDEX IF NOT EXISTS reviews_posted_at ON reviews (posted_at);
+        CREATE INDEX IF NOT EXISTS review_findings_comment ON review_findings (github_comment_id);
+        CREATE TABLE IF NOT EXISTS comment_feedback (
+            finding_id  BIGINT PRIMARY KEY REFERENCES review_findings (id) ON DELETE CASCADE,
+            thumbs_up   INT NOT NULL DEFAULT 0,
+            thumbs_down INT NOT NULL DEFAULT 0,
+            replies     INT NOT NULL DEFAULT 0,
+            resolved    BOOLEAN NOT NULL DEFAULT false,
+            etag        TEXT,
+            checked_at  TIMESTAMPTZ,
+            sent        TEXT,
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        """,
+    ),
 )
 
 _LOCK_KEY = 0x50524953  # "PRIS"

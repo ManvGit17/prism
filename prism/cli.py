@@ -667,3 +667,13 @@ def app_beat() -> None:
     from prism.github.queue import celery_app
 
     celery_app.start(["beat", "--loglevel=INFO", "--schedule", ".prism-work/celerybeat-schedule"])
+
+
+@app_cmd.command("feedback")
+def app_feedback() -> None:
+    """Read reactions on PRism's recent comments and send changes to Langfuse (one pass)."""
+    from prism.github.queue import feedback_collector
+
+    worker, _ = _worker()
+    counts = feedback_collector(worker, get_settings()).collect()
+    typer.echo(", ".join(f"{k} {v}" for k, v in counts.items()))

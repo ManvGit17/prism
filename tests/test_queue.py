@@ -183,8 +183,11 @@ def test_celery_settings_protect_slow_reviews() -> None:
     assert conf.task_acks_late and conf.task_reject_on_worker_lost
     assert conf.worker_prefetch_multiplier == 1
     assert conf.broker_transport_options["visibility_timeout"] >= 3 * 1800
-    assert set(conf.beat_schedule) == {"resume-held", "poll"}
-    assert set(make_celery(Settings(_env_file=None)).conf.beat_schedule) == {"resume-held"}
+    assert set(conf.beat_schedule) == {"resume-held", "collect-feedback", "poll"}
+    assert set(make_celery(Settings(_env_file=None)).conf.beat_schedule) == {
+        "resume-held",
+        "collect-feedback",
+    }
 
 
 def test_webhook_enqueues_when_a_queue_is_given() -> None:

@@ -182,6 +182,10 @@ def make_celery(settings: Settings | None = None) -> Any:
         broker_transport_options={"visibility_timeout": int(max(3600, 3 * s.review_time_limit_s))},
         beat_schedule={
             "resume-held": {"task": "prism.resume_held", "schedule": 60.0},
+            "collect-feedback": {
+                "task": "prism.collect_feedback",
+                "schedule": s.app_feedback_interval_s,
+            },
             **(
                 {"poll": {"task": "prism.poll_open_prs", "schedule": s.app_poll_interval_s}}
                 if s.app_poll_with_beat
@@ -247,3 +251,25 @@ def poll_open_prs() -> int:
     for job in jobs:
         enqueue_job(coord, job, review_pull.delay)
     return len(jobs)
+
+
+def feedback_collector(worker: AppWorker, s: Settings) -> Any:
+    """Reactions go to Langfuse when tracing or prompts use it, else only to the store."""
+    from prism.github.feedback import FeedbackCollector, LangfuseFeedbackSink
+
+    sink = None
+    if s.tracing == "langfuse" or s.prompt_source == "langfuse":
+        from prism.observability.tracing import LangfuseTracer
+
+        sink = LangfuseFeedbackSink(LangfuseTracer.from_settings(s).client, s.feedback_dataset)
+    return FeedbackCollector(
+        worker.auth, worker.store, sink, window_days=s.app_feedback_window_days
+    )
+
+
+@celery_app.task(name="prism.collect_feedback")  # type: ignore[untyped-decorator]
+def collect_feedback() -> dict[str, int]:
+    worker, _, s = _deps()
+    counts: dict[str, int] = feedback_collector(worker, s).collect()
+    log.info("feedback: %s", counts)
+    return counts

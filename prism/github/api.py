@@ -142,8 +142,10 @@ class GitHubClient:
         json: Any = None,
         params: Mapping[str, Any] | None = None,
         accept: str | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> httpx.Response:
-        headers = {"Accept": accept} if accept else None
+        """One API call; a 304 Not Modified is returned like a success."""
+        headers = {**({"Accept": accept} if accept else {}), **(headers or {})} or None
         for attempt in range(self.retries + 1):
             resp = self._http.request(method, path, json=json, params=params, headers=headers)
             wait = self._rate_limit_wait(resp)
@@ -200,6 +202,22 @@ class GitHubClient:
             },
         ).json()
         return data
+
+    def comment_reactions(
+        self, repo: str, comment_id: int, etag: str | None = None
+    ) -> tuple[list[dict[str, Any]] | None, str | None]:
+        """Reactions on a review comment, and the response's ETag. With the ETag of the last
+        call, an unchanged list comes back as 304 (None here), which costs no rate limit."""
+        resp = self.request(
+            "GET",
+            f"/repos/{repo}/pulls/comments/{comment_id}/reactions",
+            params={"per_page": 100},
+            headers={"If-None-Match": etag} if etag else None,
+        )
+        if resp.status_code == 304:
+            return None, etag
+        data: list[dict[str, Any]] = resp.json()
+        return data, resp.headers.get("etag")
 
     def review_comments(self, repo: str, number: int, review_id: int) -> list[dict[str, Any]]:
         data: list[dict[str, Any]] = self.request(

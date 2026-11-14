@@ -32,7 +32,16 @@ from prism.store.reviews import ReviewStore, StoredReview
 
 log = logging.getLogger(__name__)
 
-Result = Literal["posted", "held", "superseded", "closed", "too_large", "already_posted", "error"]
+Result = Literal[
+    "posted",
+    "held",
+    "superseded",
+    "closed",
+    "too_large",
+    "already_posted",
+    "nothing_to_say",
+    "error",
+]
 JOB_FILE = "job.json"
 TRIGGER_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review"}
 
@@ -202,6 +211,11 @@ class AppWorker:
         if pr["head"]["sha"] != job.head_sha:
             return "superseded"
         posted = [f for f in stored.findings if f.posted]
+        if not posted and not self._post_empty(job, stored):
+            log.info(
+                "%s#%d at %s: nothing to say, not posted", job.repo, job.number, job.head_sha[:7]
+            )
+            return "nothing_to_say"
         comments = [
             {"path": f.path, "line": f.line, "side": "RIGHT", "body": comment_body(f)}
             for f in posted
@@ -218,7 +232,7 @@ class AppWorker:
         made = await asyncio.to_thread(client.review_comments, job.repo, job.number, review["id"])
         by_spot = {(c["path"], c.get("line")): int(c["id"]) for c in made}
         ids = {f.id: by_spot[(f.path, f.line)] for f in posted if (f.path, f.line) in by_spot}
-        self.store.mark_posted(stored.id, int(review["id"]), ids)
+        self.store.mark_posted(stored.id, int(review["id"]), ids, job.installation_id)
         log.info(
             "posted review %s on %s#%d with %d comment(s)",
             review["id"],
@@ -227,6 +241,15 @@ class AppWorker:
             len(comments),
         )
         return "posted"
+
+    def _post_empty(self, job: PullJob, stored: StoredReview) -> bool:
+        """Whether a review with no comments is worth posting. "first": only when PRism has not
+        posted on this PR yet, so later pushes with nothing to add stay quiet."""
+        mode = self.s.app_post_empty
+        if mode != "first":
+            return mode == "always"
+        earlier = self.store.history(job.repo, job.number, limit=50)
+        return not any(r.github_review_id is not None and r.id != stored.id for r in earlier)
 
     async def resume(self) -> dict[str, Result]:
         """Run every held review again; post the ones whose verification is now answered."""

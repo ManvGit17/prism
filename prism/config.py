@@ -144,6 +144,14 @@ class Settings(BaseSettings):
     app_reviews_per_installation: int = Field(default=1, ge=1)
     # Let `prism app beat` also poll for open PRs, as a fallback for missed webhooks.
     app_poll_with_beat: bool = False
+    # A review with no comments: "first" posts it only if PRism has not reviewed the PR before,
+    # "always" posts every one, "never" posts none.
+    app_post_empty: Literal["first", "always", "never"] = "first"
+    # Feedback on posted comments (ADR 0019): how far back reactions are read, how often.
+    app_feedback_window_days: int = Field(default=14, ge=1)
+    app_feedback_interval_s: float = Field(default=900.0, ge=60)
+    # Langfuse dataset that collects comments people rated, for the next training round.
+    feedback_dataset: str = "prism-comment-feedback"
 
     @property
     def postgres_dsn(self) -> str:

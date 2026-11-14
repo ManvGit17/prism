@@ -17,6 +17,7 @@ from collections import deque
 from collections.abc import Callable
 from typing import Any
 
+from prism.github.feedback import on_review_comment, on_review_thread
 from prism.github.worker import AppWorker, PullJob
 
 log = logging.getLogger(__name__)
@@ -60,9 +61,17 @@ def create_app(
             seen.append(x_github_delivery)
         if x_github_event == "ping":
             return {"status": "pong"}
+        event = json.loads(body)
+        # Feedback (ADR 0019): replies to PRism's comments and resolved threads.
+        if x_github_event == "pull_request_review_comment":
+            counted = on_review_comment(worker.store, event)
+            return {"status": "feedback" if counted else "ignored", "event": x_github_event}
+        if x_github_event == "pull_request_review_thread":
+            counted = on_review_thread(worker.store, event)
+            return {"status": "feedback" if counted else "ignored", "event": x_github_event}
         if x_github_event != "pull_request":
             return {"status": "ignored", "event": x_github_event}
-        job = PullJob.from_event(json.loads(body))
+        job = PullJob.from_event(event)
         if job is None:
             return {"status": "ignored", "event": x_github_event}
         if enqueue is not None:

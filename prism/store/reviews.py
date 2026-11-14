@@ -69,6 +69,38 @@ class StoredReview(BaseModel):
     findings: tuple[StoredFinding, ...] = ()
     github_review_id: int | None = None
     posted_at: datetime | None = None
+    installation_id: int | None = None
+
+
+class Feedback(BaseModel):
+    """What people did with one posted comment (ADR 0019)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    finding_id: int
+    thumbs_up: int = 0
+    thumbs_down: int = 0
+    replies: int = 0
+    resolved: bool = False
+    etag: str | None = None  # of the last reactions response, for conditional requests
+    checked_at: datetime | None = None
+    sent: str | None = None  # what was last sent to Langfuse, to send only changes
+
+    @property
+    def signal(self) -> tuple[int, int, int, bool]:
+        return (self.thumbs_up, self.thumbs_down, self.replies, self.resolved)
+
+    @property
+    def label(self) -> str:
+        """good, bad, mixed, or none yet. A resolved thread with no reactions counts as good:
+        the author acted on the comment."""
+        if self.thumbs_up > self.thumbs_down:
+            return "good"
+        if self.thumbs_down > self.thumbs_up:
+            return "bad"
+        if self.thumbs_up:
+            return "mixed"
+        return "good" if self.resolved else "none"
 
 
 def review_key(repo: str, pr_number: int | None, head_sha: str, diff_text: str) -> str:
@@ -152,10 +184,24 @@ class ReviewStore(Protocol):
     def by_key(self, key: str) -> StoredReview | None: ...
 
     def mark_posted(
-        self, review_id: int, github_review_id: int, comment_ids: Mapping[int, int]
+        self,
+        review_id: int,
+        github_review_id: int,
+        comment_ids: Mapping[int, int],
+        installation_id: int | None = None,
     ) -> None:
         """Record the GitHub review and, per finding id, the GitHub comment id."""
         ...
+
+    def posted_since(self, since: datetime) -> list[tuple[StoredReview, StoredFinding]]:
+        """Findings posted as GitHub comments in reviews posted at or after `since`."""
+        ...
+
+    def finding_by_comment(self, github_comment_id: int) -> int | None: ...
+
+    def get_feedback(self, finding_id: int) -> Feedback | None: ...
+
+    def save_feedback(self, feedback: Feedback) -> None: ...
 
     def close(self) -> None: ...
 
@@ -165,6 +211,7 @@ class InMemoryReviewStore:
         self._reviews: dict[str, StoredReview] = {}
         self._next_review = 1
         self._next_finding = 1
+        self._feedback: dict[int, Feedback] = {}
 
     def save(self, review: StoredReview) -> StoredReview:
         old = self._reviews.get(review.key)
@@ -211,7 +258,11 @@ class InMemoryReviewStore:
         return self._reviews.get(key)
 
     def mark_posted(
-        self, review_id: int, github_review_id: int, comment_ids: Mapping[int, int]
+        self,
+        review_id: int,
+        github_review_id: int,
+        comment_ids: Mapping[int, int],
+        installation_id: int | None = None,
     ) -> None:
         for key, r in self._reviews.items():
             if r.id != review_id:
@@ -227,8 +278,31 @@ class InMemoryReviewStore:
                     "github_review_id": github_review_id,
                     "posted_at": datetime.now(UTC),
                     "findings": findings,
+                    "installation_id": installation_id,
                 }
             )
+
+    def posted_since(self, since: datetime) -> list[tuple[StoredReview, StoredFinding]]:
+        return [
+            (r, f)
+            for r in self._reviews.values()
+            if r.posted_at is not None and r.posted_at >= since
+            for f in r.findings
+            if f.github_comment_id is not None
+        ]
+
+    def finding_by_comment(self, github_comment_id: int) -> int | None:
+        for r in self._reviews.values():
+            for f in r.findings:
+                if f.github_comment_id == github_comment_id:
+                    return f.id
+        return None
+
+    def get_feedback(self, finding_id: int) -> Feedback | None:
+        return self._feedback.get(finding_id)
+
+    def save_feedback(self, feedback: Feedback) -> None:
+        self._feedback[feedback.finding_id] = feedback
 
     def close(self) -> None:
         return None
@@ -236,8 +310,9 @@ class InMemoryReviewStore:
 
 _REVIEW_COLS = (
     "id, key, repo, pr_number, head_sha, status, verdict, summary, cost_usd, duration_s, "
-    "trace_id, work_dir, created_at, github_review_id, posted_at"
+    "trace_id, work_dir, created_at, github_review_id, posted_at, installation_id"
 )
+_FEEDBACK_COLS = "finding_id, thumbs_up, thumbs_down, replies, resolved, etag, checked_at, sent"
 _FINDING_COLS = (
     "id, path, line, hunk_header, hunk, author, comment, posted, decision, verifier_note, "
     "severity, category, confidence, evidence, suggested_fix, tools, github_comment_id"
@@ -380,12 +455,17 @@ class PostgresReviewStore:
         return None if row is None else self._review(row)
 
     def mark_posted(
-        self, review_id: int, github_review_id: int, comment_ids: Mapping[int, int]
+        self,
+        review_id: int,
+        github_review_id: int,
+        comment_ids: Mapping[int, int],
+        installation_id: int | None = None,
     ) -> None:
         with self._conn.transaction():
             self._conn.execute(
-                "UPDATE reviews SET github_review_id = %s, posted_at = now() WHERE id = %s",
-                (github_review_id, review_id),
+                "UPDATE reviews SET github_review_id = %s, posted_at = now(), "
+                "installation_id = %s WHERE id = %s",
+                (github_review_id, installation_id, review_id),
             )
             for finding_id, comment_id in comment_ids.items():
                 self._conn.execute(
@@ -393,6 +473,55 @@ class PostgresReviewStore:
                     "WHERE id = %s AND review_id = %s",
                     (comment_id, finding_id, review_id),
                 )
+
+    def posted_since(self, since: datetime) -> list[tuple[StoredReview, StoredFinding]]:
+        rows = self._conn.execute(
+            f"SELECT {_REVIEW_COLS} FROM reviews WHERE posted_at >= %s ORDER BY posted_at",
+            (since,),
+        ).fetchall()
+        out = []
+        for row in rows:
+            review = self._review(row)
+            out += [(review, f) for f in review.findings if f.github_comment_id is not None]
+        return out
+
+    def finding_by_comment(self, github_comment_id: int) -> int | None:
+        row = self._conn.execute(
+            "SELECT id FROM review_findings WHERE github_comment_id = %s", (github_comment_id,)
+        ).fetchone()
+        return None if row is None else int(row[0])
+
+    def get_feedback(self, finding_id: int) -> Feedback | None:
+        row = self._conn.execute(
+            f"SELECT {_FEEDBACK_COLS} FROM comment_feedback WHERE finding_id = %s",
+            (finding_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return Feedback.model_validate(dict(zip(_FEEDBACK_COLS.split(", "), row, strict=True)))
+
+    def save_feedback(self, feedback: Feedback) -> None:
+        f = feedback
+        self._conn.execute(
+            f"""
+            INSERT INTO comment_feedback ({_FEEDBACK_COLS})
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (finding_id) DO UPDATE SET
+                thumbs_up = EXCLUDED.thumbs_up, thumbs_down = EXCLUDED.thumbs_down,
+                replies = EXCLUDED.replies, resolved = EXCLUDED.resolved, etag = EXCLUDED.etag,
+                checked_at = EXCLUDED.checked_at, sent = EXCLUDED.sent, updated_at = now()
+            """,
+            (
+                f.finding_id,
+                f.thumbs_up,
+                f.thumbs_down,
+                f.replies,
+                f.resolved,
+                f.etag,
+                f.checked_at,
+                f.sent,
+            ),
+        )
 
     def delete_repo(self, repo: str) -> None:
         """For tests: remove a repo's reviews (findings cascade)."""
