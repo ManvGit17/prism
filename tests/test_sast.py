@@ -236,4 +236,4 @@ def test_sast_comments_reach_the_verifier(tmp_path: Path) -> None:
     ]
     assert [r["author"] for r in rows] == ["fake-reviewer", "bandit"]
     assert "B602" in rows[0]["tools"][0], "the model's comment also sees the finding"
-    assert "SAST findings in reviewed hunks: bandit 1." in result.summary
+    assert "SAST findings in the changed files: bandit 1." in result.summary

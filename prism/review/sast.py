@@ -55,7 +55,8 @@ class SastReport:
         for tool in self.ran:
             n = sum(1 for f in self.findings if f.tool == tool)
             parts.append(f"{tool} {n}")
-        text = "SAST findings in reviewed hunks: " + (", ".join(parts) if parts else "no tool ran")
+        found = ", ".join(parts) if parts else "no tool ran"
+        text = f"SAST findings in the changed files: {found}"
         if self.skipped:
             text += "; not run: " + ", ".join(f"{t} ({why})" for t, why in self.skipped)
         return text + "."

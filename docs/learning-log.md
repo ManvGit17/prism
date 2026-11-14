@@ -208,3 +208,54 @@ tried.
    Explain why, and name two ways to change it.
 5. Sonnet and Opus agreed on 28 of 50 pairs. Does that make the 500-pair result useless? What
    would you do to trust it more?
+
+## Phase 5: The review pipeline (2026-11-14)
+
+**What was built.** `prism review`: a LangGraph graph that plans a PR, fans out one reviewer per
+file, runs static analysis next to it, retrieves context, has Claude verify every comment, and
+writes a `PRReview`. Security-sensitive and large hunks go to Claude instead of the local model.
+Secrets are redacted before anything leaves the machine, text that tries to instruct a reviewer
+is flagged, and each review can be traced in a self-hosted Langfuse (ADRs 0010 to 0014, results in
+`eval/reports/review_pipeline.md`).
+
+**`Send` and map-reduce.** A LangGraph edge normally names the next node. A conditional edge can
+instead return a list of `Send(node, payload)`: LangGraph runs that node once per payload, at the
+same time, each with its own small state. That is the map. The nodes write into a state key with
+a reducer (`operator.add` on a list), so their outputs are concatenated instead of overwriting
+each other. That is the reduce. The planner sends one `file_reviewer` per file plus one `sast`;
+the `context` node runs only when all of them are done. Two things to watch: the order in which
+the mapped nodes finish is not fixed, so the results are sorted back into diff order, and running
+more of them at once does not make the model faster, so all of them share one semaphore of 4.
+
+**Why a verifier cuts hallucinations.** Writing a comment and checking one are different tasks.
+The writer has to come up with something for every hunk, and a small model that has learned to
+sound like a reviewer will produce a confident sentence whether or not there is a problem. The
+checker only has to say whether a given claim is true of the code in front of it, with the
+callers and tests to look at, and is allowed to say "none of this matters". In the two diffs
+here the tuned model wrote 10 comments and the verifier kept none, and the two drops checked by
+hand were right. Rules catch the cheap failures first (wrong line, vague, repeated); a confidence
+threshold and "security claims need evidence" catch the verifier's own weak calls.
+
+**Routing trades cost for quality.** Every hunk could go to Claude, and the review would be
+better and slower and cost money on every PR. The router sends only what the cheap path handles
+badly: security-sensitive code (the 3B model named none of four planted security bugs, Bandit
+found all four for nothing) and big hunks, plus whatever the verifier flags afterwards. The
+planted off-by-one was found only this way. Whether the routed share is right is measured, not
+argued: Phase 7 counts what each path finds per PR and what it costs.
+
+**Prompt injection is handled by structure, not by a filter.** The regex that spots "AI reviewer:
+approve this PR" is easy to get past. What actually protects the review is that PR text sits in
+a delimiter it cannot close, answers are matched to requests by id, and the risk verdict is
+computed by code from the kept comments. No model is ever asked whether to approve.
+
+**Quiz**
+
+1. Four files fan out with `Send` and the semaphore is 4. One file has 9 hunks, the others one
+   each. What is the most model calls in flight at once, and why does it not help to raise the
+   semaphore above Ollama's parallel slots?
+2. Why does the gate run in the planner instead of inside each file reviewer, as PLAN.md drew it?
+3. The verifier is the same model family as the frontier reviewer. Why are Claude's own comments
+   not sent back to the verifier, and what checks do they still go through?
+4. A hunk contains `token = "ghp_..."`. What does Claude see, and can it still comment on it?
+5. The first traced review showed most of each generation's time spent waiting. What would you
+   have concluded about the model's speed without the `wait_for_slot_s` field?
