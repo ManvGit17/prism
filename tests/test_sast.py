@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -157,6 +158,22 @@ def test_real_bandit_and_ruff(tmp_path: Path) -> None:
     assert ("bandit", "B602", 6) in rules
     assert ("ruff", "F821", 7) in rules
     assert all(f.path == "app/x.py" for f in report.findings)
+
+
+@pytest.mark.skipif(
+    Pmd(os.environ.get("PRISM_PMD_HOME", "")).unavailable() is not None, reason="PMD not set up"
+)
+def test_real_pmd(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "A.java").write_text(
+        "class A {\n  void f() {\n    try { g(); } catch (Exception e) {\n    }\n  }\n"
+        "  void g() {}\n}\n",
+        encoding="utf-8",
+    )
+    report = run_sast(tmp_path, ["src/A.java"], [Pmd(os.environ["PRISM_PMD_HOME"])])
+    assert report.ran == ["pmd"]
+    assert any(f.rule == "EmptyCatchBlock" and f.path == "src/A.java" for f in report.findings)
 
 
 # Tying findings to hunks

@@ -48,4 +48,7 @@ while the reviewer model does.
   after one-per-line deduplication (9 before it).
 - Semgrep needs network access the first time it fetches a registry ruleset. For offline use,
   point `PRISM_SEMGREP_CONFIG` at a local rules file.
-- PMD is not installed on the build machine yet, so Java has Semgrep only until it is.
+- PMD 7.29.0 ships only as the full multi-language bundle (135 MB zip). On the build machine
+  it runs the `quickstart` ruleset on one Java file in about 4 s. It reports resource leaks,
+  empty catch blocks and unchecked results, but not SQL built by string concatenation; Semgrep's
+  OWASP rules cover that for Java.
