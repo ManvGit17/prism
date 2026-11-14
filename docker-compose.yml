@@ -68,6 +68,169 @@ services:
       - "127.0.0.1:3000:3000"
     mem_limit: 256m
 
+  # Langfuse v4, self-hosted (ADR 0014). Off by default:
+  #   docker compose --profile langfuse up -d --wait
+  # UI at http://localhost:3001; sign up there and you join the "prism" project as owner.
+  # Adapted from langfuse/langfuse's docker-compose.yml: the AI gateway is left out, everything
+  # binds to 127.0.0.1, Langfuse gets its own Postgres and Redis (it needs Redis with
+  # noeviction), telemetry is off, and memory is capped to fit Docker's 6 GB next to the stack
+  # above. The defaults are local development values, like the Postgres password above; set
+  # your own in .env before exposing this anywhere.
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:${LANGFUSE_IMAGE_TAG:-4.72.0}
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    depends_on: &langfuse-depends-on
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+    environment: &langfuse-env
+      NEXTAUTH_URL: http://localhost:3001
+      DATABASE_URL: postgresql://langfuse:${LANGFUSE_POSTGRES_PASSWORD:-langfuse-dev}@langfuse-postgres:5432/langfuse
+      SALT: ${LANGFUSE_SALT:-prism-local-salt}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse-dev}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-minio-dev-secret}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-minio-dev-secret}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-redis-dev}
+    mem_limit: 768m
+
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:${LANGFUSE_IMAGE_TAG:-4.72.0}
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    depends_on: *langfuse-depends-on
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-prism-local-nextauth}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9092
+      LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://langfuse-minio:9000
+      # An org, a project and its API keys on first start. No user: sign up in the UI and
+      # LANGFUSE_DEFAULT_* below makes you owner of this project.
+      LANGFUSE_INIT_ORG_ID: prism
+      LANGFUSE_INIT_ORG_NAME: PRISM
+      LANGFUSE_INIT_PROJECT_ID: prism
+      LANGFUSE_INIT_PROJECT_NAME: prism
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${PRISM_LANGFUSE_PUBLIC_KEY:-pk-lf-prism-local-dev}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${PRISM_LANGFUSE_SECRET_KEY:-sk-lf-prism-local-dev}
+      LANGFUSE_DEFAULT_ORG_ID: prism
+      LANGFUSE_DEFAULT_ORG_ROLE: OWNER
+      LANGFUSE_DEFAULT_PROJECT_ID: prism
+      LANGFUSE_DEFAULT_PROJECT_ROLE: OWNER
+      LANGFUSE_DISABLE_SIGNUP_ONBOARDING: "true"
+      # Under a 1 GB limit Node picks a heap too small for the start-up scripts (it ran out of
+      # heap there); set it explicitly.
+      NODE_OPTIONS: --max-old-space-size=1024
+    healthcheck:
+      # Next.js listens on the container's hostname, not 127.0.0.1.
+      test: ["CMD-SHELL", "wget -qO- http://$${HOSTNAME}:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    mem_limit: 1536m
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:26.3.62.3
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse-dev}
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+      - langfuse-clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    mem_limit: 1500m
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-minio-dev-secret}
+    ports:
+      - "127.0.0.1:9092:9000"
+    volumes:
+      - langfuse-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    mem_limit: 256m
+
+  langfuse-redis:
+    image: redis:7-alpine
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    command: --requirepass ${LANGFUSE_REDIS_PASSWORD:-redis-dev} --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${LANGFUSE_REDIS_PASSWORD:-redis-dev}", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    mem_limit: 128m
+
+  langfuse-postgres:
+    image: postgres:17-alpine
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:-langfuse-dev}
+      POSTGRES_DB: langfuse
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+
 volumes:
   postgres-data:
   neo4j-data:
+  langfuse-postgres-data:
+  langfuse-clickhouse-data:
+  langfuse-clickhouse-logs:
+  langfuse-minio-data:

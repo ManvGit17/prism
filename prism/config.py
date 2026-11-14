@@ -71,6 +71,57 @@ class Settings(BaseSettings):
     gate: Literal["pass-all", "onnx"] = "pass-all"
     gate_model_dir: str = "models/gate"
 
+    # Review pipeline (Phase 5). Model calls in flight at once; more only queue in Ollama. Start
+    # value from the Phase 4 throughput runs with OLLAMA_NUM_PARALLEL=4.
+    model_concurrency: int = Field(default=4, ge=1)
+    reviewer_timeout_s: float = Field(default=180.0, gt=0)
+    # A reply that is not valid JSON is retried this many times, then dropped.
+    reviewer_retries: int = Field(default=2, ge=0)
+    # At most this many hunks of a PR go to a model; the rest are listed as not reviewed.
+    review_max_hunks: int = Field(default=40, ge=1)
+    # Hunks not started by then are listed as not reviewed.
+    review_time_limit_s: float = Field(default=600.0, gt=0)
+    review_max_comments: int = Field(default=20, ge=1)
+    # Cached replies and verifier batches for `prism review` (ADR 0011).
+    review_work_dir: str = ".prism-work"
+    # "handoff": a Claude model writes verdicts into the work directory. "rules": no model check.
+    verifier: Literal["handoff", "api", "rules"] = "handoff"
+    # "api": Claude through the Anthropic SDK (`uv sync --group frontier`, ANTHROPIC_API_KEY).
+    frontier_model: str = "claude-opus-5-5"
+    frontier_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    # USD per million tokens, for PRReview.cost_usd. Defaults are claude-opus-5-5's list price.
+    frontier_price_in_per_mtok: float = Field(default=4.0, ge=0)
+    frontier_price_out_per_mtok: float = Field(default=20.0, ge=0)
+    # A comment the verifier keeps below this confidence is dropped.
+    verifier_min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
+
+    # Static analysis on the changed files (ADR 0012). Comma-separated; "" turns SAST off.
+    sast_tools: str = "bandit,semgrep,ruff,pmd"
+    # Semgrep downloads a registry ruleset on first use; a local rules file works too.
+    semgrep_config: str = "p/owasp-top-ten"
+    # PMD install directory (holds bin/pmd); unset skips PMD.
+    pmd_home: str = ""
+    sast_timeout_s: float = Field(default=300.0, gt=0)
+    # A finding on an added line at or above this becomes a comment for the verifier.
+    sast_comment_min_severity: Literal["high", "medium", "low"] = "medium"
+
+    # Routing (ADR 0013): security-sensitive and large hunks go to the frontier model (Claude,
+    # through the verifier) instead of the local reviewer. Needs a model verifier.
+    escalate: bool = True
+    escalate_min_lines: int = Field(default=60, ge=1)
+
+    # Tracing and prompt management (ADR 0014). "langfuse" needs `uv sync --group observability`
+    # and the `langfuse` Compose profile; the keys below are the profile's local defaults.
+    tracing: Literal["off", "langfuse"] = "off"
+    langfuse_host: str = "http://127.0.0.1:3001"
+    langfuse_project_id: str = "prism"
+    langfuse_public_key: str = "pk-lf-prism-local-dev"
+    langfuse_secret_key: SecretStr = SecretStr("sk-lf-prism-local-dev")
+    langfuse_environment: str = "development"
+    # "langfuse": read prompts from Langfuse by label, falling back to the code's text.
+    prompt_source: Literal["code", "langfuse"] = "code"
+    prompt_label: str = "production"
+
     @property
     def postgres_dsn(self) -> str:
         return (

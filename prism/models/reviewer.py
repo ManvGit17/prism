@@ -38,10 +38,10 @@ def user_message(hunk: str) -> str:
     return f"```diff\n{normalize_hunk(hunk)}\n```"
 
 
-def review_messages(hunk: str) -> list[dict[str, str]]:
+def review_messages(hunk: str, system: str = SYSTEM_PROMPT) -> list[dict[str, str]]:
     """The prompt sent to the reviewer for one hunk."""
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {"role": "user", "content": user_message(hunk)},
     ]
 

@@ -23,3 +23,6 @@ model-assignment.md
 
 node_modules/
 /models/
+
+# prism review work directories (cached replies, verifier batches).
+.prism-work/

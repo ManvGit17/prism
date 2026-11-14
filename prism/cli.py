@@ -11,7 +11,7 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -20,6 +20,14 @@ from prism.indexer.model import Node
 from prism.indexer.pipeline import IndexReport, index_repository
 from prism.store import GraphReader, GraphStats, InMemoryGraphStore, Related
 from prism.store.factory import StoreKind, Stores, StoreUnavailable, open_stores
+
+if TYPE_CHECKING:
+    from prism.config import Settings
+    from prism.indexer.embedder import Embedder
+    from prism.observability.prompts import PromptSource
+    from prism.observability.tracing import Tracer
+    from prism.schemas import ContextMode
+    from prism.store.base import VectorReader
 
 app = typer.Typer(help="PRism: repo-aware code review.", no_args_is_help=True)
 graph_app = typer.Typer(
@@ -149,6 +157,40 @@ def index(
             typer.echo(f"vectors: {report.vectors} written, {stores.vectors.count(rid)} stored")
     finally:
         stores.close()
+
+
+@contextmanager
+def _context_sources(
+    repo: Path, rid: str, mode: "ContextMode", store: str | None
+) -> "Iterator[tuple[GraphReader, VectorReader | None, Embedder | None]]":
+    """Base graph, vectors and embedder for retrieval, from the persistent store or by indexing
+    the checkout in memory. Exits with code 3 when the persistent store is down."""
+    from prism.indexer.embedder import OllamaEmbedder
+    from prism.store import InMemoryVectorStore
+
+    kind: StoreKind = "memory" if (store or get_settings().store) == "memory" else "persistent"
+    if kind == "persistent":
+        try:
+            stores = open_stores("persistent", with_vectors=mode.uses_vector)
+        except StoreUnavailable as exc:
+            typer.echo(f"{exc}\nStart the services (make up) or pass --store memory.", err=True)
+            raise typer.Exit(3) from exc
+        try:
+            if stores.ledger is not None and stores.ledger.latest_complete_run(rid) is None:
+                typer.echo(
+                    f"note: {rid!r} has no complete index run; run prism index first", err=True
+                )
+            yield stores.graph, stores.vectors, stores.embedder
+        finally:
+            stores.close()
+        return
+    memory = InMemoryGraphStore()
+    embedder = OllamaEmbedder() if mode.uses_vector else None
+    mem_vectors = InMemoryVectorStore() if embedder is not None else None
+    if embedder is not None:
+        typer.echo("note: embedding the whole repo in memory for vector context", err=True)
+    index_repository(repo, rid, memory, vectors=mem_vectors, embedder=embedder)
+    yield memory, mem_vectors, embedder
 
 
 @contextmanager
@@ -289,13 +331,11 @@ def context(
     ] = False,
 ) -> None:
     """Ranked context for each hunk of a diff, with token counts."""
-    from prism.indexer.embedder import OllamaEmbedder
     from prism.retrieval.context import ContextOptions, build_context
     from prism.retrieval.render import render_bundle
     from prism.retrieval.rerank import make_reranker
     from prism.retrieval.tokens import token_counter
     from prism.schemas import ContextMode
-    from prism.store import InMemoryVectorStore
 
     text = sys.stdin.read() if diff == "-" else Path(diff).read_text(encoding="utf-8")
     try:
@@ -304,28 +344,7 @@ def context(
         raise typer.BadParameter(f"unknown mode {mode!r}") from exc
     options = ContextOptions.from_settings(mode=context_mode, budget=budget, hops=hops)
     rid = repo_id or repo.resolve().name
-    kind: StoreKind = "memory" if (store or get_settings().store) == "memory" else "persistent"
-    stores: Stores | None = None
-    if kind == "persistent":
-        try:
-            stores = open_stores("persistent", with_vectors=context_mode.uses_vector)
-        except StoreUnavailable as exc:
-            typer.echo(f"{exc}\nStart the services (make up) or pass --store memory.", err=True)
-            raise typer.Exit(3) from exc
-        graph: GraphReader = stores.graph
-        vectors = stores.vectors
-        embedder = stores.embedder
-        if stores.ledger is not None and stores.ledger.latest_complete_run(rid) is None:
-            typer.echo(f"note: {rid!r} has no complete index run; run prism index first", err=True)
-    else:
-        memory = InMemoryGraphStore()
-        embedder = OllamaEmbedder() if context_mode.uses_vector else None
-        mem_vectors = InMemoryVectorStore() if embedder is not None else None
-        if embedder is not None:
-            typer.echo("note: embedding the whole repo in memory for vector context", err=True)
-        index_repository(repo, rid, memory, vectors=mem_vectors, embedder=embedder)
-        graph, vectors = memory, mem_vectors
-    try:
+    with _context_sources(repo, rid, context_mode, store) as (graph, vectors, embedder):
         bundle = build_context(
             repo,
             rid,
@@ -337,9 +356,6 @@ def context(
             reranker=make_reranker(reranker),
             counter=token_counter(),
         )
-    finally:
-        if stores is not None:
-            stores.close()
     if as_json:
         typer.echo(bundle.model_dump_json(indent=2))
         return
@@ -369,3 +385,276 @@ def context(
             )
         for d in h.dropped:
             typer.echo(f"   - dropped {d.kind.value} {d.qualified_name}: {d.reason}")
+
+
+@app.command()
+def review(
+    repo: Annotated[
+        Path,
+        typer.Option(
+            "--repo",
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            help="Checkout of the PR head commit.",
+        ),
+    ],
+    diff: Annotated[str, typer.Option("--diff", help="Unified diff file.")],
+    out: Annotated[
+        Path | None, typer.Option("--out", help="Write the PRReview JSON here too.")
+    ] = None,
+    work: Annotated[
+        Path | None,
+        typer.Option(
+            "--work",
+            help="Work directory for cached replies and verifier batches. Default "
+            "PRISM_REVIEW_WORK_DIR/<repo>-<sha>-<diff hash>.",
+        ),
+    ] = None,
+    verifier: Annotated[
+        str | None,
+        typer.Option("--verifier", help="handoff, api or rules. Default PRISM_VERIFIER."),
+    ] = None,
+    model: Annotated[
+        str | None, typer.Option("--model", help="Reviewer model. Default PRISM_REVIEWER_MODEL.")
+    ] = None,
+    max_hunks: Annotated[
+        int | None, typer.Option("--max-hunks", min=1, help="Default PRISM_REVIEW_MAX_HUNKS.")
+    ] = None,
+    time_limit: Annotated[
+        float | None,
+        typer.Option("--time-limit", min=1, help="Seconds. Default PRISM_REVIEW_TIME_LIMIT_S."),
+    ] = None,
+    store: Annotated[
+        str | None,
+        typer.Option("--store", help="persistent or memory, for the verifier's context."),
+    ] = None,
+    mode: Annotated[
+        str | None,
+        typer.Option("--mode", help="Context mode for the verifier. Default PRISM_CONTEXT_MODE."),
+    ] = None,
+    repo_id: RepoId = None,
+    pr_number: Annotated[int | None, typer.Option("--pr", min=1)] = None,
+    no_sast: Annotated[
+        bool, typer.Option("--no-sast", help="Skip static analysis (PRISM_SAST_TOOLS).")
+    ] = False,
+) -> None:
+    """Review a diff and print a validated PRReview as JSON.
+
+    With the handoff verifier (the default) the first run stops with exit code 2 after writing
+    verifier requests into the work directory; a Claude model writes the verdicts (see
+    verify/RUBRIC.md there), and running the same command again finishes the review.
+    """
+    import asyncio
+    import hashlib
+    import logging
+    from collections.abc import Sequence
+    from contextlib import nullcontext
+
+    from prism.models.gate import GateError, load_gate
+    from prism.observability.prompts import REVIEW, REVIEWER, VERIFY
+    from prism.retrieval.context import ContextOptions, build_context
+    from prism.retrieval.render import render_hunk
+    from prism.retrieval.rerank import make_reranker
+    from prism.retrieval.tokens import token_counter
+    from prism.review.checks import RuleVerifier
+    from prism.review.graph import ReviewOptions, Verifier, head_sha, run_review
+    from prism.review.handoff import ClaudeVerifier, HandoffVerifier, ReplyCache
+    from prism.review.plan import HunkTask
+    from prism.review.reviewer_client import OllamaReviewer
+    from prism.review.sast import SastReport, default_tools, run_sast
+    from prism.schemas import ContextMode
+
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    s = get_settings()
+    text = Path(diff).read_text(encoding="utf-8")
+    try:
+        gate = load_gate(s)
+    except GateError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(3) from exc
+    kind = verifier or s.verifier
+    if kind not in ("handoff", "api", "rules"):
+        raise typer.BadParameter(f"unknown verifier {kind!r}")
+    try:
+        context_mode = ContextMode(mode or s.context_mode)
+    except ValueError as exc:
+        raise typer.BadParameter(f"unknown mode {mode!r}") from exc
+    rid = repo_id or repo.resolve().name
+    if work is None:
+        digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
+        work = Path(s.review_work_dir) / f"{rid}-{head_sha(repo)[:12]}-{digest}"
+    options = ReviewOptions(
+        max_hunks=max_hunks or s.review_max_hunks,
+        time_limit_s=time_limit or s.review_time_limit_s,
+        max_comments=s.review_max_comments,
+        concurrency=s.model_concurrency,
+        retries=s.reviewer_retries,
+        sast_comment_min_severity=s.sast_comment_min_severity,
+        # The rules verifier has no model to escalate to.
+        escalate=s.escalate and kind != "rules",
+        escalate_min_lines=s.escalate_min_lines,
+    )
+    names = [] if no_sast else [n.strip() for n in s.sast_tools.split(",") if n.strip()]
+    tools = default_tools(names, s.semgrep_config, s.pmd_home)
+
+    def sast_fn(paths: Sequence[str]) -> SastReport:
+        return run_sast(repo, paths, tools, timeout_s=s.sast_timeout_s)
+
+    try:
+        tracer, prompts = _observability(s)
+    except ImportError as exc:
+        typer.echo("PRISM_TRACING=langfuse needs `uv sync --group observability`", err=True)
+        raise typer.Exit(3) from exc
+    reviewer_prompt = prompts.get(REVIEWER)
+    rubrics = {"rubric": prompts.get(VERIFY).text, "review_rubric": prompts.get(REVIEW).text}
+
+    chosen: Verifier
+    handoff: HandoffVerifier | None = None
+    claude: ClaudeVerifier | None = None
+    if kind == "handoff":
+        handoff = claude = HandoffVerifier(
+            work, min_confidence=s.verifier_min_confidence, **rubrics
+        )
+        chosen = handoff
+    elif kind == "api":
+        try:
+            from prism.review.frontier_api import ApiBackend
+
+            backend = ApiBackend(
+                s.frontier_model,
+                effort=s.frontier_effort,
+                price_in_per_mtok=s.frontier_price_in_per_mtok,
+                price_out_per_mtok=s.frontier_price_out_per_mtok,
+            )
+        except ImportError as exc:
+            typer.echo(
+                "--verifier api needs the frontier group: uv sync --group frontier", err=True
+            )
+            raise typer.Exit(3) from exc
+        claude = ClaudeVerifier(backend, min_confidence=s.verifier_min_confidence, **rubrics)
+        chosen = claude
+    else:
+        chosen = RuleVerifier()
+
+    # Only the handoff verifier reads context; the rules verifier must not need the stores.
+    needs_context = kind != "rules" and context_mode is not ContextMode.NONE
+    sources = (
+        _context_sources(repo, rid, context_mode, store)
+        if needs_context
+        else nullcontext((InMemoryGraphStore(), None, None))
+    )
+    with sources as (graph, vectors, embedder):
+
+        def contexts(tasks: Sequence[HunkTask]) -> dict[tuple[str, str], str]:
+            if not needs_context:
+                return {}
+            bundle = build_context(
+                repo,
+                rid,
+                text,
+                graph,
+                ContextOptions.from_settings(mode=context_mode),
+                vectors=vectors,
+                embedder=embedder,
+                reranker=make_reranker(),
+                counter=token_counter(),
+            )
+            wanted = {(t.path, t.hunk.header) for t in tasks}
+            return {
+                (h.path, h.hunk_header): render_hunk(h)
+                for h in bundle.hunks
+                if (h.path, h.hunk_header) in wanted
+            }
+
+        async def go() -> str:
+            reviewer = OllamaReviewer(
+                s.ollama_url,
+                model or s.reviewer_model,
+                timeout_s=s.reviewer_timeout_s,
+                system=reviewer_prompt.text,
+            )
+            try:
+                result, _ = await run_review(
+                    repo,
+                    text,
+                    gate=gate,
+                    model=reviewer,
+                    verifier=chosen,
+                    options=options,
+                    repo_name=rid,
+                    pr_number=pr_number,
+                    cache=ReplyCache(work / "replies.json"),
+                    context_fn=contexts,
+                    sast_fn=sast_fn,
+                    tracer=tracer,
+                    reviewer_prompt=reviewer_prompt.client,
+                )
+            finally:
+                await reviewer.aclose()
+            return result.model_dump_json(indent=2)
+
+        payload = asyncio.run(go())
+
+    if prompts.summary():
+        typer.echo(prompts.summary(), err=True)
+    url = tracer.trace_url()
+    if url:
+        typer.echo(f"trace: {url}", err=True)
+
+    if claude is not None:
+        for err in claude.errors:
+            typer.echo(f"verifier: {err}", err=True)
+    if claude is not None and handoff is None and claude.pending:
+        typer.echo(
+            f"{claude.pending} answer(s) missing from the API; see the errors above.", err=True
+        )
+        raise typer.Exit(4)
+    if handoff is not None and handoff.pending:
+        typer.echo(
+            f"{handoff.pending} answer(s) needed from Claude in {handoff.dir}: verdicts_NN"
+            ".jsonl for requests_NN.jsonl (RUBRIC.md) and reviews_NN.jsonl for "
+            "escalations_NN.jsonl (REVIEW_RUBRIC.md). Then run the same command again.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if out is not None:
+        out.write_text(payload + "\n", encoding="utf-8")
+    typer.echo(payload)
+
+
+def _observability(s: "Settings") -> "tuple[Tracer, PromptSource]":
+    """The tracer and the prompt source the settings ask for."""
+    from prism.observability.prompts import PromptSource
+    from prism.observability.tracing import LangfuseTracer, NoopTracer
+
+    tracer: Tracer = NoopTracer()
+    client = None
+    if s.tracing == "langfuse" or s.prompt_source == "langfuse":
+        lf = LangfuseTracer.from_settings(s)
+        client = lf.client
+        if s.tracing == "langfuse":
+            tracer = lf
+    return tracer, PromptSource(client if s.prompt_source == "langfuse" else None, s.prompt_label)
+
+
+prompts_app = typer.Typer(help="Prompts in Langfuse prompt management.", no_args_is_help=True)
+app.add_typer(prompts_app, name="prompts")
+
+
+@prompts_app.command("push")
+def prompts_push(
+    label: Annotated[
+        str, typer.Option("--label", help="Label for the new versions, e.g. staging.")
+    ] = "staging",
+) -> None:
+    """Copy the prompts in the code to Langfuse as new versions with LABEL."""
+    from prism.observability.prompts import push
+    from prism.observability.tracing import LangfuseTracer
+
+    client = LangfuseTracer.from_settings(get_settings()).client
+    if not client.auth_check():
+        typer.echo("Langfuse rejected the keys; check PRISM_LANGFUSE_* and the server.", err=True)
+        raise typer.Exit(3)
+    for line in push(client, label):
+        typer.echo(line)
