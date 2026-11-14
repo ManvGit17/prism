@@ -85,7 +85,13 @@ class Settings(BaseSettings):
     # Cached replies and verifier batches for `prism review` (ADR 0011).
     review_work_dir: str = ".prism-work"
     # "handoff": a Claude model writes verdicts into the work directory. "rules": no model check.
-    verifier: Literal["handoff", "rules"] = "handoff"
+    verifier: Literal["handoff", "api", "rules"] = "handoff"
+    # "api": Claude through the Anthropic SDK (`uv sync --group frontier`, ANTHROPIC_API_KEY).
+    frontier_model: str = "claude-opus-5-5"
+    frontier_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    # USD per million tokens, for PRReview.cost_usd. Defaults are claude-opus-5-5's list price.
+    frontier_price_in_per_mtok: float = Field(default=4.0, ge=0)
+    frontier_price_out_per_mtok: float = Field(default=20.0, ge=0)
     # A comment the verifier keeps below this confidence is dropped.
     verifier_min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
 

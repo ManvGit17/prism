@@ -36,8 +36,19 @@ the stronger comment.
 
 **Backends.** `ClaudeVerifier` asks a backend for answers to batches of `verify` and `review`
 requests. `HandoffBackend` writes `requests_NN.jsonl` and `escalations_NN.jsonl` with their
-rubrics and reads `verdicts_NN.jsonl` and `reviews_NN.jsonl`. An API backend can sit behind the same
-interface.
+rubrics and reads `verdicts_NN.jsonl` and `reviews_NN.jsonl`. `ApiBackend`
+(`prism/review/frontier_api.py`, `PRISM_VERIFIER=api`) sends the same rubric as the system prompt
+and the same requests, ten at a time, to the Anthropic API and parses the same JSON lines back,
+so a review finishes in one run, second round included. It uses the official `anthropic` SDK
+in an optional `frontier` group, `claude-opus-5-5` at effort `high` by default (Opus 5.5
+defaults to `medium`), and the server-side refusal fallback (`fallbacks="default"`). A declined
+batch is reported and its answers stay missing. Cost is input and output tokens times the
+configured price.
+
+PLAN.md named LiteLLM for routing. Routing is PRISM's own code now (above) and the only
+frontier model is Claude, so a provider-neutral layer would only add a dependency. The tests run
+the backend against a fake client; it has not been run against the real API, because the build
+machine has no key.
 
 **Redaction** (`prism/review/redact.py`). Every text field of every request is redacted before it
 is written: known token formats (AWS, GitHub, Slack, Stripe, Google, `sk-` keys, Hugging Face,

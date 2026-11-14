@@ -33,6 +33,9 @@ dev = [
     "pytest>=8.2",
     "ruff>=0.6",
 ]
+frontier = [
+    "anthropic>=2.8.0",
+]
 sast = [
     "bandit>=1.9.4",
     "semgrep>=1.185.0",
@@ -83,7 +86,7 @@ exclude = ["^tests/fixtures/"]
 
 # The training packages are not installed in CI. Targeted: only these third-party modules.
 [[tool.mypy.overrides]]
-module = ["torch", "torch.*", "transformers", "transformers.*", "onnx", "onnx.*", "sklearn", "sklearn.*", "wandb", "onnxruntime", "onnxruntime.*", "peft", "peft.*", "unsloth", "unsloth.*"]
+module = ["torch", "torch.*", "transformers", "transformers.*", "onnx", "onnx.*", "sklearn", "sklearn.*", "wandb", "onnxruntime", "onnxruntime.*", "peft", "peft.*", "unsloth", "unsloth.*", "anthropic", "anthropic.*"]
 ignore_missing_imports = true
 
 # Without torch installed, torch.nn.Module is Any, and the export wrapper subclasses it.

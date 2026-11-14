@@ -410,7 +410,7 @@ def review(
     ] = None,
     verifier: Annotated[
         str | None,
-        typer.Option("--verifier", help="handoff or rules. Default PRISM_VERIFIER."),
+        typer.Option("--verifier", help="handoff, api or rules. Default PRISM_VERIFIER."),
     ] = None,
     model: Annotated[
         str | None, typer.Option("--model", help="Reviewer model. Default PRISM_REVIEWER_MODEL.")
@@ -455,7 +455,7 @@ def review(
     from prism.retrieval.tokens import token_counter
     from prism.review.checks import RuleVerifier
     from prism.review.graph import ReviewOptions, Verifier, head_sha, run_review
-    from prism.review.handoff import HandoffVerifier, ReplyCache
+    from prism.review.handoff import ClaudeVerifier, HandoffVerifier, ReplyCache
     from prism.review.plan import HunkTask
     from prism.review.reviewer_client import OllamaReviewer
     from prism.review.sast import SastReport, default_tools, run_sast
@@ -470,7 +470,7 @@ def review(
         typer.echo(str(exc), err=True)
         raise typer.Exit(3) from exc
     kind = verifier or s.verifier
-    if kind not in ("handoff", "rules"):
+    if kind not in ("handoff", "api", "rules"):
         raise typer.BadParameter(f"unknown verifier {kind!r}")
     try:
         context_mode = ContextMode(mode or s.context_mode)
@@ -488,7 +488,7 @@ def review(
         retries=s.reviewer_retries,
         sast_comment_min_severity=s.sast_comment_min_severity,
         # The rules verifier has no model to escalate to.
-        escalate=s.escalate and kind == "handoff",
+        escalate=s.escalate and kind != "rules",
         escalate_min_lines=s.escalate_min_lines,
     )
     names = [] if no_sast else [n.strip() for n in s.sast_tools.split(",") if n.strip()]
@@ -499,14 +499,32 @@ def review(
 
     chosen: Verifier
     handoff: HandoffVerifier | None = None
+    claude: ClaudeVerifier | None = None
     if kind == "handoff":
-        handoff = HandoffVerifier(work, min_confidence=s.verifier_min_confidence)
+        handoff = claude = HandoffVerifier(work, min_confidence=s.verifier_min_confidence)
         chosen = handoff
+    elif kind == "api":
+        try:
+            from prism.review.frontier_api import ApiBackend
+
+            backend = ApiBackend(
+                s.frontier_model,
+                effort=s.frontier_effort,
+                price_in_per_mtok=s.frontier_price_in_per_mtok,
+                price_out_per_mtok=s.frontier_price_out_per_mtok,
+            )
+        except ImportError as exc:
+            typer.echo(
+                "--verifier api needs the frontier group: uv sync --group frontier", err=True
+            )
+            raise typer.Exit(3) from exc
+        claude = ClaudeVerifier(backend, min_confidence=s.verifier_min_confidence)
+        chosen = claude
     else:
         chosen = RuleVerifier()
 
     # Only the handoff verifier reads context; the rules verifier must not need the stores.
-    needs_context = kind == "handoff" and context_mode is not ContextMode.NONE
+    needs_context = kind != "rules" and context_mode is not ContextMode.NONE
     sources = (
         _context_sources(repo, rid, context_mode, store)
         if needs_context
@@ -559,17 +577,22 @@ def review(
 
         payload = asyncio.run(go())
 
-    if handoff is not None:
-        for err in handoff.errors:
-            typer.echo(f"bad verdict line {err}", err=True)
-        if handoff.pending:
-            typer.echo(
-                f"{handoff.pending} answer(s) needed from Claude in {handoff.dir}: verdicts_NN"
-                ".jsonl for requests_NN.jsonl (RUBRIC.md) and reviews_NN.jsonl for "
-                "escalations_NN.jsonl (REVIEW_RUBRIC.md). Then run the same command again.",
-                err=True,
-            )
-            raise typer.Exit(2)
+    if claude is not None:
+        for err in claude.errors:
+            typer.echo(f"verifier: {err}", err=True)
+    if claude is not None and handoff is None and claude.pending:
+        typer.echo(
+            f"{claude.pending} answer(s) missing from the API; see the errors above.", err=True
+        )
+        raise typer.Exit(4)
+    if handoff is not None and handoff.pending:
+        typer.echo(
+            f"{handoff.pending} answer(s) needed from Claude in {handoff.dir}: verdicts_NN"
+            ".jsonl for requests_NN.jsonl (RUBRIC.md) and reviews_NN.jsonl for "
+            "escalations_NN.jsonl (REVIEW_RUBRIC.md). Then run the same command again.",
+            err=True,
+        )
+        raise typer.Exit(2)
     if out is not None:
         out.write_text(payload + "\n", encoding="utf-8")
     typer.echo(payload)
