@@ -137,3 +137,17 @@ uv run prism dashboard                         # http://127.0.0.1:8090
 Reviews with their cost, time, comments posted out of considered and reactions; each review's
 comments, posted and dropped, with the verifier's reasons; who wrote the posted comments and
 where hunks were routed; and the eval reports (ADR 0020). Read-only.
+
+## BugBench
+
+```bash
+export PRISM_BENCH_ROOT=D:/res-proj-plan/bench   # clones, worktrees and runs, outside the repo
+uv run prism bench run bugbench/cases/tinydb-slice.toml --run slice-01 \
+    --report eval/reports/bugbench_slice.md
+```
+
+Each case is a real commit with one planted defect at a known line (ADR 0021). The run reviews
+every case, then stops with exit code 2 and puts all the open Claude requests of all the cases
+in one folder, `runs/<run>/handoff/round_NN`. Answer those files with the rubrics in the
+folder (a Claude session or subagent), and run the same command again until it prints the
+summary: recall at ±3 lines, comments per PR, which model found each defect, and first-run time.

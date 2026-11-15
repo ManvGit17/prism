@@ -308,3 +308,39 @@ that keeps its token.
    label does each get, and why does resolving not outweigh the 👎?
 5. The App holds every review until Claude answers. What would you change to post within N
    seconds, and what would it cost?
+
+## Phase 7, early slice: BugBench on TinyDB (2026-11-15)
+
+**What was built.** A benchmark harness (ADR 0021): a case is a real commit with one planted
+defect at a known line, materialized as a git worktree, reviewed by the full pipeline, and scored
+by whether a posted comment lands within 3 lines of the defect. The Claude handoff is batched
+across cases, so one Sonnet subagent answers a whole round instead of one per PR. The slice: 10
+TinyDB commits, two handoff rounds (35 requests, then 7 escalated hunks), 4 subagent calls.
+
+**The numbers.** Recall 9/10. Comments per PR 1.6. First run p50 14 s, p95 37 s (local reviewer,
+SAST, in-memory indexing). Of the 9 hits, the local reviewer wrote 2 and Claude wrote 7, all 7
+through escalation: the local comment on the hunk was wrong or vague, the verifier dropped it or
+kept it with low confidence and flagged the hunk, and the frontier review then named the bug. So
+on this slice the recall comes from the escalation path, not from the fine-tuned model.
+
+**The miss.** Case 07: the local reviewer described the bug correctly but put it on line 443,
+13 lines above the defect. The verifier kept it and wrote that the issue is at 455–457, but a
+verdict has no field to move a comment, so it posted at 443 and missed the window. A real
+reviewer would see the comment in roughly the right place; the metric would not.
+
+**What to keep in mind.** ±3 lines counts position, not content: case 01's hit sits on the right
+line with a wrong suggested fix. Ten cases on one repo with no clean PRs says nothing about false
+positives. And the subagent brief told the model that some PRs contain real bugs, which primes
+it; the full run needs a neutral brief that is the same for clean and buggy PRs.
+
+**Quiz**
+
+1. Why is the PR the whole commit with the defect planted, rather than a one-line diff with just
+   the defect?
+2. Request ids are hunk-local (`path#idx-hash`). What would go wrong if the runner put several
+   cases' requests in one folder without the `case::` prefix?
+3. Seven of nine hits came from Claude via escalation. What does that say about where the next
+   effort should go: the reviewer, the verifier or the router?
+4. Why does a rerun of the slice cost almost nothing, and what would make it rerun the local
+   model?
+5. What would a clean PR add that recall on planted defects cannot show?

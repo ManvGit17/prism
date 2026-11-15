@@ -697,3 +697,57 @@ def dashboard(
     )
     typer.echo(f"dashboard on http://127.0.0.1:{port}", err=True)
     uvicorn.run(web, host="127.0.0.1", port=port, log_level="warning")
+
+
+bench_app = typer.Typer(help="BugBench: planted-defect PRs and recall.", no_args_is_help=True)
+app.add_typer(bench_app, name="bench")
+
+
+@bench_app.command("run")
+def bench_run(
+    cases: Annotated[Path, typer.Argument(help="Case file (TOML) under bugbench/cases.")],
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    run: Annotated[str, typer.Option("--run", help="Folder under ROOT/runs.")] = "slice",
+    mode: Annotated[str, typer.Option("--mode", help="Context mode for the verifier.")] = "graph",
+    verifier: Annotated[str, typer.Option("--verifier")] = "handoff",
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    sast: Annotated[bool, typer.Option("--sast/--no-sast")] = True,
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated case ids.")] = None,
+    report: Annotated[
+        Path | None, typer.Option("--report", help="Also write a Markdown report here.")
+    ] = None,
+) -> None:
+    """Review every case. Exit 2 while Claude's answers are missing (the open requests are in
+    one handoff round folder); with everything answered, score and write the results."""
+    import asyncio
+    import json
+
+    from prism.bench.cases import load
+    from prism.bench.run import RunConfig, run_cases
+    from prism.review.service import ReviewError
+
+    s = get_settings().model_copy(update={"review_store": "off", "tracing": "off"})
+    cfg = RunConfig(root.resolve(), run, mode=mode, verifier=verifier, model=model, sast=sast)
+    picked = {x.strip() for x in only.split(",") if x.strip()} if only else None
+    try:
+        result = asyncio.run(
+            run_cases(load(cases), cfg, s, notes=lambda m: typer.echo(m, err=True), only=picked)
+        )
+    except ReviewError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(exc.code) from exc
+    if result.waiting:
+        typer.echo(
+            f"{len(result.waiting)} case(s) waiting for Claude; answer the files in "
+            f"{result.round_dir} and run again",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if report is not None:
+        from prism.bench.report import render
+
+        report.write_text(render(result.summary, result.results), encoding="utf-8")
+        typer.echo(f"report written to {report}", err=True)
+    typer.echo(json.dumps(result.summary, indent=2))
