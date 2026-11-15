@@ -48,6 +48,79 @@ MIGRATIONS: tuple[tuple[int, str], ...] = (
             ON index_runs (repo_id, started_at DESC);
         """,
     ),
+    (
+        2,
+        """
+        -- Reviews and every verifier decision in them (ADR 0015).
+        CREATE TABLE IF NOT EXISTS reviews (
+            id          BIGSERIAL PRIMARY KEY,
+            key         TEXT NOT NULL UNIQUE,  -- repo#pr#head_sha#diff_hash
+            repo        TEXT NOT NULL,
+            pr_number   INT,
+            head_sha    TEXT NOT NULL,
+            status      TEXT NOT NULL CHECK (status IN ('awaiting_verification', 'complete')),
+            verdict     TEXT,
+            summary     TEXT NOT NULL DEFAULT '',
+            cost_usd    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            duration_s  DOUBLE PRECISION NOT NULL DEFAULT 0,
+            trace_id    TEXT,
+            work_dir    TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS reviews_repo_pr ON reviews (repo, pr_number, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS review_findings (
+            id                BIGSERIAL PRIMARY KEY,
+            review_id         BIGINT NOT NULL REFERENCES reviews (id) ON DELETE CASCADE,
+            path              TEXT NOT NULL,
+            line              INT NOT NULL,
+            hunk_header       TEXT NOT NULL,
+            hunk              TEXT NOT NULL,
+            author            TEXT NOT NULL,
+            comment           TEXT NOT NULL,
+            posted            BOOLEAN NOT NULL,
+            decision          TEXT NOT NULL,
+            verifier_note     TEXT NOT NULL DEFAULT '',
+            severity          TEXT,
+            category          TEXT,
+            confidence        DOUBLE PRECISION,
+            evidence          JSONB NOT NULL DEFAULT '[]',
+            suggested_fix     TEXT,
+            tools             JSONB NOT NULL DEFAULT '[]',
+            github_comment_id BIGINT
+        );
+        CREATE INDEX IF NOT EXISTS review_findings_review ON review_findings (review_id);
+        """,
+    ),
+    (
+        3,
+        """
+        -- Where a review was posted on GitHub (ADR 0017). NULL until the App posts it.
+        ALTER TABLE reviews ADD COLUMN IF NOT EXISTS github_review_id BIGINT;
+        ALTER TABLE reviews ADD COLUMN IF NOT EXISTS posted_at TIMESTAMPTZ;
+        """,
+    ),
+    (
+        4,
+        """
+        -- Feedback on posted comments (ADR 0019): reactions, replies, resolved threads.
+        ALTER TABLE reviews ADD COLUMN IF NOT EXISTS installation_id BIGINT;
+        CREATE INDEX IF NOT EXISTS reviews_posted_at ON reviews (posted_at);
+        CREATE INDEX IF NOT EXISTS review_findings_comment ON review_findings (github_comment_id);
+        CREATE TABLE IF NOT EXISTS comment_feedback (
+            finding_id  BIGINT PRIMARY KEY REFERENCES review_findings (id) ON DELETE CASCADE,
+            thumbs_up   INT NOT NULL DEFAULT 0,
+            thumbs_down INT NOT NULL DEFAULT 0,
+            replies     INT NOT NULL DEFAULT 0,
+            resolved    BOOLEAN NOT NULL DEFAULT false,
+            etag        TEXT,
+            checked_at  TIMESTAMPTZ,
+            sent        TEXT,
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        """,
+    ),
 )
 
 _LOCK_KEY = 0x50524953  # "PRIS"

@@ -45,7 +45,7 @@ defaults to `medium`), and the server-side refusal fallback (`fallbacks="default
 batch is reported and its answers stay missing. Cost is input and output tokens times the
 configured price.
 
-PLAN.md named LiteLLM for routing. Routing is PRISM's own code now (above) and the only
+PLAN.md named LiteLLM for routing. Routing is PRism's own code now (above) and the only
 frontier model is Claude, so a provider-neutral layer would only add a dependency. The tests run
 the backend against a fake client; it has not been run against the real API, because the build
 machine has no key.
@@ -73,7 +73,7 @@ not an external call and sees the hunk unredacted.
    security-sensitive, so the gate cannot skip it and the router sends it to Claude.
 
 **Cost.** `PRReview.cost_usd` is what the verifier's backend reports. The handoff reports 0: the
-Claude session is not metered by PRISM. The summary has the routing: how many hunks went to the
+Claude session is not metered by PRism. The summary has the routing: how many hunks went to the
 local model and how many to Claude, with the reasons.
 
 ## Consequences

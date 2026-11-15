@@ -343,12 +343,12 @@ def read_answers(directory: Path, prefix: str) -> tuple[dict[str, dict[str, Any]
 
 def apply_verdict(c: Candidate, v: Verdict, min_confidence: float) -> Decision:
     if not v.keep:
-        return Decision(c, None, f"verifier: {v.reason or 'dropped'}")
+        return Decision(c, None, f"verifier: {v.reason or 'dropped'}", v.reason)
     if v.confidence < min_confidence:
-        return Decision(c, None, f"low_confidence ({v.confidence:.2f})")
+        return Decision(c, None, f"low_confidence ({v.confidence:.2f})", v.reason)
     category = v.category or Category.OTHER
     if category is Category.SECURITY and not v.evidence:
-        return Decision(c, None, "security_without_evidence")
+        return Decision(c, None, "security_without_evidence", v.reason)
     kept = ReviewComment(
         path=c.path,
         line=c.raw.line,
@@ -359,7 +359,7 @@ def apply_verdict(c: Candidate, v: Verdict, min_confidence: float) -> Decision:
         model=c.model,
         evidence=tuple(v.evidence),
     )
-    return Decision(c, kept, "kept")
+    return Decision(c, kept, "kept", v.reason)
 
 
 def apply_frontier(

@@ -227,9 +227,50 @@ services:
       retries: 20
     mem_limit: 256m
 
+  # The review queue's worker and beat in containers (ADR 0018). Off by default; on Windows run
+  # `prism app worker` and `prism app beat` on the host instead. The App's private key is
+  # mounted read-only from PRISM_SECRETS_DIR; nothing secret is baked into the image.
+  worker:
+    build: .
+    profiles: ["worker"]
+    restart: unless-stopped
+    depends_on: &worker-depends
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment: &worker-env
+      PRISM_REDIS_URL: redis://redis:6379/0
+      PRISM_POSTGRES_HOST: postgres
+      PRISM_NEO4J_URI: bolt://neo4j:7687
+      PRISM_OLLAMA_URL: ${PRISM_WORKER_OLLAMA_URL:-http://host.docker.internal:11434}
+      PRISM_GITHUB_PRIVATE_KEY_PATH: /run/secrets/prism-app.pem
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${PRISM_APP_KEY_FILE:-./secrets/prism-app.pem}:/run/secrets/prism-app.pem:ro
+      - worker-work:/app/.prism-work
+    mem_limit: 1g
+
+  beat:
+    build: .
+    profiles: ["worker"]
+    restart: unless-stopped
+    depends_on: *worker-depends
+    env_file: .env
+    environment: *worker-env
+    volumes:
+      - ${PRISM_APP_KEY_FILE:-./secrets/prism-app.pem}:/run/secrets/prism-app.pem:ro
+      - worker-work:/app/.prism-work
+    command: ["uv", "run", "--no-sync", "celery", "-A", "prism.github.queue:celery_app", "beat",
+              "--loglevel=INFO", "--schedule", "/app/.prism-work/celerybeat-schedule"]
+    mem_limit: 256m
+
 volumes:
   postgres-data:
   neo4j-data:
+  worker-work:
   langfuse-postgres-data:
   langfuse-clickhouse-data:
   langfuse-clickhouse-logs:

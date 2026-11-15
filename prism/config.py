@@ -122,6 +122,37 @@ class Settings(BaseSettings):
     prompt_source: Literal["code", "langfuse"] = "code"
     prompt_label: str = "production"
 
+    # Where `prism review` stores reviews (ADR 0015). "postgres" is the Compose Postgres; a review
+    # still finishes when it is down.
+    review_store: Literal["postgres", "off"] = "postgres"
+
+    # GitHub App (ADR 0017). The private key stays outside the repo; only its path goes here.
+    github_app_id: str = ""
+    github_private_key_path: str = ""
+    github_webhook_secret: SecretStr = SecretStr("")
+    github_api_url: str = "https://api.github.com"
+    # Shallow checkouts of PR heads, for SAST and retrieval.
+    app_checkout_dir: str = ".prism-work/checkouts"
+    # Polling mode: seconds between scans of the installed repos' open PRs.
+    app_poll_interval_s: float = Field(default=30.0, ge=5)
+    # Skip PRs with more changed lines than this (a review of a huge PR helps nobody).
+    app_max_changed_lines: int = Field(default=3000, ge=1)
+    # "celery": the webhook queues reviews for `prism app worker` (ADR 0018); "inline": the web
+    # process reviews them itself, one at a time.
+    app_queue: Literal["inline", "celery"] = "inline"
+    # Reviews running at once for one installation (the per-installation limit).
+    app_reviews_per_installation: int = Field(default=1, ge=1)
+    # Let `prism app beat` also poll for open PRs, as a fallback for missed webhooks.
+    app_poll_with_beat: bool = False
+    # A review with no comments: "first" posts it only if PRism has not reviewed the PR before,
+    # "always" posts every one, "never" posts none.
+    app_post_empty: Literal["first", "always", "never"] = "first"
+    # Feedback on posted comments (ADR 0019): how far back reactions are read, how often.
+    app_feedback_window_days: int = Field(default=14, ge=1)
+    app_feedback_interval_s: float = Field(default=900.0, ge=60)
+    # Langfuse dataset that collects comments people rated, for the next training round.
+    feedback_dataset: str = "prism-comment-feedback"
+
     @property
     def postgres_dsn(self) -> str:
         return (

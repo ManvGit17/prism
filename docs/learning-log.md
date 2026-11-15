@@ -259,3 +259,52 @@ computed by code from the kept comments. No model is ever asked whether to appro
 4. A hunk contains `token = "ghp_..."`. What does Claude see, and can it still comment on it?
 5. The first traced review showed most of each generation's time spent waiting. What would you
    have concluded about the model's speed without the `wait_for_slot_s` field?
+
+## Phase 6: GitHub App, queue, MCP, feedback, dashboard (2026-11-15)
+
+**What was built.** Everything around the review pipeline that makes it a product: reviews stored
+with every decision (ADR 0015), an MCP server so Claude Code can review its own changes (ADR 0016),
+a GitHub App that reviews pull requests and posts inline comments (ADR 0017), a Celery queue under
+it (ADR 0018), reactions on its comments fed back into Langfuse (ADR 0019), and a dashboard (ADR
+0020). Checked live on a private test repo: a PR with three planted bugs got a review with three
+correct inline comments 1 min 50 s after it was opened, most of that the wait for verification.
+
+**How a GitHub App authenticates.** The App has a private key. It signs a short JWT (at most 10
+minutes) to prove it is the App, then trades it for an installation token (one hour) that can act
+on the repos it is installed on. Webhooks are signed with a shared secret: the HMAC of the raw body
+must match `X-Hub-Signature-256` before anything in the body is trusted.
+
+**Why a queue.** Reviewing inside the web process loses the review when the process dies, cannot
+wait out a rate limit, and reviews old commits after newer pushes. With Celery the task is
+acknowledged only after it finishes (so a crash puts it back), the broker's visibility timeout is
+longer than the slowest review (so a slow one is not handed to a second worker), a claim on
+`repo#pr#sha` makes redeliveries harmless, and the newest head per PR lets queued reviews of older
+commits stop early.
+
+**Holding reviews instead of posting unverified ones.** The local model's comments were wrong more
+often than right, and the verifier is a Claude handoff with no API key here. So the App holds a
+review until a Claude session answers it (through the MCP tool or the files), and beat posts it
+the next minute. Slower, but nothing unverified reaches a PR.
+
+**MCP in one line.** A server exposes typed tools over a pipe; the client (Claude Code) decides when
+to call them. The useful trick here: the client is itself a Claude model, so the review's
+verification can be handed to it inside the same conversation. And stdout belongs to the protocol,
+which is why every subprocess now gets an empty stdin and nothing prints.
+
+**Conditional requests.** GitHub returns an `ETag`; sending it back as `If-None-Match` gets a 304
+for unchanged data, which costs no rate limit. Measured: the remaining quota stayed the same
+across a 304. The catch: the ETag is tied to the token, so the savings only show inside a process
+that keeps its token.
+
+**Quiz**
+
+1. Why does the worker check the PR's head commit again right before posting, when the queue
+   already drops superseded reviews?
+2. A webhook delivery times out and GitHub sends it again while the first review is still running.
+   What stops a second review, and what happens if the first one then fails?
+3. Why is GitHub's `/reviews/{id}/comments` the wrong endpoint for matching posted comments to
+   findings?
+4. A comment got one 👍 and its thread was resolved; another got one 👎 and was resolved. What
+   label does each get, and why does resolving not outweigh the 👎?
+5. The App holds every review until Claude answers. What would you change to post within N
+   seconds, and what would it cost?

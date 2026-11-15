@@ -28,6 +28,12 @@ dependencies = [
 prism = "prism.cli:app"
 
 [dependency-groups]
+app = [
+    "celery[redis]>=5.7.0",
+    "fastapi>=0.141.1",
+    "pyjwt[crypto]>=2.15.1",
+    "uvicorn>=0.54.0",
+]
 dev = [
     "mypy>=1.10",
     "pytest>=8.2",
@@ -35,6 +41,9 @@ dev = [
 ]
 frontier = [
     "anthropic>=2.8.0",
+]
+mcp = [
+    "mcp>=1.29.0",
 ]
 observability = [
     "langfuse>=4.15.6",
@@ -89,13 +98,18 @@ exclude = ["^tests/fixtures/"]
 
 # The training packages are not installed in CI. Targeted: only these third-party modules.
 [[tool.mypy.overrides]]
-module = ["torch", "torch.*", "transformers", "transformers.*", "onnx", "onnx.*", "sklearn", "sklearn.*", "wandb", "onnxruntime", "onnxruntime.*", "peft", "peft.*", "unsloth", "unsloth.*", "anthropic", "anthropic.*", "langfuse", "langfuse.*"]
+module = ["torch", "torch.*", "transformers", "transformers.*", "onnx", "onnx.*", "sklearn", "sklearn.*", "wandb", "onnxruntime", "onnxruntime.*", "peft", "peft.*", "unsloth", "unsloth.*", "anthropic", "anthropic.*", "langfuse", "langfuse.*", "mcp", "mcp.*", "jwt", "jwt.*", "fastapi", "fastapi.*", "uvicorn", "uvicorn.*", "cryptography", "cryptography.*", "celery", "celery.*", "kombu", "kombu.*"]
 ignore_missing_imports = true
 
 # Without torch installed, torch.nn.Module is Any, and the export wrapper subclasses it.
 [[tool.mypy.overrides]]
 module = ["training.gate.export_onnx"]
 disallow_subclassing_any = false
+
+# FastMCP's and FastAPI's decorators are untyped when their optional groups are not installed (CI).
+[[tool.mypy.overrides]]
+module = ["prism.mcp_server", "prism.github.webhook", "prism.dashboard"]
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
