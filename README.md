@@ -4,11 +4,12 @@ A repo-aware AI code reviewer. It parses a repository into a code knowledge grap
 callers, callees and tests for each changed function, and reviews pull-request hunks with a small
 local model whose comments a verifier then checks.
 
-**Status:** Phases 1 to 5 done: code graph for Python and Java, context retrieval for a diff, a
-gate classifier, a fine-tuned reviewer model ([results](eval/reports/sft.md)) and the review
-pipeline that puts them together with static analysis, a Claude verifier and tracing
-([what it does on real diffs](eval/reports/review_pipeline.md)). No GitHub App or benchmark yet.
-The plan is in [PLAN.md](PLAN.md).
+**Status:** Phases 1 to 6 done: code graph for Python and Java, context retrieval for a diff, a
+gate classifier, a fine-tuned reviewer model ([results](eval/reports/sft.md)), the review
+pipeline with static analysis, a Claude verifier and tracing
+([what it does on real diffs](eval/reports/review_pipeline.md)), and around it a GitHub App on a
+Celery queue, an MCP server for Claude Code, feedback from reactions into Langfuse and a
+dashboard. No benchmark yet (Phase 7). The plan is in [PLAN.md](PLAN.md).
 
 ## Run the services
 

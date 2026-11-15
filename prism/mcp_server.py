@@ -429,7 +429,8 @@ def build_server(tools: PrismTools | None = None) -> Any:
     def review_history(
         repo: str | None = None, pr_number: int | None = None, limit: int = 10
     ) -> list[dict[str, Any]]:
-        """Past reviews, newest first, optionally for one repo (its folder name) and PR."""
+        """Past reviews, newest first, optionally for one repo and PR. repo is "owner/name" for
+        reviews of GitHub pull requests and the checkout's folder name for local reviews."""
         return t.review_history(repo, pr_number, limit)
 
     @mcp.tool()
