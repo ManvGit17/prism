@@ -878,3 +878,27 @@ def bench_compare(
     text = render_comparison(prism_run, rows(prism_run), other_run, rows(other_run), name, claude)
     report.write_text(text, encoding="utf-8", newline="\n")
     typer.echo(text)
+
+
+@bench_app.command("table")
+def bench_table(
+    runs: Annotated[list[str], typer.Argument(help="NAME=RUN pairs, one column each.")],
+    report: Annotated[Path, typer.Option("--report", help="Markdown file to write.")],
+    title: Annotated[str, typer.Option("--title")] = "BugBench ablations",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """A side-by-side table of finished runs (PRism or PR-Agent) on their shared cases."""
+    import json
+
+    from prism.bench.report import render_table
+
+    cols = []
+    for pair in runs:
+        name, _, run = pair.partition("=")
+        text = (root.resolve() / "runs" / (run or name) / "results.jsonl").read_text("utf-8")
+        cols.append((name, [json.loads(x) for x in text.splitlines() if x.strip()]))
+    out = render_table(cols, title)
+    report.write_text(out, encoding="utf-8", newline="\n")
+    typer.echo(out)

@@ -320,3 +320,25 @@ def test_pr_agent_findings_are_read_and_matched_by_range() -> None:
     assert branch_name("fix: do not treat str/bytes as sequences (#641)", "6d7c4fcabc") == (
         "fix-do-not-treat-str-bytes-as-sequences-6d7c4fc"
     )
+
+
+def test_the_ablation_table_compares_runs_on_shared_cases() -> None:
+    from prism.bench.report import render_table
+
+    prism_rows = [
+        {"case_id": "a", "group": "injected", "hit": True, "posted": 1},
+        {"case_id": "b", "group": "real", "hit": False, "posted": 0},
+        {"case_id": "c", "group": "clean", "hit": False, "posted": 0},
+        {"case_id": "only-here", "group": "injected", "hit": True, "posted": 1},
+    ]
+    agent_rows = [
+        {"case_id": "a", "group": "injected", "hit": True, "findings": 2},
+        {"case_id": "b", "group": "real", "hit": True, "findings": 1},
+        {"case_id": "c", "group": "clean", "hit": False, "findings": 1},
+    ]
+    out = render_table([("PRism", prism_rows), ("PR-Agent", agent_rows)], "T")
+    assert "3 pull requests shared" in out
+    assert "| Injected recall | 1/1 | 1/1 |" in out
+    assert "| Real-bug recall | 0/1 | 1/1 |" in out
+    assert "| Clean PRs with any comment | 0/1 | 1/1 |" in out
+    assert "| b | real | - | hit |" in out and "only-here" not in out

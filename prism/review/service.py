@@ -216,6 +216,7 @@ async def review_async(
         # The rules verifier has no model to escalate to.
         escalate=s.escalate and kind != "rules",
         escalate_min_lines=s.escalate_min_lines,
+        route_all=s.route_all and kind != "rules",
     )
     names = [n.strip() for n in s.sast_tools.split(",") if n.strip()] if req.sast else []
     tools = default_tools(names, s.semgrep_config, s.pmd_home)

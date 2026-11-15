@@ -427,3 +427,33 @@ from the key).
 4. PR-Agent's clean-PR findings look true. Should they count against it? What would a fairer
    metric need?
 5. PRism made 519 Claude requests but sent less text than PR-Agent's 227. Why?
+
+## Phase 7, first ablation: Claude reviews every hunk (2026-11-15)
+
+**What was run.** A new switch (`PRISM_ROUTE_ALL`) sends every planned hunk straight to Claude's
+review rubric and skips the local model; the rest of PRism stays the same. 450 hunks, one
+handoff round.
+
+**The surprise.** It barely helped: 49/57 against PRism's 48/57, 6/10 real bugs either way. The
+small fine-tuned model was not the bottleneck. Going through the 12 misses one by one: 3 hunks
+never reached Claude (the gate and the hunk budget), 3 times Claude named the bug but was not
+sure enough to pass the 0.6 threshold, once it commented on the call site just outside the
+window, and 5 times it saw the hunk and said nothing.
+
+**A free experiment.** The answers are cached, so changing the threshold costs no Claude time.
+At 0.3, recall goes to 51/57 and 7/10, and three clean PRs get a comment (two of them real
+issues PR-Agent also found).
+
+**What it teaches.** Measure before you blame a component. The local model looked like the weak
+link because most hits came from Claude; the ablation shows the losses are in routing, the
+one-hunk-at-a-time view and the threshold.
+
+**Quiz**
+
+1. Why does the Claude-only run keep the gate and the hunk budget, rather than switching them off
+   too?
+2. Three misses had the bug named at confidence below 0.6. What is the cost of lowering the
+   threshold, as measured here?
+3. Why might Claude miss a bug in a hunk it reads, that PR-Agent finds in the same PR?
+4. If the local model costs almost no recall, what is it buying PRism?
+5. Which ablation would you run next to test the "one hunk at a time" explanation?

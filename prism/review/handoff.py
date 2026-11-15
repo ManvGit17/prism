@@ -145,8 +145,8 @@ missed. Review each hunk as a careful senior engineer.
 
 {_SHARED}
 Escalation requests also have `reasons` (why the hunk was escalated: `security`, `large`,
-`verifier`) and `notes` (an earlier comment on this hunk and what the verifier said about it, if
-any).
+`verifier`, or `all` when every hunk is sent to you) and `notes` (an earlier comment on this
+hunk and what the verifier said about it, if any).
 
 ## Write comments that matter
 

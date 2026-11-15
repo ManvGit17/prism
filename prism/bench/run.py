@@ -229,6 +229,7 @@ async def run_cases(
             "verifier": cfg.verifier,
             "sast": cfg.sast,
             "escalate": settings.escalate,
+            "route_all": settings.route_all,
             "min_confidence": settings.verifier_min_confidence,
         },
     }

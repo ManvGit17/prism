@@ -184,3 +184,55 @@ def render_comparison(
     if not any_fp:
         lines.append("None.")
     return "\n".join(lines) + "\n"
+
+
+def render_table(columns: Sequence[tuple[str, Sequence[dict[str, Any]]]], title: str) -> str:
+    """One column per run (PRism or PR-Agent results.jsonl rows), on the cases all runs share."""
+    ids = set.intersection(*({r["case_id"] for r in rows} for _, rows in columns))
+    cols = [
+        (name, {r["case_id"]: r for r in rows if r["case_id"] in ids}) for name, rows in columns
+    ]
+
+    def count(r: dict[str, Any]) -> int:
+        return int(r.get("posted", r.get("findings", 0)))
+
+    def recall(by: dict[str, dict[str, Any]], group: str) -> str:
+        rs = [r for r in by.values() if r["group"] == group]
+        hits = sum(bool(r["hit"]) for r in rs)
+        return f"{hits}/{len(rs)}" if rs else "-"
+
+    def flagged(by: dict[str, dict[str, Any]]) -> str:
+        rs = [r for r in by.values() if r["group"] == "clean"]
+        return f"{sum(count(r) > 0 for r in rs)}/{len(rs)}" if rs else "-"
+
+    def per_pr(by: dict[str, dict[str, Any]]) -> str:
+        rs = [r for r in by.values() if r["group"] != "clean"]
+        return f"{sum(count(r) for r in rs) / len(rs):.2f}" if rs else "-"
+
+    head = "| | " + " | ".join(name for name, _ in cols) + " |"
+    sep = "|---|" + "---|" * len(cols)
+    lines = [
+        f"# {title}",
+        "",
+        f"{len(ids)} pull requests shared by every run. A hit is a posted comment (or a "
+        f"finding's line range) on the defect's file within {LINE_TOLERANCE} lines of it.",
+        "",
+        head,
+        sep,
+        "| Injected recall | " + " | ".join(recall(by, "injected") for _, by in cols) + " |",
+        "| Real-bug recall | " + " | ".join(recall(by, "real") for _, by in cols) + " |",
+        "| Clean PRs with any comment | " + " | ".join(flagged(by) for _, by in cols) + " |",
+        "| Comments per buggy PR | " + " | ".join(per_pr(by) for _, by in cols) + " |",
+        "",
+        "## Which cases each run found",
+        "",
+        "| Case | Set | " + " | ".join(name for name, _ in cols) + " |",
+        "|---|---|" + "---|" * len(cols),
+    ]
+    for cid in sorted(ids):
+        first = cols[0][1][cid]
+        if first["group"] == "clean":
+            continue
+        marks = " | ".join("hit" if by[cid]["hit"] else "-" for _, by in cols)
+        lines.append(f"| {cid} | {first['group']} | {marks} |")
+    return "\n".join(lines) + "\n"

@@ -22,8 +22,13 @@ from prism.review.plan import ReviewPlan
 RouteKey = tuple[str, int]  # (path, hunk index)
 
 
-def route(plan: ReviewPlan, *, enabled: bool, min_lines: int) -> dict[RouteKey, tuple[str, ...]]:
-    """Reasons for each hunk sent to the frontier model up front. Empty when routing is off."""
+def route(
+    plan: ReviewPlan, *, enabled: bool, min_lines: int, everything: bool = False
+) -> dict[RouteKey, tuple[str, ...]]:
+    """Reasons for each hunk sent to the frontier model up front. Empty when routing is off.
+    With `everything` (the Claude-only ablation) every planned hunk goes, with reason `all`."""
+    if everything:
+        return {(task.path, task.index): ("all",) for task in plan.tasks}
     if not enabled:
         return {}
     routes: dict[RouteKey, tuple[str, ...]] = {}

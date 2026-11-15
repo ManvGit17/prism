@@ -72,6 +72,7 @@ class ReviewOptions:
     # Send security-sensitive and large hunks to the frontier model instead of the local one.
     escalate: bool = False
     escalate_min_lines: int = 60
+    route_all: bool = False
 
 
 class ReviewState(TypedDict, total=False):
@@ -125,7 +126,12 @@ def build_graph(
         plan = plan_review(
             state["files"], gate, max_hunks=options.max_hunks, churn=state.get("churn")
         )
-        routes = route(plan, enabled=options.escalate, min_lines=options.escalate_min_lines)
+        routes = route(
+            plan,
+            enabled=options.escalate,
+            min_lines=options.escalate_min_lines,
+            everything=options.route_all,
+        )
         span.end(
             output={
                 "files": [

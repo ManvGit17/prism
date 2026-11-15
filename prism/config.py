@@ -109,6 +109,8 @@ class Settings(BaseSettings):
     # through the verifier) instead of the local reviewer. Needs a model verifier.
     escalate: bool = True
     escalate_min_lines: int = Field(default=60, ge=1)
+    # Phase 7 ablation: every planned hunk goes to the frontier model, none to the local one.
+    route_all: bool = False
 
     # Tracing and prompt management (ADR 0014). "langfuse" needs `uv sync --group observability`
     # and the `langfuse` Compose profile; the keys below are the profile's local defaults.

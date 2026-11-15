@@ -182,3 +182,19 @@ def test_same_line_same_category_keeps_the_strongest() -> None:
 
     kept, cut = cap([rc("bandit", Severity.MAJOR, 0.9), rc("claude", Severity.CRITICAL, 0.95)], 5)
     assert [c.model for c in kept] == ["claude"] and cut == 0
+
+
+def test_route_all_sends_every_planned_hunk_up_front() -> None:
+    from types import SimpleNamespace
+
+    from review_fakes import hunk_diff, task_for
+
+    from prism.review.router import route
+
+    tasks = [task_for(hunk_diff("a.py", 1, ["x = 1"])), task_for(hunk_diff("b.py", 5, ["y = 2"]))]
+    plan: Any = SimpleNamespace(tasks=tasks)  # route reads only the planned tasks
+    assert route(plan, enabled=False, min_lines=60, everything=True) == {
+        ("a.py", 0): ("all",),
+        ("b.py", 0): ("all",),
+    }
+    assert route(plan, enabled=False, min_lines=60) == {}
