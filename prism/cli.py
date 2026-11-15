@@ -791,3 +791,90 @@ def bench_generate(
         f"skipped: {dict(got.skipped)}",
         err=True,
     )
+
+
+@bench_app.command("baseline")
+def bench_baseline(
+    cases: Annotated[list[Path], typer.Argument(help="Case files (TOML) under bugbench/cases.")],
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    run: Annotated[str, typer.Option("--run", help="Folder under ROOT/runs.")] = "pr-agent",
+    pr_agent: Annotated[
+        Path | None, typer.Option("--pr-agent", help="The pr-agent executable.")
+    ] = None,
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated case ids.")] = None,
+) -> None:
+    """Run PR-Agent on every case with Claude answering through a handoff. Exit 2 while
+    prompts are unanswered; with everything answered, score and write the results."""
+    import json
+
+    from prism.bench.baseline import run_baseline
+    from prism.bench.cases import load
+
+    base = root.resolve()
+    exe = pr_agent or base / "envs" / "pr-agent" / (
+        "Scripts/pr-agent.exe" if sys.platform == "win32" else "bin/pr-agent"
+    )
+    picked = {x.strip() for x in only.split(",") if x.strip()} if only else None
+    out = run_baseline(
+        [load(c) for c in cases],
+        base,
+        run,
+        exe,
+        notes=lambda m: typer.echo(m, err=True),
+        only=picked,
+    )
+    if out.waiting:
+        typer.echo(
+            f"{len(out.waiting)} case(s) waiting for Claude; answer the files in "
+            f"{out.round_dir} and run again",
+            err=True,
+        )
+        raise typer.Exit(2)
+    typer.echo(json.dumps(out.summary, indent=2))
+
+
+@bench_app.command("compare")
+def bench_compare(
+    prism_run: Annotated[str, typer.Argument(help="PRism run under ROOT/runs.")],
+    other_run: Annotated[str, typer.Argument(help="Baseline run under ROOT/runs.")],
+    report: Annotated[Path, typer.Option("--report", help="Markdown file to write.")],
+    name: Annotated[str, typer.Option("--name")] = "PR-Agent",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """Compare a PRism run with a baseline run on the same cases."""
+    import glob
+    import json
+    import os
+
+    from prism.bench.report import render_comparison
+
+    runs = root.resolve() / "runs"
+
+    def rows(run: str) -> list[dict[str, object]]:
+        text = (runs / run / "results.jsonl").read_text(encoding="utf-8")
+        return [json.loads(x) for x in text.splitlines() if x.strip()]
+
+    def volume(patterns: list[str]) -> dict[str, float]:
+        files = [f for p in patterns for f in glob.glob(str(runs / p))]
+        calls = sum(
+            sum(1 for line in Path(f).read_text(encoding="utf-8").splitlines() if line.strip())
+            for f in files
+        )
+        return {"calls": calls, "mb": sum(os.path.getsize(f) for f in files) / 1e6}
+
+    claude = {
+        "prism": volume(
+            [
+                f"{prism_run}/handoff/round_*/requests_*.jsonl",
+                f"{prism_run}/handoff/round_*/escalations_*.jsonl",
+            ]
+        ),
+        "other": volume([f"{other_run}/llm/rounds/round_*/prompts_*.jsonl"]),
+    }
+    text = render_comparison(prism_run, rows(prism_run), other_run, rows(other_run), name, claude)
+    report.write_text(text, encoding="utf-8", newline="\n")
+    typer.echo(text)

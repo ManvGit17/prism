@@ -393,3 +393,37 @@ Maven runs crawled until the unused containers were stopped.
    comments on good code?
 5. Claude wrote most of the hits. Which ablation in PLAN.md answers whether the fine-tuned
    reviewer is worth keeping?
+
+## Phase 7, the PR-Agent baseline (2026-11-15)
+
+**What was built.** PR-Agent 0.49.0 runs on the same 83 PRs in its own venv. Its model calls go
+to a small local endpoint that speaks the OpenAI chat API: a prompt it has seen gets its stored
+answer, a new one is saved and the call fails, and Sonnet subagents answer the saved prompts in
+batches. Rerun, and PR-Agent gets its answers and moves to the next call. Two rounds were enough:
+166 review and improve prompts, then 61 self-reflection prompts.
+
+**The result.** PR-Agent with Claude found 54 of 57 planted bugs and 8 of 10 real ones; PRism
+found 48 and 6. PR-Agent found every bug PRism found. It also commented on 2 of 16 clean PRs
+(both look like real issues) and wrote about twice as many comments per PR. PRism used about a
+quarter less Claude input.
+
+**Why the gap.** PR-Agent shows Claude every hunk. PRism shows Claude what the local model said
+about each hunk and lets the verifier decide whether Claude should look at the hunk itself. When
+the local model says something wrong and the verifier does not escalate, nobody looks closely.
+That is a design choice (cheaper, quieter), and this benchmark shows its price.
+
+**Making a third-party tool deterministic.** The cache only works if the same PR gives the same
+prompt every time. Three things threatened that: the branch name (it is the PR title), the
+commit hash (new on every amend, fixed with fixed dates), and the date in the prompt (stripped
+from the key).
+
+**Quiz**
+
+1. Why does the endpoint answer a new prompt with HTTP 400 rather than 503?
+2. PR-Agent reports a line range, PRism a single line. Why does the report also count only
+   findings of at most 10 lines, and what did that change?
+3. Both systems used Sonnet. What would you expect to change if PRism's escalation sent every
+   hunk the local model commented on to Claude?
+4. PR-Agent's clean-PR findings look true. Should they count against it? What would a fairer
+   metric need?
+5. PRism made 519 Claude requests but sent less text than PR-Agent's 227. Why?

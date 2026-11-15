@@ -251,3 +251,72 @@ def test_negation_only_where_it_reads_like_a_real_mistake(
 
     negated = [new for op, new in mutations_of_line(line, language) if "negate" in op.name]
     assert negated == ([expected] if expected else [])
+
+
+def test_handoff_endpoint_answers_known_prompts_and_queues_new_ones(tmp_path: Path) -> None:
+    import httpx
+
+    from prism.bench.llm_handoff import HandoffStore, export_round, import_answers, serve
+
+    store = HandoffStore(tmp_path / "llm")
+    store.tag = "case-1:review"
+    msgs = [
+        {"role": "system", "content": "You review."},
+        {"role": "user", "content": "Today's Date: 2026-11-15\ndiff"},
+    ]
+    with serve(store) as url:
+        miss = httpx.post(f"{url}/chat/completions", json={"model": "m", "messages": msgs})
+        assert miss.status_code == 400  # not retried by the client
+        rd = export_round(store)
+        assert rd is not None and (rd / "README.md").exists()
+        row = json.loads((rd / "prompts_00.jsonl").read_text("utf-8").splitlines()[0])
+        (rd / "answers_00.jsonl").write_text(
+            json.dumps({"id": row["id"], "content": "```yaml\nreview: {}\n```"}) + "\n", "utf-8"
+        )
+        assert import_answers(store) == 1
+        # The same prompt on another day still hits: the date line is not part of the key.
+        msgs[1]["content"] = "Today's Date: 2026-11-16\ndiff"
+        hit = httpx.post(f"{url}/chat/completions", json={"model": "other", "messages": msgs})
+    assert hit.status_code == 200
+    assert hit.json()["choices"][0]["message"]["content"].startswith("```yaml")
+    assert store.missed == {"case-1:review": {row["id"]}}
+    assert not store.pending()
+
+
+def test_pr_agent_findings_are_read_and_matched_by_range() -> None:
+    from prism.bench.baseline import branch_name, findings_of, hits
+
+    review = {
+        "review": {
+            "key_issues_to_review": [
+                {
+                    "relevant_file": "a.py\n",
+                    "issue_header": "Bug",
+                    "issue_content": "x",
+                    "start_line": 31,
+                    "end_line": 32,
+                },
+                {"relevant_file": "a.py", "issue_header": "Vague", "issue_content": "no lines"},
+            ]
+        }
+    }
+    improve = {
+        "code_suggestions": [
+            {
+                "relevant_file": "b.py\n",
+                "suggestion_content": "y",
+                "relevant_lines_start": "10",
+                "relevant_lines_end": "20",
+            },
+        ]
+    }
+    found = findings_of("review", review) + findings_of("improve", improve)
+    assert [(f.tool, f.path, f.start, f.end) for f in found] == [
+        ("review", "a.py", 31, 32),
+        ("improve", "b.py", 10, 20),
+    ]
+    assert hits(found[0], "a.py", [34]) and not hits(found[0], "a.py", [36])
+    assert hits(found[1], "b.py", [15]) and not hits(found[1], "a.py", [15])
+    assert branch_name("fix: do not treat str/bytes as sequences (#641)", "6d7c4fcabc") == (
+        "fix-do-not-treat-str-bytes-as-sequences-6d7c4fc"
+    )

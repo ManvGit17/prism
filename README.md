@@ -158,3 +158,11 @@ New injected cases come from `prism bench generate REPO --out bugbench/cases/REP
 needs the repo's test environment (`bugbench/repos.toml`; for Java, `PRISM_BENCH_MVN` and
 `PRISM_BENCH_M2`). It keeps a mutation only when the repo's tests pass without it and fail
 with it.
+
+The PR-Agent baseline (ADR 0022) runs on the same cases with Claude answering through the same
+kind of handoff, then a report compares the two runs:
+
+```bash
+uv run prism bench baseline $(ls bugbench/cases/*.toml | grep -v slice) --run pra-01
+uv run prism bench compare mid-01 pra-01 --report eval/reports/bugbench_vs_pr_agent.md
+```

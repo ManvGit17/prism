@@ -99,3 +99,88 @@ def render(summary: dict[str, Any], results: Sequence[CaseResult]) -> str:
     if not any_near:
         lines.append("None.")
     return "\n".join(lines) + "\n"
+
+
+def render_comparison(
+    prism_run: str,
+    prism_rows: Sequence[dict[str, Any]],
+    other_run: str,
+    other_rows: Sequence[dict[str, Any]],
+    other_name: str,
+    claude_volume: dict[str, dict[str, float]] | None = None,
+) -> str:
+    """PRism against another reviewer on the same cases, from the two runs' results.jsonl."""
+    by_id = {r["case_id"]: r for r in other_rows}
+    shared = [r for r in prism_rows if r["case_id"] in by_id]
+
+    def recall(rows: Sequence[dict[str, Any]], group: str) -> str:
+        rs = [r for r in rows if r["group"] == group]
+        hits = sum(bool(r["hit"]) for r in rs)
+        return f"{hits}/{len(rs)} ({hits / len(rs):.2f})" if rs else "-"
+
+    def strict(rows: Sequence[dict[str, Any]], group: str, span: int) -> str:
+        rs = [r for r in rows if r["group"] == group]
+        hits = sum(
+            any(d["near_defect"] and abs(d["end"] - d["start"]) + 1 <= span for d in r["details"])
+            for r in rs
+        )
+        return f"{hits}/{len(rs)} ({hits / len(rs):.2f})" if rs else "-"
+
+    def clean(rows: Sequence[dict[str, Any]], key: str) -> str:
+        rs = [r for r in rows if r["group"] == "clean"]
+        flagged = sum(r[key] > 0 for r in rs)
+        return f"{flagged}/{len(rs)}"
+
+    def per_pr(rows: Sequence[dict[str, Any]], key: str) -> str:
+        rs = [r for r in rows if r["group"] != "clean"]
+        return f"{sum(r[key] for r in rs) / len(rs):.2f}" if rs else "-"
+
+    other = [by_id[r["case_id"]] for r in shared]
+    buggy = [r for r in shared if r["group"] != "clean"]
+    only_other = [r["case_id"] for r in buggy if by_id[r["case_id"]]["hit"] and not r["hit"]]
+    only_prism = [r["case_id"] for r in buggy if r["hit"] and not by_id[r["case_id"]]["hit"]]
+    neither = [r["case_id"] for r in buggy if not r["hit"] and not by_id[r["case_id"]]["hit"]]
+    lines = [
+        f"# BugBench: PRism against {other_name}",
+        "",
+        f"The same {len(shared)} pull requests (runs `{prism_run}` and `{other_run}`). A hit is a "
+        f"posted comment, or for {other_name} a finding's line range, on the defect's file within "
+        f"{LINE_TOLERANCE} lines of a defect line. Both used Claude Sonnet for every model answer "
+        "they needed from Claude, through a handoff.",
+        "",
+        f"| | PRism | {other_name} |",
+        "|---|---|---|",
+        f"| Injected recall | {recall(shared, 'injected')} | {recall(other, 'injected')} |",
+        f"| Injected recall, findings of at most 10 lines | {recall(shared, 'injected')} | "
+        f"{strict(other, 'injected', 10)} |",
+        f"| Real-bug recall | {recall(shared, 'real')} | {recall(other, 'real')} |",
+        f"| Clean PRs with any comment | {clean(shared, 'posted')} | {clean(other, 'findings')} |",
+        f"| Comments per buggy PR | {per_pr(shared, 'posted')} | {per_pr(other, 'findings')} |",
+    ]
+    if claude_volume:
+        a, b = claude_volume.get("prism", {}), claude_volume.get("other", {})
+        lines += [
+            f"| Claude requests | {a.get('calls', 0):.0f} | {b.get('calls', 0):.0f} |",
+            f"| Claude input (MB of prompt text) | {a.get('mb', 0):.2f} | {b.get('mb', 0):.2f} |",
+        ]
+    lines += [
+        "",
+        f"Found by {other_name} only: {', '.join(only_other) or 'none'}.",
+        f"Found by PRism only: {', '.join(only_prism) or 'none'}.",
+        f"Missed by both: {', '.join(neither) or 'none'}.",
+        "",
+        f"## {other_name} on clean PRs",
+        "",
+    ]
+    any_fp = False
+    for r in other:
+        if r["group"] == "clean" and r["findings"]:
+            for d in r["details"]:
+                any_fp = True
+                text = " ".join(str(d["text"]).split())
+                text = text[:237] + "..." if len(text) > 240 else text
+                where = f"{d['path']}:{d['start']}-{d['end']}"
+                lines.append(f"- **{r['case_id']}** `{where}` ({d['tool']}): {text}")
+    if not any_fp:
+        lines.append("None.")
+    return "\n".join(lines) + "\n"
