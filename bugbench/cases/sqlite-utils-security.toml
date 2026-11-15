@@ -1,0 +1,43 @@
+# Hand-written security cases for sqlite-utils (PLAN.md lists SQL string concatenation as a
+# defect kind). Each takes a query a commit added with bound parameters and pastes the values
+# into the SQL text instead. They are written by hand, not test-checked: the repo's tests do not
+# exercise hostile names, and at these three commits some tests already fail in the benchmark's
+# environment, so a test run would prove nothing either way. `failing` is empty for that reason.
+
+[repo]
+name = "sqlite-utils"
+url = "https://github.com/simonw/sqlite-utils.git"
+license = "Apache-2.0"
+
+[[case]]
+id = "sqlite-utils-s01"
+group = "injected"
+commit = "2b52b5e"
+path = "sqlite_utils/db.py"
+kind = "SQL injection"
+operator = "hand: interpolate bound parameter"
+find = '"SELECT seq FROM sqlite_sequence WHERE name = ?", [self.name]'
+replace = '''f"SELECT seq FROM sqlite_sequence WHERE name = '{self.name}'"'''
+note = "a table name with a quote breaks out of the string literal"
+
+[[case]]
+id = "sqlite-utils-s02"
+group = "injected"
+commit = "19dd077"
+path = "sqlite_utils/cli.py"
+kind = "SQL injection"
+operator = "hand: interpolate bound parameter"
+find = 'db.conn.execute("SELECT load_extension(?, ?)", [path, entrypoint])'
+replace = '''db.conn.execute(f"SELECT load_extension('{path}', '{entrypoint}')")'''
+note = "the --load-extension value from the command line is pasted into SQL"
+
+[[case]]
+id = "sqlite-utils-s03"
+group = "injected"
+commit = "ee11274"
+path = "sqlite_utils/db.py"
+kind = "SQL injection"
+operator = "hand: interpolate bound parameter"
+find = '"select CreateSpatialIndex(?, ?)", [self.name, column_name]'
+replace = '''f"select CreateSpatialIndex('{self.name}', '{column_name}')"'''
+note = "table and column names are pasted into SQL as string literals"

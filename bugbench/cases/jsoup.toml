@@ -1,0 +1,218 @@
+# BugBench cases for jsoup, from `prism bench generate` (seed 7, window 120).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+# jsoup-i06 was removed by hand: its mutation read `if (!(i == -1))`, which looks planted.
+# The operator now skips that shape (tests/test_bench.py).
+
+[repo]
+name = "jsoup"
+url = "https://github.com/jhy/jsoup.git"
+license = "MIT"
+
+[[case]]
+id = "jsoup-i01"
+group = "injected"
+commit = "cf6ffe08"
+path = "src/main/java/org/jsoup/nodes/Element.java"
+kind = "wrong boolean operator"
+operator = "oror-to-andand"
+find = """                || !element.tag.isInline()
+"""
+replace = """                && !element.tag.isInline()
+"""
+failing = "ElementTest.textBoundaryTagsDoNotSynthesizeAttributeText"
+
+[[case]]
+id = "jsoup-i02"
+group = "injected"
+commit = "6feca03b"
+path = "src/main/java/org/jsoup/nodes/FormElement.java"
+kind = "wrong return value"
+operator = "false-to-true-java"
+find = """        return false;
+"""
+replace = """        return true;
+"""
+failing = "FormElementTest.emptyDropsDescendantLinksAndRetainsOutsideControls"
+
+[[case]]
+id = "jsoup-i03"
+group = "injected"
+commit = "598a895a"
+path = "src/main/java/org/jsoup/nodes/DocumentType.java"
+kind = "inverted condition"
+operator = "negate-if-java"
+find = """        if (has(SystemId)) {
+"""
+replace = """        if (!has(SystemId)) {
+"""
+failing = "DocumentTest.testClonesDeclarations"
+
+[[case]]
+id = "jsoup-i04"
+group = "injected"
+commit = "862ba2f1"
+path = "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+kind = "wrong null check"
+operator = "eq-null"
+find = """            if (previousValue == null) namespaceBindings.remove(prefix);
+"""
+replace = """            if (previousValue != null) namespaceBindings.remove(prefix);
+"""
+failing = "XmlTreeBuilderTest.restoresNamespaceBindingsAfterNestedOverride"
+
+[[case]]
+id = "jsoup-i05"
+group = "injected"
+commit = "6145bd5c"
+path = "src/main/java/org/jsoup/parser/CharacterReader.java"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                    return consumeRange(start, pos);
+"""
+replace = """                    return consumeRange(pos, start);
+"""
+failing = "timeout"
+
+[[case]]
+id = "jsoup-i07"
+group = "injected"
+commit = "d90d5752"
+path = "src/main/java/org/jsoup/parser/Tokeniser.java"
+kind = "off-by-one"
+operator = "drop-minus-one"
+find = """        int start = reader.pos() - 1; // the '<' was consumed before entering RcdataLessthanSign
+"""
+replace = """        int start = reader.pos(); // the '<' was consumed before entering RcdataLessthanSign
+"""
+failing = "PositionTest.recoveredRcDataRanges"
+
+[[case]]
+id = "jsoup-i08"
+group = "injected"
+commit = "659b7d27"
+path = "src/main/java/org/jsoup/nodes/Element.java"
+kind = "wrong null check"
+operator = "eq-null"
+find = """        if (attributes == null) return null;
+"""
+replace = """        if (attributes != null) return null;
+"""
+failing = "ElementTest.testShallowClone"
+
+[[case]]
+id = "jsoup-i09"
+group = "injected"
+commit = "e87be9db"
+path = "src/main/java/org/jsoup/nodes/Node.java"
+kind = "wrong null check"
+operator = "ne-null"
+find = """        for (Node ancestor = parentNode; ancestor != null; ancestor = ancestor.parentNode)
+"""
+replace = """        for (Node ancestor = parentNode; ancestor == null; ancestor = ancestor.parentNode)
+"""
+failing = "NodeTest.rejectsAncestorAsChild"
+
+[[case]]
+id = "jsoup-i10"
+group = "injected"
+commit = "823709f5"
+path = "src/main/java/org/jsoup/helper/DataUtil.java"
+kind = "wrong boolean operator"
+operator = "andand-to-oror"
+find = """            } else if (reuseDocIfFullyRead && input.baseReadFully()) { // keep the current parse if the caller can use a fully read doc
+"""
+replace = """            } else if (reuseDocIfFullyRead || input.baseReadFully()) { // keep the current parse if the caller can use a fully read doc
+"""
+failing = "DataUtilTest.charsetSniffingCanReuseTruncatedPreParse"
+
+[[case]]
+id = "jsoup-i11"
+group = "injected"
+commit = "cad054a6"
+path = "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+kind = "wrong boolean operator"
+operator = "andand-to-oror"
+find = """        return el != null && el != contextElement;
+"""
+replace = """        return el != null || el != contextElement;
+"""
+failing = "timeout"
+
+[[case]]
+id = "jsoup-i12"
+group = "injected"
+commit = "2cc74b6f"
+path = "src/main/java/org/jsoup/parser/TreeBuilder.java"
+kind = "off-by-one"
+operator = "ge-to-gt"
+find = """        while (stack.size() >= maxDepth) {
+"""
+replace = """        while (stack.size() > maxDepth) {
+"""
+failing = "XmlTreeBuilderTest.xmlParserRespectsConfiguredMaxDepth"
+
+[[case]]
+id = "jsoup-i13"
+group = "injected"
+commit = "fbdd177b"
+path = "src/main/java/org/jsoup/parser/CharacterReader.java"
+kind = "wrong return value"
+operator = "false-to-true-java"
+find = """        lastIcIndex = -1;
+        return false;
+"""
+replace = """        lastIcIndex = -1;
+        return true;
+"""
+failing = "CharacterReaderTest.containsIgnoreCase"
+
+[[case]]
+id = "jsoup-i14"
+group = "injected"
+commit = "b523b7aa"
+path = "src/main/java/org/jsoup/nodes/Element.java"
+kind = "inverted condition"
+operator = "negate-if-java"
+find = """        if (childNodes.isEmpty() || htmlVoid) {
+"""
+replace = """        if (!(childNodes.isEmpty() || htmlVoid)) {
+"""
+failing = "DataUtilTest.parseSequenceInputStream"
+
+[[case]]
+id = "jsoup-i15"
+group = "injected"
+commit = "b035b623"
+path = "src/main/java/org/jsoup/internal/StringUtil.java"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """        return colon > 0 && isHttpScheme(value.substring(0, colon));
+"""
+replace = """        return colon > 0 && isHttpScheme(value.substring(colon, 0));
+"""
+failing = "FuzzFixesTest.testHtmlFragmentParse"
+
+[[case]]
+id = "jsoup-c01"
+group = "clean"
+commit = "3475afc4"
+kind = "clean"
+
+[[case]]
+id = "jsoup-c02"
+group = "clean"
+commit = "ff69df4c"
+kind = "clean"
+
+[[case]]
+id = "jsoup-c03"
+group = "clean"
+commit = "c4b27405"
+kind = "clean"
+
+[[case]]
+id = "jsoup-c04"
+group = "clean"
+commit = "9d3f82c2"
+kind = "clean"

@@ -1,0 +1,28 @@
+# Real-bug cases for jsoup: commits that introduced a bug a later commit fixed, found with
+# SZZ (`prism.bench.realbugs`) and checked by hand. `lines` are the lines of `path` at
+# `commit` that the fix (`fix`) removed or changed.
+
+[repo]
+name = "jsoup"
+url = "https://github.com/jhy/jsoup.git"
+license = "MIT"
+
+[[case]]
+id = "jsoup-r01"
+group = "real"
+commit = "4a278e9"
+path = "src/main/java/org/jsoup/helper/W3CDom.java"
+kind = "null dereference"
+lines = [357, 358, 362]
+fix = "385219da"
+note = "contextElement comes from getUserData and is null for a document jsoup did not create"
+
+[[case]]
+id = "jsoup-r02"
+group = "real"
+commit = "4690661"
+path = "src/main/java/org/jsoup/nodes/DocumentType.java"
+kind = "wrong escaping"
+lines = [98, 99]
+fix = "598a895a"
+note = "a system ID containing a double quote is written inside double quotes: invalid XML. This commit rewrote the lines; the bug may be older"

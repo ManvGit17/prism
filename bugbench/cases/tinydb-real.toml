@@ -1,0 +1,38 @@
+# Real-bug cases for tinydb: commits that introduced a bug a later commit fixed, found with
+# SZZ (`prism.bench.realbugs`) and checked by hand. `lines` are the lines of `path` at
+# `commit` that the fix (`fix`) removed or changed.
+
+[repo]
+name = "tinydb"
+url = "https://github.com/msiemens/tinydb.git"
+license = "MIT"
+
+[[case]]
+id = "tinydb-r01"
+group = "real"
+commit = "b596c92"
+path = "tinydb/table.py"
+kind = "data loss"
+lines = [114]
+fix = "717616b"
+note = "persist_empty clears the table every time it is opened, not only when it is new"
+
+[[case]]
+id = "tinydb-r02"
+group = "real"
+commit = "52c04e1"
+path = "tinydb/table.py"
+kind = "missing check"
+lines = [369]
+fix = "3e66d33"
+note = "len(table) raises KeyError for a table that is not in the file yet"
+
+[[case]]
+id = "tinydb-r03"
+group = "real"
+commit = "f680393"
+path = "tinydb/storages.py"
+kind = "missing check"
+lines = [21]
+fix = "59ee593"
+note = "create_dirs with a bare file name calls makedirs('') and raises FileNotFoundError"

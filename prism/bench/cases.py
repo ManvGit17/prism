@@ -1,8 +1,14 @@
-"""BugBench cases: a real commit plus one planted defect, materialized as a git worktree.
+"""BugBench cases, materialized as git worktrees.
 
-A case file (TOML) names a repository and its cases. For each case the commit is checked out
-in its own worktree, `find` is replaced by `replace` in `path`, and the pull request is the
-working tree against the commit's parent: the real change with the defect inside it.
+A case file (TOML) names a repository and its cases. Each case is a real commit, checked out in
+its own worktree; the pull request is the working tree against the commit's parent. A case is
+one of three groups:
+
+* `injected`: `find` is replaced by `replace` in `path`, so the real change has a planted
+  defect inside it. The defect's line is computed from the replacement.
+* `real`: the commit introduced a bug that a later commit (`fix`) fixed; `lines` are the lines
+  of `path` (at this commit) that the fix changed.
+* `clean`: the commit as it is, with no known defect, to count false positives.
 """
 
 from __future__ import annotations
@@ -11,17 +17,40 @@ import subprocess
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Literal
+
+Group = Literal["injected", "real", "clean"]
 
 
 @dataclass(frozen=True)
 class Case:
     id: str
     commit: str
-    path: str
-    kind: str
-    find: str
-    replace: str
+    kind: str  # the kind of defect, or "clean"
+    group: Group = "injected"
+    path: str = ""
+    find: str = ""
+    replace: str = ""
+    lines: tuple[int, ...] = ()  # real bugs: the defect's lines at `commit`
+    fix: str = ""  # real bugs: the commit that fixed it
+    operator: str = ""  # injected by the generator: which mutation
+    failing: str = ""  # injected and test-checked: a test the defect makes fail
     note: str = ""
+
+    def check(self) -> None:
+        if self.group == "injected" and not (self.path and self.find):
+            raise ValueError(f"{self.id}: an injected case needs `path` and `find`")
+        if self.group == "real" and not (self.path and self.lines):
+            raise ValueError(f"{self.id}: a real-bug case needs `path` and `lines`")
+        if self.group == "clean" and (self.find or self.lines):
+            raise ValueError(f"{self.id}: a clean case has no defect")
+
+
+def _case(row: dict[str, Any]) -> Case:
+    row = {**row, "lines": tuple(row.get("lines", ()))}
+    c = Case(**row)
+    c.check()
+    return c
 
 
 @dataclass(frozen=True)
@@ -37,13 +66,13 @@ class Materialized:
     case: Case
     checkout: Path
     diff: str
-    line: int  # the defect's line in the new file
+    lines: tuple[int, ...]  # the defect's lines in the new file; empty for a clean case
 
 
 def load(path: Path) -> CaseSet:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     repo = data["repo"]
-    cases = tuple(Case(**c) for c in data["case"])
+    cases = tuple(_case(c) for c in data["case"])
     ids = [c.id for c in cases]
     if len(ids) != len(set(ids)):
         raise ValueError(f"{path}: duplicate case ids")
@@ -92,17 +121,23 @@ def ensure_clone(root: Path, cs: CaseSet) -> Path:
 
 def materialize(root: Path, cs: CaseSet, case: Case) -> Materialized:
     """A worktree at the case's commit with the defect planted (reused if already there)."""
-    clone = ensure_clone(root, cs)
-    wt = root / "worktrees" / case.id
+    wt = checkout(ensure_clone(root, cs), root / "worktrees" / case.id, case.commit)
+    lines = case.lines
+    if case.group == "injected":
+        target = wt / case.path
+        new, line = plant(target.read_bytes().decode("utf-8"), case)
+        target.write_bytes(new.encode("utf-8"))
+        lines = (line,)
+    diff = git(wt, "diff", "--no-color", "--no-ext-diff", f"{case.commit}^")
+    return Materialized(case, wt, diff, lines)
+
+
+def checkout(clone: Path, wt: Path, commit: str) -> Path:
+    """A worktree of `clone` at `commit` with clean files (created, or reset if it exists)."""
     if not (wt / ".git").exists():
         wt.parent.mkdir(parents=True, exist_ok=True)
-        git(clone, "worktree", "add", "-f", "--detach", str(wt), case.commit)
+        git(clone, "worktree", "add", "-f", "--detach", str(wt), commit)
     # Start from the commit every time, so a rerun plants the same defect on clean files.
-    git(wt, "checkout", "-q", "-f", case.commit)
+    git(wt, "checkout", "-q", "-f", commit)
     git(wt, "clean", "-q", "-fdx")
-    target = wt / case.path
-    text = target.read_bytes().decode("utf-8")
-    new, line = plant(text, case)
-    target.write_bytes(new.encode("utf-8"))
-    diff = git(wt, "diff", "--no-color", "--no-ext-diff", f"{case.commit}^")
-    return Materialized(case, wt, diff, line)
+    return wt

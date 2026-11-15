@@ -705,7 +705,7 @@ app.add_typer(bench_app, name="bench")
 
 @bench_app.command("run")
 def bench_run(
-    cases: Annotated[Path, typer.Argument(help="Case file (TOML) under bugbench/cases.")],
+    cases: Annotated[list[Path], typer.Argument(help="Case files (TOML) under bugbench/cases.")],
     root: Annotated[
         Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
     ] = Path(".bench"),
@@ -733,7 +733,13 @@ def bench_run(
     picked = {x.strip() for x in only.split(",") if x.strip()} if only else None
     try:
         result = asyncio.run(
-            run_cases(load(cases), cfg, s, notes=lambda m: typer.echo(m, err=True), only=picked)
+            run_cases(
+                [load(c) for c in cases],
+                cfg,
+                s,
+                notes=lambda m: typer.echo(m, err=True),
+                only=picked,
+            )
         )
     except ReviewError as exc:
         typer.echo(f"error: {exc}", err=True)
@@ -751,3 +757,37 @@ def bench_run(
         report.write_text(render(result.summary, result.results), encoding="utf-8")
         typer.echo(f"report written to {report}", err=True)
     typer.echo(json.dumps(result.summary, indent=2))
+
+
+@bench_app.command("generate")
+def bench_generate(
+    repo: Annotated[str, typer.Argument(help="A repo name from bugbench/repos.toml.")],
+    out: Annotated[Path, typer.Option("--out", help="Case file to write.")],
+    injected: Annotated[int, typer.Option("--injected")] = 15,
+    clean: Annotated[int, typer.Option("--clean")] = 4,
+    window: Annotated[int, typer.Option("--window", help="Recent commits to draw from.")] = 150,
+    seed: Annotated[int, typer.Option("--seed")] = 7,
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    repos: Annotated[Path, typer.Option("--repos")] = Path("bugbench/repos.toml"),
+) -> None:
+    """Mutate recent commits of REPO and keep the mutations a test catches (ADR 0021)."""
+    from prism.bench.mutate import generate, load_repos, write_cases
+
+    spec = load_repos(repos)[repo]
+    note = lambda m: typer.echo(m, err=True)  # noqa: E731
+    got = generate(
+        root.resolve(), spec, injected=injected, clean=clean, window=window, seed=seed, notes=note
+    )
+    header = (
+        f"BugBench cases for {repo}, from `prism bench generate` (seed {seed}, window {window}).\n"
+        "Injected cases: one mutation on a line the commit added; the repo's tests pass at the\n"
+        "commit and `failing` fails with the mutation. Clean cases: the commit as it is."
+    )
+    write_cases(out, spec, [*got.injected, *got.clean], header)
+    typer.echo(
+        f"{len(got.injected)} injected, {len(got.clean)} clean written to {out}; "
+        f"skipped: {dict(got.skipped)}",
+        err=True,
+    )

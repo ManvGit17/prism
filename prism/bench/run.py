@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -151,21 +151,25 @@ def _timing(case_dir: Path) -> dict[str, Any]:
 
 
 async def run_cases(
-    cs: CaseSet,
+    sets: CaseSet | Sequence[CaseSet],
     cfg: RunConfig,
     settings: Settings,
     notes: Callable[[str], None] = print,
     only: set[str] | None = None,
 ) -> RunResult:
+    """Every case of every set, with one handoff across all of them."""
     run_dir = cfg.root / "runs" / cfg.run
-    cases = [c for c in cs.cases if only is None or c.id in only]
-    ids = [c.id for c in cases]
+    sets = [sets] if isinstance(sets, CaseSet) else list(sets)
+    cases = [(cs, c) for cs in sets for c in cs.cases if only is None or c.id in only]
+    ids = [c.id for _, c in cases]
+    if len(ids) != len(set(ids)):
+        raise ValueError("case ids must be unique across the case files of a run")
     imported = import_answers(run_dir, ids)
     if imported:
         notes(f"{imported} answer(s) handed back to their cases")
     out = RunResult(run_dir)
-    finished: list[tuple[Materialized, Any]] = []
-    for case in cases:
+    finished: list[tuple[CaseSet, Materialized, Any]] = []
+    for cs, case in cases:
         m = materialize(cfg.root, cs, case)
         case_dir = run_dir / case.id
         timing = _timing(case_dir)
@@ -188,7 +192,7 @@ async def run_cases(
         )
         elapsed = round(time.monotonic() - started, 2)
         if "first_run_s" not in timing:
-            timing = {"first_run_s": elapsed, "line": m.line}
+            timing = {"first_run_s": elapsed, "lines": list(m.lines)}
             case_dir.mkdir(parents=True, exist_ok=True)
             (case_dir / "bench.json").write_text(json.dumps(timing), encoding="utf-8")
         state = outcome.status
@@ -196,25 +200,27 @@ async def run_cases(
         if outcome.pending:
             out.waiting.append(case.id)
         else:
-            finished.append((m, outcome))
+            finished.append((cs, m, outcome))
     if out.waiting:
         out.round_dir = export_requests(run_dir, out.waiting)
         return out
-    for m, outcome in finished:
+    for cs, m, outcome in finished:
         out.results.append(
             score_case(
                 m.case.id,
                 m.case.kind,
                 m.case.path,
-                m.line,
+                m.lines,
                 outcome.review.comments,
                 outcome.state.get("decisions", []),
                 _timing(run_dir / m.case.id).get("first_run_s"),
+                group=m.case.group,
+                repo=cs.repo,
             )
         )
     out.summary = {
         **summarize(out.results),
-        "repo": cs.repo,
+        "repo": ", ".join(cs.repo for cs in sets),
         "run": cfg.run,
         "settings": {
             "reviewer": cfg.model or settings.reviewer_model,
