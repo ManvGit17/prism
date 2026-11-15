@@ -45,6 +45,7 @@ from prism.review.checks import (
     Escalation,
     VerifyBatch,
     apply_rules,
+    new_side_lines,
     rule_reason,
 )
 from prism.review.plan import HunkTask
@@ -112,7 +113,8 @@ Keep a comment only if all of these hold:
 2. **Useful.** A developer would want it: a bug, a risk, a missing test, a real readability
    problem, or a fair question about intent that the diff does not answer.
 3. **On the right line.** It is about the code at or near `line`. If it is right but placed on
-   the wrong line, still keep it and say so in the reason.
+   the wrong line, still keep it and give `line`: the new-file line it belongs on, one of the
+   lines shown in the hunk. Leave `line` out when the comment is where it should be.
 
 When the comment is true but weak, keep it with low confidence rather than drop it. When you
 cannot tell from what you see, use confidence below 0.5.
@@ -129,7 +131,8 @@ One JSON line per request, in `verdicts_NN.jsonl` next to the requests file with
  "reason": "<at most 25 words>", "evidence": [{{"source": "hunk", "detail": "line 42 ..."}}],
  "escalate": false}}
 
-For a dropped comment, `severity`, `category` and `evidence` may be omitted. Write a verdict for
+Add `"line": <n>` only to move a kept comment. For a dropped comment, `severity`, `category`
+and `evidence` may be omitted. Write a verdict for
 every request.
 """
 
@@ -177,6 +180,7 @@ class Verdict(BaseModel):
     reason: str = ""
     evidence: list[Evidence] = []
     escalate: bool = False
+    line: int | None = None  # where a kept comment belongs, if not where it was written
 
 
 class FrontierComment(BaseModel):
@@ -349,9 +353,11 @@ def apply_verdict(c: Candidate, v: Verdict, min_confidence: float) -> Decision:
     category = v.category or Category.OTHER
     if category is Category.SECURITY and not v.evidence:
         return Decision(c, None, "security_without_evidence", v.reason)
+    # The verifier may move a comment, but only onto a line the hunk shows.
+    line = v.line if v.line is not None and v.line in new_side_lines(c.task) else c.raw.line
     kept = ReviewComment(
         path=c.path,
-        line=c.raw.line,
+        line=line,
         comment=c.raw.comment,
         severity=v.severity or Severity.MINOR,
         category=category,

@@ -315,7 +315,7 @@ that keeps its token.
 defect at a known line, materialized as a git worktree, reviewed by the full pipeline, and scored
 by whether a posted comment lands within 3 lines of the defect. The Claude handoff is batched
 across cases, so one Sonnet subagent answers a whole round instead of one per PR. The slice: 10
-TinyDB commits, two handoff rounds (35 requests, then 7 escalated hunks), 4 subagent calls.
+TinyDB commits, two handoff rounds per run (35 requests, then 7 to 12 escalated hunks).
 
 **The numbers.** Recall 9/10. Comments per PR 1.6. First run p50 14 s, p95 37 s (local reviewer,
 SAST, in-memory indexing). Of the 9 hits, the local reviewer wrote 2 and Claude wrote 7, all 7
@@ -328,10 +328,18 @@ on this slice the recall comes from the escalation path, not from the fine-tuned
 verdict has no field to move a comment, so it posted at 443 and missed the window. A real
 reviewer would see the comment in roughly the right place; the metric would not.
 
-**What to keep in mind.** ±3 lines counts position, not content: case 01's hit sits on the right
-line with a wrong suggested fix. Ten cases on one repo with no clean PRs says nothing about false
-positives. And the subagent brief told the model that some PRs contain real bugs, which primes
-it; the full run needs a neutral brief that is the same for clean and buggy PRs.
+**The fix and the second run.** A verdict can now give `line`, where a kept comment belongs (only
+a line the hunk shows). The first run's subagent brief also told the model that some PRs contain
+real bugs, which primes it, so each round folder now carries a neutral `README.md` and every
+subagent gets the same one-line prompt. Run `slice-02` reused the first run's cached local
+replies, so only Claude's side changed: recall 10/10, comments per PR 1.7. The verifier moved
+case 07's comment from 443 to 456. Two cases changed who gets the credit (01 and 10 went from the
+local reviewer to Claude), so per-case detail varies between answer passes even with the same
+requests.
+
+**What to keep in mind.** ±3 lines counts position, not content: case 01's first-run hit sat on
+the right line with a wrong suggested fix. Ten cases on one repo with no clean PRs says nothing
+about false positives.
 
 **Quiz**
 

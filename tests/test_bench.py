@@ -157,6 +157,9 @@ def test_handoff_is_batched_across_cases_and_answers_go_back(tmp_path: Path) -> 
     assert ids == [f"c1{SEP}a.py#0-x", f"c2{SEP}a.py#0-x"]
     assert (rd / "escalations_00.jsonl").exists()
     assert (rd / "RUBRIC.md").exists() and (rd / "REVIEW_RUBRIC.md").exists()
+    readme = (rd / "README.md").read_text("utf-8")
+    assert "`requests_00.jsonl` -> `verdicts_00.jsonl`" in readme
+    assert "`escalations_00.jsonl` -> `reviews_00.jsonl`" in readme
     assert export_requests(run, ["c1", "c2"]) == rd  # unchanged, unanswered: the same round
 
     _write(rd / "verdicts_00.jsonl", [{"id": f"c1{SEP}a.py#0-x", "keep": False}])

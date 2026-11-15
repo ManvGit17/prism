@@ -158,3 +158,18 @@ def test_server_errors_are_not_cached(tmp_path: Path) -> None:
     _, verifier = run(tmp_path, up)
     assert up.calls == 3, "hunks that failed on a server error are tried again"
     assert verifier.pending == 3
+
+
+def test_a_verdict_can_move_a_comment_within_the_hunk() -> None:
+    from prism.review.checks import Candidate
+    from prism.schemas import RawComment
+
+    task = task_for(hunk_diff("a.py", 1, ["x_value = 1", "y_value = x_value / 0"]))
+    c = Candidate(task, RawComment(line=2, comment="`y_value` divides by zero."), "m")
+    moved = apply_verdict(c, Verdict(id="i", keep=True, confidence=0.8, line=3), 0.6)
+    assert moved.kept is not None and moved.kept.line == 3
+    # A line the hunk does not show is ignored: the comment stays where it was written.
+    outside = apply_verdict(c, Verdict(id="i", keep=True, confidence=0.8, line=40), 0.6)
+    assert outside.kept is not None and outside.kept.line == 2
+    stays = apply_verdict(c, Verdict(id="i", keep=True, confidence=0.8), 0.6)
+    assert stays.kept is not None and stays.kept.line == 2

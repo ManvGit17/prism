@@ -37,7 +37,15 @@ requests into one folder, `<run>/handoff/round_NN`, with ids prefixed `<case>::`
 rubrics. One Claude session (a Sonnet subagent, as in every live check so far) answers the
 whole round; the next run hands each answer back to its case and reviews again. Reviewer
 replies are cached, so a rerun calls no local model. A round that is unchanged and unanswered
-is reused rather than written again.
+is reused rather than written again. Each round folder has a `README.md` the runner writes: which
+request file goes with which rubric and answer file, and that only the folder may be read. It
+says nothing about whether the pull requests have bugs, so a subagent's prompt is just "follow
+README.md", the same for every round and, later, for clean PRs.
+
+**Moving a comment.** The first run missed one defect because the local reviewer named the bug
+correctly 13 lines above it, and the verifier could only say so in its reason. A verdict now has
+an optional `line`: where a kept comment belongs. It is applied only if the hunk shows that line
+(an added or context line), so the verifier cannot move a comment off the diff.
 
 **Metric** (`prism/bench/score.py`). A case is a hit when a posted comment is on the defect's
 file within 3 lines of the defect's line. Recall is hits over cases. Each case also records the
@@ -55,3 +63,8 @@ cache hits and are not counted). Results go to `results.jsonl` and `summary.json
   positives. The full benchmark adds 30 clean PRs.
 * Ten cases on one repo is a smoke test of the harness, not a result. The numbers are read with
   that in mind.
+* The same requests answered twice gave different verdicts in places (which model gets credit
+  for a hit changed in two cases), so a single run's per-case detail is noisy. The full benchmark
+  should report the spread over more than one answer pass where it matters.
+* The rubric change reaches Langfuse only after `prism prompts push`; with
+  `PRISM_PROMPT_SOURCE=langfuse` the old verifier prompt is used until then.
