@@ -352,3 +352,44 @@ about false positives.
 4. Why does a rerun of the slice cost almost nothing, and what would make it rerun the local
    model?
 5. What would a clean PR add that recall on planted defects cannot show?
+
+## Phase 7, mid-size BugBench: 4 repos, 83 PRs (2026-11-15)
+
+**What was built.** Cases are now one of three groups: injected (a planted defect), real (a
+commit that introduced a bug someone later fixed) and clean (left alone, to count false
+positives). Injected cases come from a generator: it mutates lines a recent commit added and
+keeps a mutation only if the repo's own tests pass without it and fail with it. Real bugs come
+from SZZ: blame the lines a bug fix changed to find the commit that wrote them. Four repos:
+TinyDB, aiosqlite, sqlite-utils and jsoup (Java). 57 injected, 16 clean, 10 real.
+
+**The numbers.** Injected recall 48/57 (84%), real bugs 6/10 (60%), and no comment at all on any
+of the 16 clean PRs. About one posted comment per buggy PR, most of them on the bug. Claude
+found 41 of the 48 injected hits, nearly all after escalation; the fine-tuned reviewer found 7.
+One pass took 2 handoff rounds and 22 Sonnet subagent calls (about 520 answers).
+
+**Why test-check the mutants.** Without it, a mutation can be equivalent (it changes nothing)
+or break something no one depends on, and the benchmark would count misses that are not misses.
+With it, every injected case is a behaviour change some test cares about. The cost is bias:
+only testable defects get in, and the failing test is often in the same PR.
+
+**Why the real bugs score lower.** They are not filtered by tests, the "defect line" is wherever
+the fix happened to edit (sometimes many lines away from the root cause), and a few introducing
+commits were refactors that only rewrote an older bug. Three of the four misses had a comment
+near the defect that the verifier dropped.
+
+**What went wrong on the way.** A hung jsoup test left Maven's JVM holding the output pipes, so
+killing the shell did not end the run and the generator waited for an hour. The fix kills the
+whole process tree. Later the machine ran short of memory (Docker, WSL and Maven together) and
+Maven runs crawled until the unused containers were stopped.
+
+**Quiz**
+
+1. A mutation is kept only if a test fails. Name one kind of real bug this rule can never
+   produce, and how the benchmark covers it instead.
+2. Why does the generator throw away a mutation that makes the build fail?
+3. SZZ blames the lines a fix removed. Why can a fix that only adds lines (a missing check) not
+   be traced this way?
+4. The clean false-positive rate is 0. What would you check before believing the pipeline never
+   comments on good code?
+5. Claude wrote most of the hits. Which ablation in PLAN.md answers whether the fine-tuned
+   reviewer is worth keeping?

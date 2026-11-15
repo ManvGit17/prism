@@ -141,13 +141,20 @@ where hunks were routed; and the eval reports (ADR 0020). Read-only.
 ## BugBench
 
 ```bash
-export PRISM_BENCH_ROOT=D:/res-proj-plan/bench   # clones, worktrees and runs, outside the repo
-uv run prism bench run bugbench/cases/tinydb-slice.toml --run slice-01 \
-    --report eval/reports/bugbench_slice.md
+export PRISM_BENCH_ROOT=D:/res-proj-plan/bench   # clones, worktrees, venvs, runs: outside the repo
+uv run prism bench run $(ls bugbench/cases/*.toml | grep -v slice) --run mid-01 \
+    --report eval/reports/bugbench_mid.md
 ```
 
-Each case is a real commit with one planted defect at a known line (ADR 0021). The run reviews
-every case, then stops with exit code 2 and puts all the open Claude requests of all the cases
-in one folder, `runs/<run>/handoff/round_NN`. Answer those files with the rubrics in the
-folder (a Claude session or subagent), and run the same command again until it prints the
-summary: recall at ±3 lines, comments per PR, which model found each defect, and first-run time.
+Each case is a real commit (ADR 0021): with one planted defect at a known line, a commit that
+introduced a bug fixed later, or a clean commit. The run reviews every case, then stops with
+exit code 2 and puts all the open Claude requests of all the cases in one folder,
+`runs/<run>/handoff/round_NN`, with a `README.md` saying which file to answer with which rubric.
+Answer them (a Claude session or subagent) and run the same command again until it prints the
+summary: recall at ±3 lines for injected and real bugs, the false-positive rate on clean PRs,
+comments per PR, which model found each defect, and first-run time.
+
+New injected cases come from `prism bench generate REPO --out bugbench/cases/REPO.toml`, which
+needs the repo's test environment (`bugbench/repos.toml`; for Java, `PRISM_BENCH_MVN` and
+`PRISM_BENCH_M2`). It keeps a mutation only when the repo's tests pass without it and fail
+with it.

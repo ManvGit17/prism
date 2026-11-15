@@ -220,7 +220,7 @@ async def run_cases(
         )
     out.summary = {
         **summarize(out.results),
-        "repo": ", ".join(cs.repo for cs in sets),
+        "repo": ", ".join(dict.fromkeys(cs.repo for cs in sets)),
         "run": cfg.run,
         "settings": {
             "reviewer": cfg.model or settings.reviewer_model,

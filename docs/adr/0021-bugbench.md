@@ -54,6 +54,45 @@ comment near the defect was written and then dropped (a verifier miss rather tha
 miss), and the first run's wall time (reviewer, SAST and in-memory indexing; the reruns are
 cache hits and are not counted). Results go to `results.jsonl` and `summary.json` in the run.
 
+## The mid-size benchmark (2026-11-15)
+
+**Groups.** A case is `injected` (a planted defect), `real` (a commit that introduced a bug a
+later commit fixed; `lines` are the lines the fix changed, at the introducing commit) or `clean`
+(the commit as it is). Injected and real recall are reported apart, as PLAN.md asks, and clean
+PRs get a false-positive rate: the share of clean PRs with at least one posted comment.
+
+**Repos** (`bugbench/repos.toml`): TinyDB (MIT), aiosqlite (MIT, async, for missing `await`),
+sqlite-utils (Apache-2.0, builds SQL) and jsoup (MIT, Java). Each has a test command and a venv
+or Maven cache on D.
+
+**Injected cases are test-checked** (`prism bench generate`, `prism/bench/mutate.py`). On the
+source lines a recent commit added, single-line operators propose a defect: off-by-one, wrong
+null check, wrong boolean operator, inverted condition, missing `await`, wrong exception type,
+swapped arguments, wrong return value, a dropped `close()`. A mutation is kept only if the
+repo's tests pass at the commit and fail with it, and it names the failing test (a hang counts,
+recorded as `timeout`; a bare exit code does not). Mutations that do not parse or compile are
+dropped, since a build error is not a review finding. Operators skip prose (docstrings, block
+comments), lines that test the interpreter (`sys.version_info`), and shapes nobody writes by
+mistake (`not a is b`, `if (!(i == -1))`, `while not True`). One case per commit; no kind takes
+more than about a fifth of a repo's set. Commits whose tests pass and that got no case become
+the clean cases. A timed-out test run is killed with its whole process tree: Maven's forked JVM
+holds the output pipes, and killing only the parent left the generator waiting for an hour.
+
+**Real bugs** (`prism/bench/realbugs.py`) come from SZZ: a fix commit's removed or changed
+source lines are blamed at its parent to find the commit that wrote them. Fixes to docs, typos,
+style, type hints or tooling are skipped, and so are blamed lines in comments. The output is a
+list of candidates: I read each fix and the blamed line at the introducing commit and kept 10
+whose fix changes behaviour and whose blamed line is the buggy code.
+
+**Security cases** are hand-written: three SQL injections in sqlite-utils, where a bound
+parameter is pasted into the SQL text. No test checks them. PLAN.md's hardcoded-secret kind is
+left out because it has no natural place in these libraries.
+
+**Result (run `mid-01`, eval/reports/bugbench_mid.md)**: injected recall 48/57 (0.84), real-bug
+recall 6/10 (0.60), no comment on any of the 16 clean PRs, 1.05 comments per injected PR, first
+run p50 20 s and p95 90 s. Claude wrote 41 of the 48 injected hits, almost all through
+escalation.
+
 ## Consequences
 
 * Recall at ±3 lines credits a comment for being in the right place, not for naming the bug. A
@@ -68,3 +107,13 @@ cache hits and are not counted). Results go to `results.jsonl` and `summary.json
   should report the spread over more than one answer pass where it matters.
 * The rubric change reaches Langfuse only after `prism prompts push`; with
   `PRISM_PROMPT_SOURCE=langfuse` the old verifier prompt is used until then.
+* Test-checked mutants are a biased sample: only defects a test catches get in, and the
+  reviewer sees the commit's own tests in the PR. Real bugs had no such filter, which is one
+  reason their recall is lower.
+* Many old commits cannot run their tests in today's environment (newer pytest and Python, a
+  test layout that moved), so the cases lean towards recent history. aiosqlite stopped at 11
+  injected (10 after one was dropped) for that reason.
+* A clean false-positive rate of 0 on 16 PRs says the verifier is strict, not that the pipeline
+  never errs. The verifier dropped every comment it saw on clean PRs (0 to 15 per PR), and it
+  drops most comments on injected PRs too. Recall then depends on escalation catching what the
+  local model missed.
