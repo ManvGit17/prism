@@ -457,3 +457,27 @@ one-hunk-at-a-time view and the threshold.
 3. Why might Claude miss a bug in a hunk it reads, that PR-Agent finds in the same PR?
 4. If the local model costs almost no recall, what is it buying PRism?
 5. Which ablation would you run next to test the "one hunk at a time" explanation?
+
+## Phase 7, second ablation: the gate off (2026-11-16)
+
+**What was run.** PRism as in the main run, but with the gate letting every hunk through. To keep
+it cheap, the run started from a copy of the main run: the local model's cached replies and
+Claude's answers were reused for every request that did not change, so only 175 new hunks went
+to the local model and 167 new requests to Claude.
+
+**The result.** 50 of 57 planted bugs instead of 48; the two extra are hunks the gate had
+skipped. Real bugs, clean PRs and comments per PR barely moved. The gate saves 29% of the local
+model's work and 24% of Claude's, for 2 bugs out of 57.
+
+**Caching as an experiment tool.** Because answers are keyed by what was asked, an ablation that
+changes only part of the pipeline pays only for the part it changes. The context-mode ablations
+cannot use this: they change the context inside every request, so every answer is new.
+
+**Quiz**
+
+1. Why is wall-clock time a poor measure of the gate's saving in this run, and what was measured
+   instead?
+2. The gate skips 29% of hunks but saves only 24% of Claude requests. Why are the two different?
+3. One miss from the Claude-only run is still missed with the gate off. What causes it?
+4. When would you turn the gate off in production?
+5. Why can the context-mode ablation not reuse the main run's answers?
