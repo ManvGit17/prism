@@ -184,6 +184,55 @@ def test_same_line_same_category_keeps_the_strongest() -> None:
     assert [c.model for c in kept] == ["claude"] and cut == 0
 
 
+def test_whole_pr_view_sends_one_request_and_places_comments_by_path(tmp_path: Path) -> None:
+    def run() -> tuple[PRReview, HandoffVerifier]:
+        verifier = HandoffVerifier(tmp_path, whole_pr=True)
+        result, _ = asyncio.run(
+            run_review(
+                tmp_path,
+                SAFE + RISKY,
+                gate=PassAllGate(),
+                model=FakeModel(),
+                verifier=verifier,
+                options=ReviewOptions(route_all=True),
+                repo_name="demo",
+            )
+        )
+        return result, verifier
+
+    _, verifier = run()
+    assert verifier.pending == 1
+    assert rows(tmp_path, "escalations") == []
+    (req,) = rows(tmp_path, "pr_requests")
+    assert [f["path"] for f in req["files"]] == ["app/a.py", "app/b.py"]
+    assert "<untrusted_pull_request>" in req["files"][1]["hunks"][0]["hunk"]
+    assert (tmp_path / "verify" / "PR_RUBRIC.md").is_file()
+
+    def fc(path: str, line: int, text: str, conf: float = 0.9) -> dict[str, Any]:
+        return {"path": path, "line": line, "comment": text, "category": "bug", "confidence": conf}
+
+    answer(
+        tmp_path,
+        "pr_reviews",
+        [
+            {
+                "id": req["id"],
+                "comments": [
+                    fc("app/b.py", 2, "`cmd` reaches a shell with `shell=True`: injection risk."),
+                    fc("app/a.py", 2, "`total` ignores the discount computed in `price`."),
+                    fc("app/a.py", 40, "`total` is wrong on a line outside the hunk."),
+                    fc("app/z.py", 2, "`total` in a file this PR does not touch."),
+                    fc("app/a.py", 2, "`qty` may be None when `price` is set.", conf=0.3),
+                ],
+            }
+        ],
+    )
+    done, verifier = run()
+    assert verifier.pending == 0
+    # Off-hunk, unknown-file and low-confidence comments are dropped; the rest land by path.
+    assert sorted((c.path, c.line) for c in done.comments) == [("app/a.py", 2), ("app/b.py", 2)]
+
+
 def test_route_all_sends_every_planned_hunk_up_front() -> None:
     from types import SimpleNamespace
 

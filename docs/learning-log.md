@@ -481,3 +481,32 @@ cannot use this: they change the context inside every request, so every answer i
 3. One miss from the Claude-only run is still missed with the gate off. What causes it?
 4. When would you turn the gate off in production?
 5. Why can the context-mode ablation not reuse the main run's answers?
+
+## Phase 7, third ablation: the whole-PR view (2026-11-16)
+
+**What was run.** The Claude-only setup, but with every hunk of a PR in one request, grouped by
+file, instead of one request per hunk (`PRISM_REVIEW_UNIT=pr`). Same hunks, same retrieved
+context, same checks and threshold. 82 requests instead of 450, carrying the same 2.29 MB.
+
+**The result.** 52 of 57 planted bugs instead of 49, with none lost. Claude wrote the same number
+of comments (92 against 91); more of them landed on the bug. Two of the new finds were bugs the
+per-hunk answers had already named at low confidence: seeing the javadoc, the test or the caller
+in the same request moved them from 0.35 or 0.5 to 0.75.
+
+**The catch.** Real bugs went from 6 to 5: three were lost, each named but below 0.6. Re-scored at
+0.3 (free, the answers are cached), the whole-PR view finds 52/57 and 9/10 with 2 clean PRs
+flagged, against PR-Agent's 54/57, 8/10 and 2, with about two thirds of the comments.
+
+**What it teaches.** The view decides what the model can be sure of. A bug that is a guess from
+one hunk can be a certainty when its test sits in the same prompt. It also shows that a single
+threshold is a blunt tool: the same answer quality gives very different recall at 0.6 and 0.3.
+
+**Quiz**
+
+1. Why does the whole-PR run keep the retrieved context, though PR-Agent has none?
+2. Claude wrote almost the same number of comments in both views. Where do the extra hits come
+   from, then?
+3. Why can real-bug recall go down while injected recall goes up, in the same run?
+4. What bounds the size of a whole-PR request here, and what would break without it?
+5. Which two remaining planted-bug misses would the gate-off setting fix, and why are the other
+   three out of its reach?

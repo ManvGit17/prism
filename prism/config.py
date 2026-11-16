@@ -111,6 +111,9 @@ class Settings(BaseSettings):
     escalate_min_lines: int = Field(default=60, ge=1)
     # Phase 7 ablation: every planned hunk goes to the frontier model, none to the local one.
     route_all: bool = False
+    # Phase 7 ablation, with route_all: "pr" shows Claude the whole PR in one request instead of
+    # one hunk per request.
+    review_unit: Literal["hunk", "pr"] = "hunk"
 
     # Tracing and prompt management (ADR 0014). "langfuse" needs `uv sync --group observability`
     # and the `langfuse` Compose profile; the keys below are the profile's local defaults.

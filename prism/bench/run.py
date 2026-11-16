@@ -25,8 +25,10 @@ from prism.review.handoff import BATCH_SIZE, read_answers
 from prism.review.service import ReviewRequest, review_async
 
 SEP = "::"
-_PAIRS = (("requests", "verdicts"), ("escalations", "reviews"))
-_RUBRICS = ("RUBRIC.md", "REVIEW_RUBRIC.md")
+_PAIRS = (("requests", "verdicts"), ("escalations", "reviews"), ("pr_requests", "pr_reviews"))
+_RUBRICS = ("RUBRIC.md", "REVIEW_RUBRIC.md", "PR_RUBRIC.md")
+# Whole-PR requests carry every hunk of a PR, so their files are cut by size as well as count.
+MAX_ROUND_FILE_BYTES = 200_000
 
 
 @dataclass
@@ -112,14 +114,30 @@ def export_requests(run_dir: Path, case_ids: list[str]) -> Path | None:
     rd = handoff / f"round_{len(rounds) + 1:02d}"
     rd.mkdir(parents=True, exist_ok=True)
     for req, rows in pending.items():
-        for start in range(0, len(rows), BATCH_SIZE):
-            chunk = rows[start : start + BATCH_SIZE]
-            text = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in chunk)
-            (rd / f"{req}_{start // BATCH_SIZE:02d}.jsonl").write_text(text, encoding="utf-8")
+        for n, chunk in enumerate(_chunks(rows)):
+            (rd / f"{req}_{n:02d}.jsonl").write_text(chunk, encoding="utf-8")
     for name, src in rubrics.items():
         shutil.copyfile(src, rd / name)
     (rd / "README.md").write_text(brief(rd), encoding="utf-8")
     return rd
+
+
+def _chunks(rows: Sequence[dict[str, Any]]) -> list[str]:
+    """JSONL texts of at most BATCH_SIZE rows and, past one row, MAX_ROUND_FILE_BYTES each."""
+    out: list[str] = []
+    lines: list[str] = []
+    size = 0
+    for r in rows:
+        line = json.dumps(r, ensure_ascii=False) + "\n"
+        n = len(line.encode("utf-8"))
+        if lines and (len(lines) == BATCH_SIZE or size + n > MAX_ROUND_FILE_BYTES):
+            out.append("".join(lines))
+            lines, size = [], 0
+        lines.append(line)
+        size += n
+    if lines:
+        out.append("".join(lines))
+    return out
 
 
 def brief(rd: Path) -> str:
@@ -230,6 +248,7 @@ async def run_cases(
             "sast": cfg.sast,
             "escalate": settings.escalate,
             "route_all": settings.route_all,
+            "review_unit": settings.review_unit,
             "min_confidence": settings.verifier_min_confidence,
         },
     }

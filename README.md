@@ -166,3 +166,9 @@ kind of handoff, then a report compares the two runs:
 uv run prism bench baseline $(ls bugbench/cases/*.toml | grep -v slice) --run pra-01
 uv run prism bench compare mid-01 pra-01 --report eval/reports/bugbench_vs_pr_agent.md
 ```
+
+Ablations are the same command with a setting changed and a new `--run` (ADRs 0023 to 0025):
+`PRISM_ROUTE_ALL=true` sends every planned hunk to Claude instead of the local model,
+`PRISM_GATE=pass-all` turns the gate off, and `PRISM_REVIEW_UNIT=pr` (with `PRISM_ROUTE_ALL`)
+shows Claude the whole PR in one request instead of one hunk at a time. `prism bench table
+NAME=RUN ...` puts finished runs side by side, as in `eval/reports/bugbench_ablation_*.md`.

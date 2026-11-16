@@ -342,3 +342,13 @@ def test_the_ablation_table_compares_runs_on_shared_cases() -> None:
     assert "| Real-bug recall | 0/1 | 1/1 |" in out
     assert "| Clean PRs with any comment | 0/1 | 1/1 |" in out
     assert "| b | real | - | hit |" in out and "only-here" not in out
+
+
+def test_round_files_are_cut_by_size_as_well_as_count() -> None:
+    from prism.bench import run as bench_run
+
+    big = [{"id": f"c::{i}", "x": "y" * 90_000} for i in range(5)]
+    chunks = bench_run._chunks(big)
+    assert [c.count("\n") for c in chunks] == [2, 2, 1]
+    small = [{"id": f"c::{i}"} for i in range(30)]
+    assert [c.count("\n") for c in bench_run._chunks(small)] == [25, 5]

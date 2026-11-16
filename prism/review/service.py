@@ -230,12 +230,17 @@ async def review_async(
         raise ReviewError("PRISM_TRACING=langfuse needs `uv sync --group observability`") from exc
     reviewer_prompt = prompts.get(REVIEWER)
     rubrics = {"rubric": prompts.get(VERIFY).text, "review_rubric": prompts.get(REVIEW).text}
+    if s.review_unit == "pr" and not options.route_all:
+        raise ReviewError("PRISM_REVIEW_UNIT=pr needs PRISM_ROUTE_ALL=true", code=2)
+    whole_pr = s.review_unit == "pr"
 
     chosen: Verifier
     claude: ClaudeVerifier | None = None
     verify_dir: Path | None = None
     if kind == "handoff":
-        handoff = HandoffVerifier(work, min_confidence=s.verifier_min_confidence, **rubrics)
+        handoff = HandoffVerifier(
+            work, min_confidence=s.verifier_min_confidence, whole_pr=whole_pr, **rubrics
+        )
         claude, chosen, verify_dir = handoff, handoff, handoff.dir
     elif kind == "api":
         try:
@@ -249,7 +254,9 @@ async def review_async(
             )
         except ImportError as exc:
             raise ReviewError("the api verifier needs `uv sync --group frontier`") from exc
-        claude = ClaudeVerifier(backend, min_confidence=s.verifier_min_confidence, **rubrics)
+        claude = ClaudeVerifier(
+            backend, min_confidence=s.verifier_min_confidence, whole_pr=whole_pr, **rubrics
+        )
         chosen = claude
     else:
         chosen = RuleVerifier()
