@@ -179,11 +179,23 @@ async def run_suite(
     for spec in suite.runs:
         if spec.sweep and suite.thresholds:
             cfg = RunConfig(
-                root, spec.run, mode=spec.mode, verifier=spec.verifier, model=spec.model
+                root,
+                spec.run,
+                mode=spec.mode,
+                verifier=spec.verifier,
+                model=spec.model,
+                worktrees=spec.worktrees,
             )
-            sw = await run_sweep(
-                sets, cfg, settings_for(base, suite, spec), suite.thresholds, notes
-            )
+            saved = root / "runs" / spec.run / "sweep.json"
+            sw = json.loads(saved.read_text(encoding="utf-8")) if saved.exists() else {}
+            got = sw.get("thresholds", {})
+            scored = {r["case_id"] for r in got.get("0.60", {}).get("rows", [])}
+            wanted = {c.id for cs in sets for c in cs.cases}
+            if set(got) != {f"{t:.2f}" for t in suite.thresholds} or scored != wanted:
+                # No sweep yet, or one made with other thresholds or cases.
+                sw = await run_sweep(
+                    sets, cfg, settings_for(base, suite, spec), suite.thresholds, notes
+                )
             sweeps.append((spec.name, sw))
     if sweeps:
         text += "\n" + render_sweep(sweeps, "Confidence threshold sweep")
