@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from prism.bench.cases import CaseSet, load
+from prism.bench.run import DONE
 from prism.config import Settings
 
 _KEEP_OUT = {"handoff", "results.jsonl", "summary.json", "sweep.json"}
@@ -92,7 +93,8 @@ def seed(root: Path, spec: RunSpec) -> int:
             if entry.name in _KEEP_OUT or dest.exists():
                 continue
             if entry.is_dir():
-                shutil.copytree(entry, dest)
+                # A case's score belongs to the run that made it, not to a run seeded from it.
+                shutil.copytree(entry, dest, ignore=shutil.ignore_patterns(DONE))
             else:
                 shutil.copy2(entry, dest)
             copied += 1

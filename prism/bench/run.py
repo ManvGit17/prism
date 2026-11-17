@@ -25,6 +25,7 @@ from prism.review.handoff import BATCH_SIZE, read_answers
 from prism.review.service import ReviewOutcome, ReviewRequest, review_async
 
 SEP = "::"
+DONE = "result.json"  # a case's score, written once it needs no more answers
 _PAIRS = (("requests", "verdicts"), ("escalations", "reviews"), ("pr_requests", "pr_reviews"))
 _RUBRICS = ("RUBRIC.md", "REVIEW_RUBRIC.md", "PR_RUBRIC.md")
 # Whole-PR requests carry every hunk of a PR, so their files are cut by size as well as count.
@@ -234,32 +235,44 @@ async def run_cases(
     if imported:
         notes(f"{imported} answer(s) handed back to their cases")
     out = RunResult(run_dir)
-    finished: list[tuple[CaseSet, Materialized, Any]] = []
+    sast_ran: set[str] = set()
+    skipped = 0
     for cs, case in cases:
+        # A case scored on an earlier pass has every answer it needs: it is not reviewed again.
+        done = run_dir / case.id / DONE
+        if done.exists():
+            saved = json.loads(done.read_text(encoding="utf-8"))
+            out.results.append(CaseResult(**saved["result"]))
+            sast_ran.update(saved.get("sast_ran", []))
+            skipped += 1
+            continue
         m, outcome, elapsed = await review_case(cs, case, cfg, settings, notes)
         state = outcome.status
         notes(f"{case.id}: {state}, {len(outcome.review.comments)} comment(s), {elapsed}s")
         if outcome.pending:
             out.waiting.append(case.id)
-        else:
-            finished.append((cs, m, outcome))
+            continue
+        result = score_case(
+            case.id,
+            case.kind,
+            case.path,
+            m.lines,
+            outcome.review.comments,
+            outcome.state.get("decisions", []),
+            _timing(run_dir / case.id).get("first_run_s"),
+            group=case.group,
+            repo=cs.repo,
+        )
+        report = outcome.state.get("sast")
+        ran = sorted(report.ran) if report is not None else []
+        done.write_text(json.dumps({"result": result.to_json(), "sast_ran": ran}), encoding="utf-8")
+        out.results.append(result)
+        sast_ran.update(ran)
+    if skipped:
+        notes(f"{skipped} case(s) already scored on an earlier pass")
     if out.waiting:
         out.round_dir = export_requests(run_dir, out.waiting)
         return out
-    for cs, m, outcome in finished:
-        out.results.append(
-            score_case(
-                m.case.id,
-                m.case.kind,
-                m.case.path,
-                m.lines,
-                outcome.review.comments,
-                outcome.state.get("decisions", []),
-                _timing(run_dir / m.case.id).get("first_run_s"),
-                group=m.case.group,
-                repo=cs.repo,
-            )
-        )
     out.summary = {
         **summarize(out.results),
         "repo": ", ".join(dict.fromkeys(cs.repo for cs in sets)),
@@ -271,9 +284,7 @@ async def run_cases(
             "verifier": cfg.verifier,
             "sast": cfg.sast,
             # A tool that is not installed is skipped, so record which ones actually ran.
-            "sast_ran": sorted(
-                {t for _, _, o in finished if o.state.get("sast") for t in o.state["sast"].ran}
-            ),
+            "sast_ran": sorted(sast_ran),
             "escalate": settings.escalate,
             "route_all": settings.route_all,
             "review_unit": settings.review_unit,
