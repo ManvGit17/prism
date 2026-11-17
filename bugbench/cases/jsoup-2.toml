@@ -1,0 +1,355 @@
+# BugBench cases for jsoup, from `prism bench generate` (seed 11, window 600).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+
+[repo]
+name = "jsoup"
+url = "https://github.com/jhy/jsoup.git"
+license = "MIT"
+
+[[case]]
+id = "jsoup-i16"
+group = "injected"
+commit = "31ad0686"
+path = "src/main/java/org/jsoup/nodes/Element.java"
+kind = "off-by-one"
+operator = "lt-to-le"
+find = """        for (int i = 0, e = 0; i < size; i++) { // direct iter is faster than chasing firstElSib, nextElSibd
+"""
+replace = """        for (int i = 0, e = 0; i <= size; i++) { // direct iter is faster than chasing firstElSib, nextElSibd
+"""
+failing = "ElementTest.testChildThrowsIndexOutOfBoundsWhenCachedChildrenIsNull"
+
+[[case]]
+id = "jsoup-i17"
+group = "injected"
+commit = "1df14edb"
+path = "src/main/java/org/jsoup/parser/TokeniserState.java"
+kind = "inverted condition"
+operator = "negate-if-java"
+find = """                        if (r.matches('>')) {
+"""
+replace = """                        if (!(r.matches('>'))) {
+"""
+failing = "W3CDomTest.doesNotExpandEntities"
+
+[[case]]
+id = "jsoup-i18"
+group = "injected"
+commit = "5e498c66"
+path = "src/main/java/org/jsoup/parser/Tag.java"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """        return Objects.hash(tagName, namespace); // options not included so that mutations do not prevent use as a key
+"""
+replace = """        return Objects.hash(namespace, tagName); // options not included so that mutations do not prevent use as a key
+"""
+failing = "TagTest.stableHashcode"
+
+[[case]]
+id = "jsoup-i19"
+group = "injected"
+commit = "5ee2e11a"
+path = "src/main/java/org/jsoup/helper/W3CDom.java"
+kind = "wrong null check"
+operator = "eq-null"
+find = """                if (normalized == null) return "_";
+"""
+replace = """                if (normalized != null) return "_";
+"""
+failing = "W3CDomTest.normalizesElementNamesWithInvalidXmlStarts"
+
+[[case]]
+id = "jsoup-i20"
+group = "injected"
+commit = "37aea499"
+path = "src/main/java/org/jsoup/parser/ForeignNames.java"
+kind = "inverted condition"
+operator = "negate-if-java"
+find = """                    if (equalsIgnoreAsciiCase(name, orig)) {
+"""
+replace = """                    if (!equalsIgnoreAsciiCase(name, orig)) {
+"""
+failing = "HtmlParserTest.adjustedForeignAttributesDedupe"
+
+[[case]]
+id = "jsoup-i21"
+group = "injected"
+commit = "731d9011"
+path = "src/main/java/org/jsoup/select/Evaluator.java"
+kind = "wrong null check"
+operator = "eq-null"
+find = """    	    if (element.parent() == null) return 0;
+"""
+replace = """    	    if (element.parent() != null) return 0;
+"""
+failing = "CssTest.nthLastChild_advanced"
+
+[[case]]
+id = "jsoup-i22"
+group = "injected"
+commit = "bcbac427"
+path = "src/main/java/org/jsoup/parser/TagSet.java"
+kind = "wrong null check"
+operator = "ne-null"
+find = """        if (original.customizers != null)
+"""
+replace = """        if (original.customizers == null)
+"""
+failing = "ConnectTest.bodyAfterParseThrowsValidationError"
+
+[[case]]
+id = "jsoup-i23"
+group = "injected"
+commit = "44460bc1"
+path = "src/main/java/org/jsoup/parser/TokenQueue.java"
+kind = "wrong boolean operator"
+operator = "oror-to-andand"
+find = '''            } else if (c <= '\u001F' || c == '\u007F') {
+'''
+replace = '''            } else if (c <= '\u001F' && c == '\u007F') {
+'''
+failing = "TokenQueueTest.escapeCssIdentifier"
+
+[[case]]
+id = "jsoup-i24"
+group = "injected"
+commit = "3c8350e2"
+path = "src/main/java/org/jsoup/helper/HttpConnection.java"
+kind = "wrong boolean operator"
+operator = "andand-to-oror"
+find = """                && first.getHost().equalsIgnoreCase(second.getHost())
+"""
+replace = """                || first.getHost().equalsIgnoreCase(second.getHost())
+"""
+failing = "HttpConnectionTest.sameOriginUsesSchemeHostAndEffectivePort"
+
+[[case]]
+id = "jsoup-i25"
+group = "injected"
+commit = "03f9ed13"
+path = "src/main/java/org/jsoup/safety/Safelist.java"
+kind = "wrong return value"
+operator = "false-to-true-java"
+find = """        if (preserveRelativeLinks) return false;
+"""
+replace = """        if (preserveRelativeLinks) return true;
+"""
+failing = "CleanerTest.nofollowOnlyOnExternalLinks"
+
+[[case]]
+id = "jsoup-i26"
+group = "injected"
+commit = "7693192f"
+path = "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java"
+kind = "wrong null check"
+operator = "ne-null"
+find = """                    if (textState != null) { // custom rcdata or rawtext (if we were in head, will have auto-transitioned here)
+"""
+replace = """                    if (textState == null) { // custom rcdata or rawtext (if we were in head, will have auto-transitioned here)
+"""
+failing = "DataUtilTest.parseSequenceInputStream"
+
+[[case]]
+id = "jsoup-i27"
+group = "injected"
+commit = "bd92bcac"
+path = "src/main/java/org/jsoup/internal/SimpleBufferedInput.java"
+kind = "off-by-one"
+operator = "ge-to-gt"
+find = """        int keepFrom = bufMark >= 0 ? bufMark : bufPos;
+"""
+replace = """        int keepFrom = bufMark > 0 ? bufMark : bufPos;
+"""
+failing = "DataUtilTest.firstMetaElementWithCharsetShouldBeUsedForDecoding"
+
+[[case]]
+id = "jsoup-i28"
+group = "injected"
+commit = "be8c3756"
+path = "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+kind = "inverted condition"
+operator = "negate-if-java"
+find = """                    } else if (NamespaceSvg.equals(contextTag.namespace())) {
+"""
+replace = """                    } else if (!(NamespaceSvg.equals(contextTag.namespace()))) {
+"""
+failing = "HtmlParserTest.fragmentTokeniserStateUsesContextNamespace"
+
+[[case]]
+id = "jsoup-i29"
+group = "injected"
+commit = "ada77949"
+path = "src/main/java/org/jsoup/select/Elements.java"
+kind = "wrong null check"
+operator = "ne-null"
+find = """        Evaluator eval = query != null? Selector.evaluatorOf(query) : null;
+"""
+replace = """        Evaluator eval = query == null? Selector.evaluatorOf(query) : null;
+"""
+failing = "ElementTest.testNextElementSiblings"
+
+[[case]]
+id = "jsoup-i30"
+group = "injected"
+commit = "ec7fcd3b"
+path = "src/main/java/org/jsoup/nodes/Printer.java"
+kind = "wrong boolean operator"
+operator = "oror-to-andand"
+find = """                if (prev == null || !(prev instanceof TextNode) && shouldIndent(prev))
+"""
+replace = """                if (prev == null && !(prev instanceof TextNode) && shouldIndent(prev))
+"""
+failing = "CommentTest.stableIndentInBlock"
+
+[[case]]
+id = "jsoup-i31"
+group = "injected"
+commit = "97a39215"
+path = "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                tb.insertNode(lastEl, commonAncestor);
+"""
+replace = """                tb.insertNode(commonAncestor, lastEl);
+"""
+failing = "HtmlParserTest.fostersAdoptedFormattingInDocument"
+
+[[case]]
+id = "jsoup-i32"
+group = "injected"
+commit = "967306fb"
+path = "src/main/java/org/jsoup/select/NodeTraversor.java"
+kind = "wrong boolean operator"
+operator = "oror-to-andand"
+find = """                    if (node == root || node == null) break; // done, break outer
+"""
+replace = """                    if (node == root && node == null) break; // done, break outer
+"""
+failing = "TraversorTest.doesntVisitAgainAfterRemoving"
+
+[[case]]
+id = "jsoup-i33"
+group = "injected"
+commit = "4e381147"
+path = "src/main/java/org/jsoup/helper/HttpConnection.java"
+kind = "wrong boolean operator"
+operator = "andand-to-oror"
+find = """                if (nextMethod != null && res.hasHeader(LOCATION) && req.followRedirects()) {
+"""
+replace = """                if (nextMethod != null || res.hasHeader(LOCATION) && req.followRedirects()) {
+"""
+failing = "ConnectTest.doesNotFollowLocationForOtherStatuses"
+
+[[case]]
+id = "jsoup-i34"
+group = "injected"
+commit = "cd22c55b"
+path = "src/main/java/org/jsoup/parser/Tokeniser.java"
+kind = "inverted condition"
+operator = "negate-if-java"
+find = """            if (inAttribute && (reader.matchesAsciiAlpha() || reader.matchesDigit() || reader.matches('='))) {
+"""
+replace = """            if (!(inAttribute && (reader.matchesAsciiAlpha() || reader.matchesDigit() || reader.matches('=')))) {
+"""
+failing = "ConnectTest.doesGet"
+
+[[case]]
+id = "jsoup-i35"
+group = "injected"
+commit = "e1d48ba9"
+path = "src/main/java/org/jsoup/select/QueryParser.java"
+kind = "off-by-one"
+operator = "le-to-lt"
+find = """        Validate.isTrue(++complexity <= MaxQueryComplexity, "Query complexity exceeds maximum of " + MaxQueryComplexity);
+"""
+replace = """        Validate.isTrue(++complexity < MaxQueryComplexity, "Query complexity exceeds maximum of " + MaxQueryComplexity);
+"""
+failing = "QueryParserTest.limitsCombinatorChains"
+
+[[case]]
+id = "jsoup-i36"
+group = "injected"
+commit = "be2a74a1"
+path = "src/main/java/org/jsoup/helper/UrlBuilder.java"
+kind = "off-by-one"
+operator = "ge-to-gt"
+find = """            } else if (c < 0x20 || c >= 0x7f || unsafeCharacters.indexOf(c) != -1) { // ascii control, past ascii, or otherwise unsafe
+"""
+replace = """            } else if (c < 0x20 || c > 0x7f || unsafeCharacters.indexOf(c) != -1) { // ascii control, past ascii, or otherwise unsafe
+"""
+failing = "HttpConnectionTest.urlControlCharsAreEncoded"
+
+[[case]]
+id = "jsoup-i37"
+group = "injected"
+commit = "dedf6ab9"
+path = "src/main/java/org/jsoup/parser/Token.java"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                data.replace(TokeniserState.nullChar, Tokeniser.replacementChar) :
+"""
+replace = """                data.replace(Tokeniser.replacementChar, TokeniserState.nullChar) :
+"""
+failing = "HtmlParserTest.replacesNullsInForeign"
+
+[[case]]
+id = "jsoup-i38"
+group = "injected"
+commit = "bd155b85"
+path = "src/main/java/org/jsoup/select/Evaluator.java"
+kind = "off-by-one"
+operator = "drop-minus-one"
+find = """                value = value.substring(1, value.length() - 1);
+"""
+replace = """                value = value.substring(1, value.length());
+"""
+failing = "HtmlParserTest.testUsingSingleQuotesInQueries"
+
+[[case]]
+id = "jsoup-i39"
+group = "injected"
+commit = "bd345ac5"
+path = "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+kind = "off-by-one"
+operator = "ge-to-gt"
+find = """        Element firstFound = null;
+
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+"""
+replace = """        Element firstFound = null;
+
+        for (int pos = stack.size() -1; pos > 0; pos--) {
+"""
+failing = "ConnectTest.fetchHandlesXml"
+
+[[case]]
+id = "jsoup-i40"
+group = "injected"
+commit = "b87fd364"
+path = "src/main/java/org/jsoup/helper/W3CDom.java"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                    el = doc.createElementNS(imputedNamespace, tagName);
+"""
+replace = """                    el = doc.createElementNS(tagName, imputedNamespace);
+"""
+failing = "W3CDomTest.addedAttributeUsesInheritedNamespace"
+
+[[case]]
+id = "jsoup-c05"
+group = "clean"
+commit = "f0d87821"
+kind = "clean"
+
+[[case]]
+id = "jsoup-c06"
+group = "clean"
+commit = "de2bfde1"
+kind = "clean"
+
+[[case]]
+id = "jsoup-c07"
+group = "clean"
+commit = "7c32b7e1"
+kind = "clean"
