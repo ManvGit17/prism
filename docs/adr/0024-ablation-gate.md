@@ -30,6 +30,10 @@ so the saving is counted in work: hunks sent to the local model, and requests se
 The two extra hits (aiosqlite-i11, sqlite-utils-i04) are both hunks the gate scored below its
 threshold. Nothing found with the gate on was lost with it off, and no clean PR got a comment.
 
+Found later (ADR 0026): Bandit was missing from the virtualenv when `mid-01` ran and present for
+`gate-off-01`, so this run also had 3 Bandit findings in sqlite-utils that `mid-01` did not.
+None of them changed a posted comment; the result above stands.
+
 ## Consequences
 
 * The gate does what it was built for: it skips 29% of the hunks and saves 24% of the Claude

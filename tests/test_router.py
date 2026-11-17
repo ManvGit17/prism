@@ -233,6 +233,42 @@ def test_whole_pr_view_sends_one_request_and_places_comments_by_path(tmp_path: P
     assert sorted((c.path, c.line) for c in done.comments) == [("app/a.py", 2), ("app/b.py", 2)]
 
 
+def test_sweep_rescores_saved_answers_and_counts_new_questions(tmp_path: Path) -> None:
+    from prism.bench.sweep import rescore
+
+    def run(threshold: float) -> Any:
+        verifier = HandoffVerifier(tmp_path, min_confidence=threshold)
+        _, state = asyncio.run(
+            run_review(
+                tmp_path,
+                SAFE,
+                gate=PassAllGate(),
+                model=FakeModel(),
+                verifier=verifier,
+                options=ReviewOptions(escalate=True),
+                cache=ReplyCache(tmp_path / "replies.json"),
+            )
+        )
+        return state, verifier
+
+    run(0.6)
+    (req,) = rows(tmp_path, "requests")
+    answer(tmp_path, "verdicts", [keep(req["id"], confidence=0.7)])
+    state, verifier = run(0.6)
+    assert verifier.pending == 0
+    verify = tmp_path / "verify"
+    before = sorted(p.name for p in verify.iterdir())
+
+    posted, _, missing = asyncio.run(rescore(state, verify, 0.6))
+    assert missing == 0 and [c.confidence for c in posted] == [0.7]
+    posted, _, missing = asyncio.run(rescore(state, verify, 0.75))
+    # Above 0.7 the kept comment is weak, so its hunk would go back to Claude: a new question.
+    assert missing == 1 and posted == []
+    posted, _, missing = asyncio.run(rescore(state, verify, 0.3))
+    assert missing == 0 and len(posted) == 1
+    assert sorted(p.name for p in verify.iterdir()) == before, "the sweep writes nothing"
+
+
 def test_route_all_sends_every_planned_hunk_up_front() -> None:
     from types import SimpleNamespace
 

@@ -172,3 +172,7 @@ Ablations are the same command with a setting changed and a new `--run` (ADRs 00
 `PRISM_GATE=pass-all` turns the gate off, and `PRISM_REVIEW_UNIT=pr` (with `PRISM_ROUTE_ALL`)
 shows Claude the whole PR in one request instead of one hunk at a time. `prism bench table
 NAME=RUN ...` puts finished runs side by side, as in `eval/reports/bugbench_ablation_*.md`.
+
+`prism bench sweep CASES --run RUN` re-scores a finished run at confidence thresholds 0.3 to 0.9
+from its saved answers, with the run's own settings and no new Claude work (ADR 0026), and
+`prism bench sweep-table NAME=RUN ...` compares sweeps.

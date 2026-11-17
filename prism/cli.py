@@ -759,6 +759,74 @@ def bench_run(
     typer.echo(json.dumps(result.summary, indent=2))
 
 
+@bench_app.command("sweep")
+def bench_sweep(
+    cases: Annotated[list[Path], typer.Argument(help="The run's case files.")],
+    run: Annotated[str, typer.Option("--run", help="A finished run under ROOT/runs.")],
+    thresholds: Annotated[
+        str, typer.Option("--thresholds", help="Comma-separated confidence thresholds.")
+    ] = "0.3,0.4,0.5,0.6,0.7,0.8,0.9",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    mode: Annotated[str, typer.Option("--mode", help="Context mode for the verifier.")] = "graph",
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    sast: Annotated[bool, typer.Option("--sast/--no-sast")] = True,
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated case ids.")] = None,
+) -> None:
+    """Re-score a finished run at other confidence thresholds from its saved answers (no new
+    Claude work). Run it with the run's own settings; writes ROOT/runs/RUN/sweep.json."""
+    import asyncio
+
+    from prism.bench.cases import load
+    from prism.bench.run import RunConfig
+    from prism.bench.sweep import render_sweep, run_sweep
+
+    s = get_settings().model_copy(update={"review_store": "off", "tracing": "off"})
+    cfg = RunConfig(root.resolve(), run, mode=mode, verifier="handoff", model=model, sast=sast)
+    picked = {x.strip() for x in only.split(",") if x.strip()} if only else None
+    ts = [float(x) for x in thresholds.split(",") if x.strip()]
+    try:
+        sweep = asyncio.run(
+            run_sweep(
+                [load(c) for c in cases],
+                cfg,
+                s,
+                ts,
+                notes=lambda m: typer.echo(m, err=True),
+                only=picked,
+            )
+        )
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(render_sweep([(run, sweep)], f"Threshold sweep: {run}"))
+
+
+@bench_app.command("sweep-table")
+def bench_sweep_table(
+    runs: Annotated[list[str], typer.Argument(help="NAME=RUN pairs of swept runs.")],
+    report: Annotated[Path, typer.Option("--report", help="Markdown file to write.")],
+    title: Annotated[str, typer.Option("--title")] = "BugBench threshold sweep",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """The sweeps of several runs side by side."""
+    import json
+
+    from prism.bench.sweep import render_sweep
+
+    cols = []
+    for pair in runs:
+        name, _, run = pair.partition("=")
+        path = root.resolve() / "runs" / (run or name) / "sweep.json"
+        cols.append((name, json.loads(path.read_text("utf-8"))))
+    out = render_sweep(cols, title)
+    report.write_text(out, encoding="utf-8", newline="\n")
+    typer.echo(out)
+
+
 @bench_app.command("generate")
 def bench_generate(
     repo: Annotated[str, typer.Argument(help="A repo name from bugbench/repos.toml.")],

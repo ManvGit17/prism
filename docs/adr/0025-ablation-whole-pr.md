@@ -21,9 +21,10 @@ comment on a file or line the PR does not show is dropped.
 
 Everything else is as in `claude-only-01`: the gate, the 40-hunk budget, SAST, graph context and
 the 0.6 threshold. The run (`whole-pr-01`) was seeded from a copy of `claude-only-01`, so the SAST
-verdicts were reused. Bandit raised 3 SQL-string findings in sqlite-utils that it had not raised
-in that run (it did in `gate-off-01`), so those 3 were verified fresh. Bandit's output is not
-identical from run to run on this machine, and that is worth knowing for every comparison here.
+verdicts were reused. One difference crept in: Bandit was missing from the virtualenv when
+`mid-01` and `claude-only-01` ran (PRism skips a SAST tool it cannot find), and was installed
+before `gate-off-01`. Here it raised 3 SQL-string findings in sqlite-utils, which were verified
+fresh. None changed a posted comment: in those 3 PRs both runs posted the same comments.
 As for ADR 0023, the same answers were re-scored at confidence 0.3 (`whole-pr-01-conf03`).
 
 ## Result (eval/reports/bugbench_ablation_whole_pr.md)

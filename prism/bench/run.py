@@ -18,11 +18,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from prism.bench.cases import CaseSet, Materialized, materialize
+from prism.bench.cases import Case, CaseSet, Materialized, materialize
 from prism.bench.score import CaseResult, score_case, summarize
 from prism.config import Settings
 from prism.review.handoff import BATCH_SIZE, read_answers
-from prism.review.service import ReviewRequest, review_async
+from prism.review.service import ReviewOutcome, ReviewRequest, review_async
 
 SEP = "::"
 _PAIRS = (("requests", "verdicts"), ("escalations", "reviews"), ("pr_requests", "pr_reviews"))
@@ -168,6 +168,49 @@ def _timing(case_dir: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
+def selected(
+    sets: CaseSet | Sequence[CaseSet], only: set[str] | None = None
+) -> list[tuple[CaseSet, Case]]:
+    sets = [sets] if isinstance(sets, CaseSet) else list(sets)
+    cases = [(cs, c) for cs in sets for c in cs.cases if only is None or c.id in only]
+    ids = [c.id for _, c in cases]
+    if len(ids) != len(set(ids)):
+        raise ValueError("case ids must be unique across the case files of a run")
+    return cases
+
+
+async def review_case(
+    cs: CaseSet, case: Case, cfg: RunConfig, settings: Settings, notes: Callable[[str], None]
+) -> tuple[Materialized, ReviewOutcome, float]:
+    """One case reviewed in its work dir under the run; the first run's time is kept."""
+    m = materialize(cfg.root, cs, case)
+    case_dir = cfg.root / "runs" / cfg.run / case.id
+    timing = _timing(case_dir)
+    started = time.monotonic()
+    outcome = await review_async(
+        ReviewRequest(
+            repo=m.checkout,
+            diff_text=m.diff,
+            repo_id=cs.repo,
+            work=case_dir,
+            verifier=cfg.verifier,
+            model=cfg.model,
+            store="memory",
+            mode=cfg.mode,
+            sast=cfg.sast,
+            save=False,
+        ),
+        settings=settings,
+        notes=_prefixed(notes, case.id),
+    )
+    elapsed = round(time.monotonic() - started, 2)
+    if "first_run_s" not in timing:
+        timing = {"first_run_s": elapsed, "lines": list(m.lines)}
+        case_dir.mkdir(parents=True, exist_ok=True)
+        (case_dir / "bench.json").write_text(json.dumps(timing), encoding="utf-8")
+    return m, outcome, elapsed
+
+
 async def run_cases(
     sets: CaseSet | Sequence[CaseSet],
     cfg: RunConfig,
@@ -178,41 +221,15 @@ async def run_cases(
     """Every case of every set, with one handoff across all of them."""
     run_dir = cfg.root / "runs" / cfg.run
     sets = [sets] if isinstance(sets, CaseSet) else list(sets)
-    cases = [(cs, c) for cs in sets for c in cs.cases if only is None or c.id in only]
+    cases = selected(sets, only)
     ids = [c.id for _, c in cases]
-    if len(ids) != len(set(ids)):
-        raise ValueError("case ids must be unique across the case files of a run")
     imported = import_answers(run_dir, ids)
     if imported:
         notes(f"{imported} answer(s) handed back to their cases")
     out = RunResult(run_dir)
     finished: list[tuple[CaseSet, Materialized, Any]] = []
     for cs, case in cases:
-        m = materialize(cfg.root, cs, case)
-        case_dir = run_dir / case.id
-        timing = _timing(case_dir)
-        started = time.monotonic()
-        outcome = await review_async(
-            ReviewRequest(
-                repo=m.checkout,
-                diff_text=m.diff,
-                repo_id=cs.repo,
-                work=case_dir,
-                verifier=cfg.verifier,
-                model=cfg.model,
-                store="memory",
-                mode=cfg.mode,
-                sast=cfg.sast,
-                save=False,
-            ),
-            settings=settings,
-            notes=_prefixed(notes, case.id),
-        )
-        elapsed = round(time.monotonic() - started, 2)
-        if "first_run_s" not in timing:
-            timing = {"first_run_s": elapsed, "lines": list(m.lines)}
-            case_dir.mkdir(parents=True, exist_ok=True)
-            (case_dir / "bench.json").write_text(json.dumps(timing), encoding="utf-8")
+        m, outcome, elapsed = await review_case(cs, case, cfg, settings, notes)
         state = outcome.status
         notes(f"{case.id}: {state}, {len(outcome.review.comments)} comment(s), {elapsed}s")
         if outcome.pending:
@@ -246,6 +263,10 @@ async def run_cases(
             "context_mode": cfg.mode,
             "verifier": cfg.verifier,
             "sast": cfg.sast,
+            # A tool that is not installed is skipped, so record which ones actually ran.
+            "sast_ran": sorted(
+                {t for _, _, o in finished if o.state.get("sast") for t in o.state["sast"].ran}
+            ),
             "escalate": settings.escalate,
             "route_all": settings.route_all,
             "review_unit": settings.review_unit,

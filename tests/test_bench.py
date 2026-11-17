@@ -352,3 +352,21 @@ def test_round_files_are_cut_by_size_as_well_as_count() -> None:
     assert [c.count("\n") for c in chunks] == [2, 2, 1]
     small = [{"id": f"c::{i}"} for i in range(30)]
     assert [c.count("\n") for c in bench_run._chunks(small)] == [25, 5]
+
+
+def test_sweep_table_marks_thresholds_with_unscored_prs() -> None:
+    from prism.bench.sweep import render_sweep
+
+    def row(case: str, group: str, hit: bool, posted: int) -> dict[str, object]:
+        return {"case_id": case, "group": group, "hit": hit, "posted": posted}
+
+    full = [row("i1", "injected", True, 1), row("c1", "clean", False, 0)]
+    sweep = {
+        "thresholds": {
+            "0.60": {"rows": full, "missing": 0, "cases_missing": []},
+            "0.80": {"rows": full[1:], "missing": 2, "cases_missing": ["i1"]},
+        }
+    }
+    text = render_sweep([("PRism", sweep)], "t")
+    assert "| 0.60 | 1/1 |" in text
+    assert "| 0.80 | 0/0 (1 PR(s) unscored) |" in text

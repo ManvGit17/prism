@@ -510,3 +510,36 @@ threshold is a blunt tool: the same answer quality gives very different recall a
 4. What bounds the size of a whole-PR request here, and what would break without it?
 5. Which two remaining planted-bug misses would the gate-off setting fix, and why are the other
    three out of its reach?
+
+## Phase 7, fourth ablation: the confidence threshold (2026-11-17)
+
+**What was run.** A sweep from 0.3 to 0.9 over three finished runs (PRism, Claude-only, whole-PR),
+with no new Claude work. Each case is reviewed once more from its caches, and the verifier's input
+is rebuilt from the final state and answered at every threshold from the saved answers. Each sweep
+gives back its own run's numbers exactly at 0.6, which is how I know the method is sound.
+
+**The result.** PRism at 0.4 finds 50/57 and 7/10, against 48/57 and 6/10 at 0.6, and still
+comments on no clean PR. Above 0.6 every run loses bugs quickly and gains nothing, since nothing
+is flagged on clean PRs at 0.6 anyway. The whole-PR view holds its planted-bug recall from 0.3 to
+0.7; only its real-bug recall depends on the threshold.
+
+**A threshold with two jobs.** In PRism the threshold also routes: a local comment Claude keeps
+below it goes back to Claude for a review. Raising it would ask Claude new questions, so those PRs
+cannot be re-scored for free, and the sweep reports them as unscored instead of guessing.
+
+**A lesson about the environment.** The first sweep failed because Bandit, missing from the
+virtualenv during the first two runs, was installed now. PRism skips a missing tool quietly, so
+nothing showed it. The run summary now lists the tools that actually ran.
+
+**Why not just change the default to 0.4?** The 0.4 was picked on the same 83 PRs it is measured
+on, and 16 clean PRs say little about the false-positive rate. It needs checking on the bigger
+set.
+
+**Quiz**
+
+1. Why can the sweep re-score PRism below 0.6 for free, but not above it?
+2. What check tells you the sweep reproduces a run faithfully?
+3. Why is 16 clean PRs too few to set the threshold, even though none is flagged at 0.4?
+4. Comments per buggy PR rise from 1.00 to 1.18 at 0.4. What would you need to know before
+   calling that a cost?
+5. How did a missing SAST tool go unnoticed for two runs, and what now catches it?
