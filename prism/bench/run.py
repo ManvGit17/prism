@@ -185,6 +185,11 @@ def selected(
     ids = [c.id for _, c in cases]
     if len(ids) != len(set(ids)):
         raise ValueError("case ids must be unique across the case files of a run")
+    seen: dict[tuple[str, str], str] = {}
+    for cs, c in cases:
+        other = seen.setdefault((cs.repo, c.commit[:7]), c.id)
+        if other != c.id:
+            raise ValueError(f"{other} and {c.id} use the same commit; a PR can be one case only")
     return cases
 
 

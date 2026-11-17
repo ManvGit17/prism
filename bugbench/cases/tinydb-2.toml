@@ -205,19 +205,6 @@ replace = """            return True
 failing = "tests/test_queries.py::test_nested_query"
 
 [[case]]
-id = "tinydb-i31"
-group = "injected"
-commit = "6b33fee"
-path = "tinydb/database.py"
-kind = "wrong boolean operator"
-operator = "and-to-or"
-find = """        if doc_ids is not None and not len(documents) == len(doc_ids):
-"""
-replace = """        if doc_ids is not None or not len(documents) == len(doc_ids):
-"""
-failing = "tests/test_tinydb.py::test_write_back"
-
-[[case]]
 id = "tinydb-i32"
 group = "injected"
 commit = "2206110"
@@ -227,19 +214,6 @@ operator = "gt-to-ge"
 find = """        if len(self._queries_cache) > self._cache_size:
 """
 replace = """        if len(self._queries_cache) >= self._cache_size:
-"""
-failing = "tests/test_tables.py::test_query_cache_size"
-
-[[case]]
-id = "tinydb-i33"
-group = "injected"
-commit = "91d4375"
-path = "tinydb/utils.py"
-kind = "wrong boolean operator"
-operator = "or-to-and"
-find = """        self.capacity = kwargs.pop('capacity', None) or float('nan')
-"""
-replace = """        self.capacity = kwargs.pop('capacity', None) and float('nan')
 """
 failing = "tests/test_tables.py::test_query_cache_size"
 
@@ -335,12 +309,6 @@ replace = """            self._storage.write(data)
         except IndexError:
 """
 failing = "tests/test_tinydb.py::test_purge_table"
-
-[[case]]
-id = "tinydb-c05"
-group = "clean"
-commit = "6b518b8"
-kind = "clean"
 
 [[case]]
 id = "tinydb-c06"

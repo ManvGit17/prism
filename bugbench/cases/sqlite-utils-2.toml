@@ -99,19 +99,6 @@ replace = """        docs = itertools.islice(stop_after, docs)
 failing = "tests/test_cli_insert.py::test_insert_stop_after[[{\"name\":"
 
 [[case]]
-id = "sqlite-utils-i23"
-group = "injected"
-commit = "8e015d0"
-path = "sqlite_utils/db.py"
-kind = "wrong boolean operator"
-operator = "or-to-and"
-find = """                rename.get(pk_name) or pk_name
-"""
-replace = """                rename.get(pk_name) and pk_name
-"""
-failing = "tests/test_atomic.py::test_transform_parent_table_with_foreign_keys_in_atomic"
-
-[[case]]
 id = "sqlite-utils-i24"
 group = "injected"
 commit = "d516e58"
