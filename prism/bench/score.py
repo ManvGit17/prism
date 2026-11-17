@@ -1,5 +1,5 @@
 """Scoring a BugBench run: recall at the defect's line, false positives on clean PRs, and what
-each PR got. Injected and real bugs are reported apart (PLAN.md: injected bugs are easier)."""
+each PR got. Injected and real bugs are reported apart (injected bugs are easier)."""
 
 from __future__ import annotations
 

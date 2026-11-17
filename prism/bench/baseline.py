@@ -1,4 +1,4 @@
-"""The PR-Agent baseline (PLAN.md Phase 7): an existing open-source reviewer on the same cases.
+"""The PR-Agent baseline: an existing open-source reviewer on the same cases.
 
 Qodo's PR-Agent (pinned in its own venv, not a PRism dependency) reviews each BugBench case the
 way it reviews a local branch: `--pr_url <base branch>` with the local git provider, so it gets

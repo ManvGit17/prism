@@ -88,13 +88,13 @@ between sessions (`eval/reports/reviewer_throughput.jsonl`).
 - **It does not know more about bugs than the base model.** Fine-tuning changed how comments are
   phrased, not what they find.
 - **It sounds sure when it is wrong.** It suggests renames, removals and missing fields in a
-  reviewer's voice, often about code it cannot see. The verifier (Phase 5) is meant to catch
+  reviewer's voice, often about code it cannot see. The verifier is meant to catch
   these.
 - **Every comment sounds alike.** 89% start with "I think" and 1% ask a question, against 3% and
   43% for human reviewers. This comes from greedy decoding always taking the most common opener,
   not from the training data (`eval/reports/sft.md`).
 - **It sees one hunk.** It was trained without repository context and is served without it.
-  Whether context helps it is a Phase 7 question.
+  BugBench tests whether context helps it.
 - **Scores are for the Kaggle version.** The served Q4_K_M model writes different text for the
   same hunk (0 of 20 identical, all 20 valid JSON); it was not scored separately.
 - **The labels are what reviewers wrote on open-source projects in 2022 and earlier.** Comments

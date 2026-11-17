@@ -1,4 +1,4 @@
-"""The confidence threshold sweep (Phase 7): a finished run re-scored at other thresholds.
+"""The confidence threshold sweep: a finished run re-scored at other thresholds.
 
 `PRISM_VERIFIER_MIN_CONFIDENCE` decides which of Claude's verdicts and comments are posted. In
 PRism it also routes: a local comment Claude keeps below the threshold sends its hunk back to

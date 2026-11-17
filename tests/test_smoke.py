@@ -1,4 +1,4 @@
-"""Phase 0 smoke test: every backing service answers.
+"""Smoke test: every backing service answers.
 
 Needs `make up` and the host Ollama with the reviewer model pulled. CI has
 neither, so it runs with `-m "not smoke"`.

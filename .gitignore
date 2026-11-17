@@ -15,7 +15,7 @@ data/
 *.onnx
 *.pem
 
-# Private planning material (PLAN.md is the public copy).
+# Private planning material.
 *.v1-original.md
 *.v2.md
 full-discussion-summary.pdf

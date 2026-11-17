@@ -1,6 +1,6 @@
 # ADR 0004: Best-effort call resolution with confidence bands
 
-Date: 2026-11-11. Status: accepted for Python and Java.
+Status: accepted.
 
 ## Context
 
@@ -165,6 +165,5 @@ Java only:
 ## Consequences
 
 - Retrieval sees fewer but more reliable edges by default. Recall for dynamic code is lower.
-- The bands are fixed guesses, not measured. When code-graph-bench has ground truth for PRism,
-  report precision and recall per band and adjust the bands and the threshold from that.
+- The bands are fixed estimates, not measured against ground truth.
 - Each edge says how it was found, so a reviewer prompt can mark low-confidence context as such.

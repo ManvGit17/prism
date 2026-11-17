@@ -3,7 +3,7 @@
 Measured 2026-11-11 on the build machine (Windows 11, 15.6 GB RAM, Docker capped at 6 GB through
 `.wslconfig`) with `docker stats --no-stream` and `ollama ps`, right after `make up` and one run
 of `make test`. The services were idle and held no project data, so these are floors, not working
-figures. Re-measure after Phase 1 indexes a real repo.
+figures.
 
 | Service | Memory used | Limit set in Compose |
 |---|---|---|
@@ -18,7 +18,7 @@ Only one of the two models is loaded at a time.
 
 Not yet measured: the Celery worker, the API, and Prometheus and Grafana (the `ops` profile).
 
-## Langfuse profile (Phase 5)
+## Langfuse profile
 
 Measured 2026-11-14 with `docker stats --no-stream` right after three traced reviews, with only
 the `langfuse` profile running (`docker compose --profile langfuse up -d --wait`). Langfuse

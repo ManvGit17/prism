@@ -1,16 +1,16 @@
 # ADR 0012: Static analysis as evidence and as comments
 
-Date: 2026-11-14. Status: accepted.
+Status: accepted.
 
 ## Context
 
-PLAN.md Phase 5 runs Semgrep (OWASP ruleset), Bandit, Ruff and PMD on the changed files and asks
-that every security claim cite a tool finding or code context. ADR 0011 already drops a security
-comment whose verdict cites no evidence. What was missing is the tools themselves.
+PRism runs Semgrep (OWASP ruleset), Bandit, Ruff and PMD on the changed files, and every security
+claim has to cite a tool finding or code context. ADR 0011 already drops a security comment whose
+verdict cites no evidence. The tools supply that evidence.
 
-The tuned reviewer is weak at security. On a test commit that added an SQL f-string, `shell=True`,
-`pickle.loads` and MD5 password hashing, `prism-reviewer:v2` commented on none of them. Bandit
-found all four.
+The tuned reviewer is weak at security. On a test commit that added an SQL f-string,
+`shell=True`, `pickle.loads` and MD5 password hashing, `prism-reviewer:v2` commented on none of
+them. Bandit found all four.
 
 ## Decision
 
@@ -44,11 +44,11 @@ while the reviewer model does.
 - A security hunk the gate or the budget leaves out gets no SAST comment either, even with a high
   severity finding. Security-looking hunks already skip the gate (ADR 0010), so this matters only
   when the budget runs out.
-- The first real run (the test commit above) went from 2 model comments to 6 verifier requests
-  after one-per-line deduplication (9 before it).
+- On the test commit above, the review went from 2 model comments to 6 verifier requests after
+  one-per-line deduplication (9 before it).
 - Semgrep needs network access the first time it fetches a registry ruleset. For offline use,
   point `PRISM_SEMGREP_CONFIG` at a local rules file.
-- PMD 7.29.0 ships only as the full multi-language bundle (135 MB zip). On the build machine
-  it runs the `quickstart` ruleset on one Java file in about 4 s. It reports resource leaks,
-  empty catch blocks and unchecked results, but not SQL built by string concatenation; Semgrep's
-  OWASP rules cover that for Java.
+- PMD 7.29.0 ships only as the full multi-language bundle (135 MB zip). On my machine it runs the
+  `quickstart` ruleset on one Java file in about 4 s. It reports resource leaks, empty catch
+  blocks and unchecked results, but not SQL built by string concatenation; Semgrep's OWASP rules
+  cover that for Java.

@@ -4,7 +4,7 @@ Up front, from the plan:
 
 * `security`: the hunk's path or added code looks security-sensitive (the planner's check,
   ADR 0010, which includes prompt-injection text). The tuned 3B model found none of the four
-  security bugs in the Phase 5 test commit, so it is not asked.
+  security bugs in my test commit, so it is not asked.
 * `large`: the hunk changes at least `min_lines` lines. The reviewer was trained on short hunks
   and writes one comment; a big hunk needs more than that.
 

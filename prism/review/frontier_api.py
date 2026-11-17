@@ -8,7 +8,7 @@ It sends the same rubric and the same requests the handoff writes, a batch at a 
 back the same JSON lines a Claude session would write into `verdicts_NN.jsonl` or
 `reviews_NN.jsonl`. So the two backends are interchangeable and the rubric is the one prompt.
 
-PLAN.md named LiteLLM for this. Routing lives in `prism.review.router` now, and the only
+I first planned LiteLLM for this. Routing lives in `prism.review.router` now, and the only
 frontier model is Claude, so the official SDK is used directly.
 """
 

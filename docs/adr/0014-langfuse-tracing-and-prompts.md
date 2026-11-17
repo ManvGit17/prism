@@ -1,14 +1,14 @@
 # ADR 0014: Self-hosted Langfuse for traces and prompts
 
-Date: 2026-11-14. Status: accepted.
+Status: accepted.
 
 ## Context
 
-PLAN.md Phase 5 asks for a Langfuse trace per PR with nested spans per file and hunk, tagged with
-the repo, PR and model, and for every prompt to come from Langfuse prompt management with
-`production` and `staging` labels. The user chose to self-host Langfuse rather than send diffs to
-Langfuse Cloud. Langfuse is at major version 4 now: web, worker, ClickHouse, S3-compatible storage,
-Redis and Postgres; the Python SDK (4.15) is built on OpenTelemetry.
+I want a Langfuse trace per PR with nested spans per file and hunk, tagged with the repo, PR and
+model, and every prompt served from Langfuse prompt management with `production` and `staging`
+labels. I chose to self-host Langfuse rather than send diffs to Langfuse Cloud. Langfuse is at
+major version 4: web, worker, ClickHouse, S3-compatible storage, Redis and Postgres; the Python
+SDK (4.15) is built on OpenTelemetry.
 
 ## Decision
 
@@ -49,12 +49,14 @@ over a prompt. The reviewer's prompt is the one the model was fine-tuned on and 
 into its Modelfile: serving another text to it is allowed (that is how a staging prompt gets
 tried on the base model) but logged as a warning.
 
-**Checked against the running server.** Three traced reviews: the `review` trace for the
+## Results
+
+I checked this against the running server with three traced reviews. The `review` trace for the
 c8ac930 diff has 19 observations: the five file spans and the SAST tool start within 3 ms of
 each other, the nine generations sit under their files with `model=prism-reviewer:v2` and
 `promptName=prism-reviewer-system` v1, the first four generations waited 0 s for a slot and the
-next four 8 to 15 s (the concurrency limit of 4 at work), and the tags read back as above. Read
-through `GET /api/public/v2/observations`; v4's older trace endpoints are switched off in its
+next four 8 to 15 s (the concurrency limit of 4 at work), and the tags read back as above. I read
+them through `GET /api/public/v2/observations`; v4's older trace endpoints are switched off in its
 events-only mode.
 
 ## Consequences

@@ -52,7 +52,7 @@ sast = [
     "bandit>=1.9.4",
     "semgrep>=1.185.0",
 ]
-# Gate classifier training (Phase 3). Not installed by `uv sync` or CI: use
+# Gate classifier training. Not installed by `uv sync` or CI: use
 # `uv sync --group training`. Serving the gate needs only onnxruntime and tokenizers.
 training = [
     "accelerate>=1.0",

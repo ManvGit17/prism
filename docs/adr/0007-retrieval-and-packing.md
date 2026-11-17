@@ -1,13 +1,13 @@
 # ADR 0007: Retrieval, reranking and packing of review context
 
-Date: 2026-11-11. Status: accepted.
+Status: accepted.
 
 ## Context
 
 For each changed hunk, the verifier (and the frontier model on escalated hunks) gets code from
 the rest of the repository to confirm or reject a review comment. The fine-tuned reviewer is
-served the hunk alone (PLAN.md section 2b). The context has to fit a small local model's prompt,
-so what goes in, in which order, and how it is counted matter more than how much is found.
+served the hunk alone (ADR 0009). The context has to fit a small local model's prompt, so what
+goes in, in which order, and how it is counted matter more than how much is found.
 
 ## Decision
 
@@ -33,21 +33,21 @@ only), and files without a parser are `non_code` (no context). Binary files are 
 | class_test | tests of S's class, only when S has no direct test; best 3 kept | 8 |
 | similar | functions most similar to the hunk (vector search), outside the changed files and not already found | 9 |
 
-The plan fixed signature > tests > callers > similar. Contract sits next to the signature because
-it is short and states what S must keep doing. Implementations sit after callers because a change
-to an interface method reaches them the same way it reaches callers. Class context and callees
-come after: they explain S but show less of the change's impact, and on the bench repos a class
-summary of a large utility class pushed every caller out of the budget when it ranked higher.
-CALLS and TESTS edges below `PRISM_CALL_CONFIDENCE_THRESHOLD` are left out (ADR 0004).
+The base order is signature > tests > callers > similar. Contract sits next to the signature
+because it is short and states what S must keep doing. Implementations sit after callers because
+a change to an interface method reaches them the same way it reaches callers. Class context and
+callees come after: they explain S but show less of the change's impact, and on the bench repos a
+class summary of a large utility class pushed every caller out of the budget when it ranked
+higher. CALLS and TESTS edges below `PRISM_CALL_CONFIDENCE_THRESHOLD` are left out (ADR 0004).
 
 **Rerank.** Items are scored against a query made of the changed symbols' signatures and the hunk
 as the head reads it. The score orders items **within** a priority class; it never moves an item
 across classes, because the priority encodes what the verifier needs first and the reranker is
 not trained on code. The reranker is a cross-encoder, `Xenova/ms-marco-MiniLM-L-6-v2`, run with
 ONNX Runtime through `fastembed` 0.9.1 (`TextCrossEncoder`). No torch. Installing fastembed added
-124 MB to the virtualenv on this machine; the model is 87.5 MB in `PRISM_MODEL_CACHE_DIR`
-(default `~/.cache/prism`), downloaded once. fastembed lists it at 0.08 GB. Tests use a
-deterministic word-overlap reranker; `--reranker none` keeps collection order.
+124 MB to the virtualenv; the model is 87.5 MB in `PRISM_MODEL_CACHE_DIR` (default
+`~/.cache/prism`), downloaded once. fastembed lists it at 0.08 GB. Tests use a deterministic
+word-overlap reranker; `--reranker none` keeps collection order.
 
 **Budget.** `PRISM_CONTEXT_BUDGET_TOKENS` (default 1500) per hunk, covering the whole rendered
 block: wrapper, item headers, reasons and code. Items are taken in priority order, then score,
@@ -80,14 +80,15 @@ collectors on or off, so all modes share the reranker, budget and packer. Signat
 and class items count as graph context, so `none` and `vector` carry no copy of the changed
 symbol beyond the hunk itself.
 
-## Not done, on purpose
+## Consequences and limits
 
-- No budget across hunks or per PR; a PR with many hunks gets many full blocks. The review
-  budget of Phase 5 decides how many hunks are reviewed.
-- No deduplication across hunks: two hunks in one function each get that function's context.
-- No summarising of long items by a model; long items are cut by lines.
-- The reranker is a web-passage model, not a code model. It was checked on a handful of examples
-  only; Phase 7 should measure whether reranking helps at all against `--reranker none`.
+- There is no budget across hunks or per PR; a PR with many hunks gets many full blocks. The
+  review budget (ADR 0010) decides how many hunks are reviewed.
+- There is no deduplication across hunks: two hunks in one function each get that function's
+  context.
+- Long items are cut by lines, not summarised by a model.
+- The reranker is a web-passage model, not a code model. I checked it on a handful of examples
+  only. Whether reranking helps at all against `--reranker none` is not yet measured.
 - A deleted symbol's own code is not shown (the hunk shows it); only its callers and tests are.
 - Module-level hunks get no graph context.
 - `--store memory` builds the base from the head tree, so deleted or renamed symbols have no base

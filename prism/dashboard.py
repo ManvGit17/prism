@@ -1,4 +1,4 @@
-"""The dashboard's JSON API and the built page (PLAN.md Phase 6, ADR 0020).
+"""The dashboard's JSON API and the built page (ADR 0020).
 
     prism dashboard --port 8090     ->  http://127.0.0.1:8090
 

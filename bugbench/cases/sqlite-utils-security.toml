@@ -1,4 +1,4 @@
-# Hand-written security cases for sqlite-utils (PLAN.md lists SQL string concatenation as a
+# Hand-written security cases for sqlite-utils (SQL string concatenation is a
 # defect kind). Each takes a query a commit added with bound parameters and pastes the values
 # into the SQL text instead. They are written by hand, not test-checked: the repo's tests do not
 # exercise hostile names, and at these three commits some tests already fail in the benchmark's

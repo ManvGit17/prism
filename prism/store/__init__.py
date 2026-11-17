@@ -1,4 +1,4 @@
-"""Graph and vector stores behind one interface (PLAN.md Phase 1, revision 3 item 3)."""
+"""Graph and vector stores behind one interface."""
 
 from prism.store.base import (
     GraphReader,

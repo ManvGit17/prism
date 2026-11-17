@@ -1,6 +1,6 @@
 # Indexer check on real repos
 
-Run on 2026-11-11 for the Phase 1 "done when". Both repos were shallow clones, indexed with
+A check of the indexer on two real repositories. Both repos were shallow clones, indexed with
 `uv run prism index <path> --repo-id <name> --no-embed` into Neo4j. The counts below are from
 Cypher count queries on Neo4j afterwards, and they matched the in-memory index exactly.
 

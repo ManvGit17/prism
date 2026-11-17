@@ -1,12 +1,12 @@
 # ADR 0015: Reviews are stored with every decision
 
-Date: 2026-11-14. Status: accepted.
+Status: accepted.
 
 ## Context
 
-Phase 6 adds three readers of past reviews: the MCP tools `explain_finding` and `review_history`,
-the GitHub App (which posts a review after its verification is answered, ADR 0011) and the
-dashboard. Until now a review existed only as the JSON `prism review` printed.
+Three components read past reviews: the MCP tools `explain_finding` and `review_history`, the
+GitHub App (which posts a review after its verification is answered, ADR 0011) and the
+dashboard. Without storage, a review would exist only as the JSON `prism review` prints.
 
 ## Decision
 
@@ -20,7 +20,7 @@ Dropped comments are kept on purpose: "why did PRism say nothing about this line
 A review is keyed by `repo#pr#head_sha#diff_hash` (`local` for a diff with no PR). Saving the same
 key replaces the review and its findings, so a handoff review that stops as
 `awaiting_verification` and then finishes as `complete` ends as one row. That key is also the
-queue's idempotency key in a later stage.
+queue's idempotency key.
 
 `prism review` saves by default (`PRISM_REVIEW_STORE=postgres`, `--no-save`); when Postgres is
 down it prints a note and the review still finishes. `InMemoryReviewStore` and

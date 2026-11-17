@@ -4,7 +4,7 @@
 raw reply text. `review_hunk` parses it, retries a reply that is not the JSON asked for, and gives
 up after `retries` more tries. Every model call in a review shares one `asyncio.Semaphore` sized
 by PRISM_MODEL_CONCURRENCY: Ollama only runs as many requests as it has parallel slots, so more
-in flight would only queue there (PLAN.md Phase 5, review budget).
+in flight would only queue there.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class OllamaReviewer:
         self._client = httpx.AsyncClient(timeout=timeout_s)
 
     async def reply(self, hunk: str, attempt: int) -> str:
-        # Greedy, as in training and the Phase 4 eval; a retry samples a little so it can differ.
+        # Greedy, as in training and its evaluation; a retry samples a little so it can differ.
         options: dict[str, float | int] = {"temperature": 0.0 if attempt == 0 else 0.4}
         if attempt:
             options["seed"] = attempt

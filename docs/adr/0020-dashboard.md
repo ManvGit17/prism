@@ -1,12 +1,12 @@
 # ADR 0020: A small, read-only dashboard
 
-Date: 2026-11-15. Status: accepted.
+Status: accepted.
 
 ## Context
 
-PLAN.md Phase 6 asks for a React dashboard: the PR list, comments with their accept rate, cost and
-latency per PR, the model routing mix and the eval reports. Everything it needs is already in the
-review store (ADR 0015) and its feedback (ADR 0019).
+PRism needs a React dashboard: the PR list, comments with their accept rate, cost and latency per
+PR, the model routing mix and the eval reports. Everything it needs is already in the review
+store (ADR 0015) and its feedback (ADR 0019).
 
 ## Decision
 

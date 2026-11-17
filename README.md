@@ -9,7 +9,7 @@ gate classifier, a fine-tuned reviewer model ([results](eval/reports/sft.md)), t
 pipeline with static analysis, a Claude verifier and tracing
 ([what it does on real diffs](eval/reports/review_pipeline.md)), and around it a GitHub App on a
 Celery queue, an MCP server for Claude Code, feedback from reactions into Langfuse and a
-dashboard. No benchmark yet (Phase 7). The plan is in [PLAN.md](PLAN.md).
+dashboard. No benchmark yet. The plan is in [PLAN.md](PLAN.md).
 
 ## Run the services
 

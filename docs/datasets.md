@@ -8,7 +8,7 @@ Licence: CC BY 4.0.
 | Archive | Download size | Status |
 |---|---|---|
 | `Comment_Generation.zip` | 847 MB | Downloaded and inspected 2026-11-11 |
-| `Diff_Quality_Estimation.zip` | 2.8 GB | Downloaded and inspected 2026-11-12 (used in Phase 3) |
+| `Diff_Quality_Estimation.zip` | 2.8 GB | Used for the gate classifier |
 | `Code_Refinement.zip` | 1.2 GB | Not needed |
 
 Files live in `data/codereviewer/`, which is git-ignored.
@@ -40,7 +40,7 @@ Fields:
 
 1. **There is no line number, and it cannot be read off the hunk.** A row is a whole diff hunk
    (ending in its trailing context lines) and a comment that can be about any line in it. The
-   guess that the hunk is cut at the commented line was checked in Phase 4 and is wrong. On the
+   guess that the hunk is cut at the commented line was checked during reviewer training and is wrong. On the
    valid split (`eval/comment_line_check.py`), the comment shares identifiers with exactly one
    changed line in 30% of rows, ties between several in 20%, and shares none in 51%; 10% of hunks
    have a single changed line. So the reviewer is trained to write the comment only, and the line
@@ -49,12 +49,12 @@ Fields:
    hunk and comment only means dropping `oldf`, which brings the data down to something a Colab
    session handles easily.
 3. **There is file context after all.** The plan says the dataset has no repository context. That
-   is true for callers, callees and tests, but the old file is there. Phase 7 could use it for a
+   is true for callers, callees and tests, but the old file is there. An evaluation could use it for a
    "hunk plus surrounding file" variant.
 4. **Train has no `lang` or `proj`.** Filtering train to Python and Java would need language
    detection from the code. Valid and test can be filtered directly.
 5. `y` is 1 in all 10,319 valid rows: every row here is a hunk that got a comment. It is not used.
-6. **Cleaning (Phase 4, `training/sft/format.py`).** Of 117,739 train rows, 8,439 are exact
+6. **Cleaning (`training/sft/format.py`).** Of 117,739 train rows, 8,439 are exact
    duplicates (same hunk and comment), 226 have comments over 120 words, 26 hunks are over 4,000
    characters and 20 comments are mostly non-ASCII; 109,028 are left. No comment is under 3 words
    and no train hunk also appears in valid or test, so those filters removed nothing.
@@ -122,7 +122,7 @@ Token length of `patch`:
    possible for the positives.
 3. **The data is balanced 50/50, real pull requests are not.** Precision and the share filtered on
    this test split do not carry over to real traffic, where hunks with a comment are rarer. Recall
-   does carry over to hunks like these. Phase 7 has to measure the gate on the bench PRs.
+   does carry over to hunks like these. BugBench measures the gate on real PRs (see the gate ablation).
 4. **Train hunks are much longer than valid and test hunks.** A quarter of train hunks are over 512
    tokens (99th percentile above 5,000), against about 10% in valid and test (99th percentile about
    1,000). Why is not known; it may be a length filter applied to valid and test only. The model is

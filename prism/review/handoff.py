@@ -9,8 +9,8 @@ Claude does two jobs, each with its own rubric:
   suggested fix where one is clear.
 
 A backend answers batches of requests. `HandoffBackend` writes them to files for a Claude
-session to answer (there is no API key on the build machine; the Phase 4 judge worked the same
-way); `prism.review.frontier_api.ApiBackend` calls a model through LiteLLM.
+session to answer (there is no API key on the build machine; the reviewer-training judge
+worked the same way); `prism.review.frontier_api.ApiBackend` calls a model through LiteLLM.
 
 With the handoff, `prism review --work DIR` stops with exit code 2 while answers are missing:
 
@@ -540,7 +540,7 @@ class ClaudeVerifier:
         self.backend = backend
         self.rubric = rubric
         self.review_rubric = review_rubric
-        # The whole-PR view (Phase 7 ablation): the hunks routed up front go to Claude as one
+        # The whole-PR view: the hunks routed up front go to Claude as one
         # request per PR instead of one per hunk. Second-round escalations stay per hunk.
         self.whole_pr = whole_pr
         self.min_confidence = min_confidence

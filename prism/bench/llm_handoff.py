@@ -1,4 +1,4 @@
-"""An OpenAI-compatible chat endpoint whose answers come from a Claude handoff (Phase 7 baseline).
+"""An OpenAI-compatible chat endpoint whose answers come from a Claude handoff (the baseline).
 
 A third-party reviewer (PR-Agent) calls `/v1/chat/completions` as if it were a model. A prompt
 seen before gets its stored answer back. A new prompt is saved as pending and the call fails

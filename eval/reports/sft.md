@@ -1,6 +1,6 @@
 # Reviewer fine-tuning: base vs tuned
 
-Phase 4. QLoRA on Qwen2.5-Coder-3B-Instruct with CodeReviewer comment generation, two runs on
+QLoRA on Qwen2.5-Coder-3B-Instruct with CodeReviewer comment generation, two runs on
 Kaggle, compared with the untuned model on the same 500 held-out test hunks.
 
 **Short version.** The first run lost to the base model with a blinded judge. Its training data
@@ -151,8 +151,9 @@ v1 and v2 are the same architecture and size, so they should run at the same spe
 setting measured 57 hunks/min one evening and 25 the next morning: on this laptop the
 measurement moves by a factor of two between sessions (power and heat, other programs). What
 holds in every run: one request at a time gives about 20 hunks/min at about 3 s each, and 4 in
-flight is never slower than 2, at the cost of longer waits per hunk. So Phase 5 should start with
-a concurrency limit of 4 on a server with 4 slots, and measure again on the machine it runs on.
+flight is never slower than 2, at the cost of longer waits per hunk. So the review pipeline
+starts with a concurrency limit of 4 on a server with 4 slots; measure again on the machine it
+runs on.
 
 ## Kaggle vs Ollama
 
@@ -176,16 +177,16 @@ scored separately.
 should use it. The tuned 3B weights are not published until the Qwen research licence is
 checked (ADR 0003).
 
-## What did not work, and what might
+## What I tried that did not help, and why
 
 - Fine-tuning on CodeReviewer did not teach the model to find more real problems. It changed
-  how comments are phrased. Usefulness on real pull requests is Phase 7's question, with
+  how comments are phrased. Usefulness on real pull requests is what BugBench measures, with
   repository context and the verifier in the loop.
 - The data filter is what moved the result, from a loss to a tie.
 - The "I think" habit and the lack of questions come from greedy decoding picking the most likely
   opener every time. Sampling with a moderate temperature would spread the openers out, but
-  then the same hunk gets a different comment each run, and it was not tested here. DPO
-  (PLAN.md, stretch) is the other way to change it. Not tried.
+  then the same hunk gets a different comment each run, so I kept greedy decoding. DPO is
+  another way to change it.
 - 1.5B was not trained; the quota went to the second 3B run.
 
 ## Reproduce

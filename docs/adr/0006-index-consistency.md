@@ -1,6 +1,6 @@
 # ADR 0006: Base graph, PR overlays and the index-run ledger
 
-Date: 2026-11-11. Status: accepted.
+Status: accepted.
 
 ## Context
 
@@ -29,7 +29,7 @@ heartbeat and finish times. A run is inserted as running, writes Neo4j, then pgv
 marked complete. Any error marks it failed. Readers use `latest_complete_run(repo_id)`.
 
 **One run per repo at a time.** A unique partial index on `index_runs (repo_id) WHERE status =
-'running'` refuses a second running row. We chose this over a Postgres advisory lock because the
+'running'` refuses a second running row. I chose this over a Postgres advisory lock because the
 row is both the lock and the record: any process can see it with a plain query, it survives
 connection pooling, and it needs no session held open for the length of a run. The cost is that
 a crashed run leaves its row behind, which the heartbeat handles.
@@ -41,16 +41,16 @@ did not complete becomes a full index, since a crashed run may have left the gra
 
 **A review waits while its repo is being indexed.** Neo4j is updated in place, so the ledger
 alone does not give a reader a consistent snapshot. A reader in the middle of an update could
-see a file's new nodes with another file's old edges. Phase 5's review task calls
+see a file's new nodes with another file's old edges. The review task calls
 `raise_if_indexing(ledger, repo_id)` first and retries on `IndexInProgress`. A stale run does
 not block reviews; `needs_full_index` tells the caller to schedule a full index instead.
 
 ## Alternative: tag nodes with a run id
 
 Each run could write new nodes and edges tagged with its run id, and readers would filter on the
-latest complete run. Old runs would be deleted afterwards. Readers would then never wait. We did
-not do this now: every query needs the extra filter, a run briefly doubles the graph, and
-garbage collection becomes a job of its own. If reviews wait too often, this is the next step.
+latest complete run. Old runs would be deleted afterwards. Readers would then never wait. I did
+not do this: every query needs the extra filter, a run briefly doubles the graph, and garbage
+collection becomes a job of its own. If reviews wait too often, this is the next step.
 
 ## Known approximation
 

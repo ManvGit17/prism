@@ -1,4 +1,4 @@
-# BugBench early slice (PLAN.md Phase 7): 10 real TinyDB commits, each with one planted defect.
+# A small BugBench smoke set: 10 real TinyDB commits, each with one planted defect.
 #
 # A case's pull request is the whole commit (source, tests, docs) with `find` replaced by
 # `replace` in `path` at that commit. `find` must occur exactly once. The defect's line is the

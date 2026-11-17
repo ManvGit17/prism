@@ -1,4 +1,4 @@
-"""The review graph in LangGraph (PLAN.md Phase 5, ADR 0010).
+"""The review graph in LangGraph (ADR 0010).
 
     planner ─► Send() per file ─► file_reviewer ─┐
             └► Send() once ─────► sast ───────────┴► context ─► verifier ─► aggregator
