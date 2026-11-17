@@ -1,7 +1,8 @@
 # The BugBench configurations measured on the full benchmark. `make eval-bugbench` runs them
 # (from cached answers where they exist), judges every posted comment, sweeps the threshold
 # where `sweep = true`, and writes the report. Any other setting (`prism bench run` options, the
-# `PRISM_*` settings) can be added as one more [[run]] with its own run folder.
+# `PRISM_*` settings) can be added as one more [[run]] with its own run folder, and PR-Agent
+# as a run with kind = "pr-agent" (see ADR 0022).
 
 cases = ["bugbench/cases/*.toml"]
 exclude = ["bugbench/cases/tinydb-slice.toml"]
@@ -16,13 +17,6 @@ name = "PRism"
 run = "bb-prism"
 seed = ["mid-01"]
 sweep = true
-
-[[run]]
-name = "PR-Agent"
-run = "bb-pr-agent"
-kind = "pr-agent"
-seed = ["pra-01"]
-worktrees = "worktrees-pr-agent"
 
 [[run]]
 name = "Whole PR to Claude"
