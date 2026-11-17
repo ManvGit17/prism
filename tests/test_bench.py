@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 from review_fakes import hunk_diff, task_for
@@ -463,7 +464,7 @@ def test_judge_keys_comments_by_content_and_scores_runs() -> None:
     (p,) = posted(prism_row)
     (q,) = posted(agent_row)
     assert p.key == q.key, "the same comment from two runs is judged once"
-    verdicts = {
+    verdicts: dict[str, dict[str, Any]] = {
         p.key: {"valid": True, "names_defect": True},
         posted(clean_row)[0].key: {"valid": False, "names_defect": None},
     }
