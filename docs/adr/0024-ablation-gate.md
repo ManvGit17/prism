@@ -1,12 +1,15 @@
 # ADR 0024: Ablation, the gate off
 
-Date: 2026-11-16. Status: accepted.
+Status: accepted.
+
+This ablation was measured on the first 83 pull requests of BugBench (57 planted bugs, 10 real
+bugs, 16 clean PRs), before the benchmark was grown.
 
 ## Context
 
 The Claude-only ablation (ADR 0023) found that 3 of its misses were hunks that never reached a
-model: the CodeBERT gate (ADR 0008) skipped them, or the 40-hunk budget did. PLAN.md asks what
-the gate saves against what it costs in recall, and says a small saving is a valid result.
+model: the CodeBERT gate (ADR 0008) skipped them, or the 40-hunk budget did. The question is what
+the gate saves against what it costs in recall; a small saving is a valid answer.
 
 ## Decision
 
@@ -16,7 +19,13 @@ reused wherever the request is the same, so only the hunks the gate used to skip
 and only their comments were sent to Claude. Wall-clock time on a rerun from cache says nothing,
 so the saving is counted in work: hunks sent to the local model, and requests sent to Claude.
 
-## Result (eval/reports/bugbench_ablation_gate.md)
+I found that Bandit was missing from the virtualenv when `mid-01` ran and present for
+`gate-off-01`, so this run also had 3 Bandit findings in sqlite-utils that `mid-01` did not. It
+did not change any posted comment (see ADR 0026).
+
+## Results
+
+Report: `eval/reports/bugbench_ablation_gate.md`.
 
 | | Gate on | Gate off |
 |---|---|---|
@@ -29,10 +38,6 @@ so the saving is counted in work: hunks sent to the local model, and requests se
 
 The two extra hits (aiosqlite-i11, sqlite-utils-i04) are both hunks the gate scored below its
 threshold. Nothing found with the gate on was lost with it off, and no clean PR got a comment.
-
-Found later (ADR 0026): Bandit was missing from the virtualenv when `mid-01` ran and present for
-`gate-off-01`, so this run also had 3 Bandit findings in sqlite-utils that `mid-01` did not.
-None of them changed a posted comment; the result above stands.
 
 ## Consequences
 

@@ -1,13 +1,16 @@
 # ADR 0023: Ablation, Claude reviews every hunk
 
-Date: 2026-11-15. Status: accepted.
+Status: accepted.
+
+This ablation, like ADRs 0024 to 0026, was measured on the first 83 pull requests of BugBench (57
+planted bugs, 10 real bugs, 16 clean PRs), before the benchmark was grown.
 
 ## Context
 
 The PR-Agent baseline (ADR 0022) found 54 of 57 planted bugs to PRism's 48, with the same model
 (Sonnet) behind both. The obvious suspect was PRism's local reviewer: Claude mostly sees what
-`prism-reviewer:v2` said, and only looks at a hunk itself when the verifier escalates it. The
-first ablation tests that directly.
+`prism-reviewer:v2` said, and only looks at a hunk itself when the verifier escalates it. This
+ablation tests that directly.
 
 ## Decision
 
@@ -20,7 +23,9 @@ and 29 SAST comments verified, in one handoff round of 20 Sonnet subagents.
 Because the answers are cached per case, the threshold can be re-scored for free:
 `claude-only-01-conf03` is the same answers with `PRISM_VERIFIER_MIN_CONFIDENCE=0.3`.
 
-## Result (eval/reports/bugbench_ablation_claude_only.md)
+## Results
+
+Report: `eval/reports/bugbench_ablation_claude_only.md`.
 
 | | PRism | Claude-only | Claude-only, conf 0.3 | PR-Agent |
 |---|---|---|---|---|
@@ -44,9 +49,8 @@ real issues PR-Agent raised there, one is a PMD unused-variable note.
 
 * The fine-tuned reviewer is not what costs PRism recall; the pipeline around the model is: what
   reaches it (gate, budget), how it sees the change (one hunk at a time), and how much it must be
-  sure of to post. That is where the next changes go, and the remaining ablations (gate off,
-  context modes, threshold) should be read in that light.
-* It also means that, on this benchmark, the local reviewer is close to a free first pass: PRism
-  with it is within one bug of Claude reviewing every hunk, while Claude reads less.
+  sure of to post. The other ablations (gate off, context modes, threshold) test exactly those.
+* On this benchmark the local reviewer is close to a free first pass: PRism with it is within
+  one bug of Claude reviewing every hunk, while Claude reads less.
 * The ±3 window undercounts call-site comments (one case here, three across all runs). A judge
-  that asks "does this comment name the planted bug" would fix that; it is still to do.
+  that asks "does this comment name the planted bug" would fix that; it is not built yet.

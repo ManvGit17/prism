@@ -1,13 +1,16 @@
 # ADR 0026: The confidence threshold sweep
 
-Date: 2026-11-17. Status: accepted.
+Status: accepted.
+
+This sweep was measured on the first 83 pull requests of BugBench (57 planted bugs, 10 real bugs,
+16 clean PRs), before the benchmark was grown.
 
 ## Context
 
 `PRISM_VERIFIER_MIN_CONFIDENCE` (0.6) decides which of Claude's verdicts and comments are
 posted. The Claude-only and whole-PR ablations (ADRs 0023, 0025) both found that many misses were
-bugs Claude named below 0.6, and re-scoring at 0.3 changed the picture. PLAN.md asks for the
-threshold as an ablation of its own.
+bugs Claude named below 0.6, and re-scoring at 0.3 changed the picture. The threshold deserves an
+ablation of its own.
 
 The threshold has a second job in PRism: a local comment Claude keeps below it sends its hunk
 back to Claude for a review of its own (ADR 0013). So a new threshold can ask Claude new
@@ -25,11 +28,14 @@ main run (`mid-01`), Claude-only and whole-PR. No new Claude work.
 Each sweep reproduces its run's own result at 0.6, case by case, and the earlier 0.3 re-runs
 (`claude-only-01-conf03`, `whole-pr-01-conf03`) at 0.3.
 
-Bandit was missing from the virtualenv when `mid-01` and `claude-only-01` ran, so those two were
-swept with `PRISM_SAST_TOOLS=semgrep,ruff,pmd` to match. The bench summary now records which SAST
-tools actually ran (`sast_ran`), so a missing tool shows up.
+I found that Bandit was missing from the virtualenv when `mid-01` and `claude-only-01` ran; it
+did not change their posted comments. Those two were swept with
+`PRISM_SAST_TOOLS=semgrep,ruff,pmd` to match. The bench summary records which SAST tools
+actually ran (`sast_ran`), so a missing tool shows up.
 
-## Result (eval/reports/bugbench_threshold_sweep.md)
+## Results
+
+Report: `eval/reports/bugbench_threshold_sweep.md`.
 
 Injected recall / real-bug recall / clean PRs with any comment:
 
@@ -60,10 +66,10 @@ Injected recall / real-bug recall / clean PRs with any comment:
 
 ## Consequences
 
-* On this benchmark, 0.4 is a better default for PRism than 0.6. The default is not changed
-  here: 16 clean PRs is too few to set a false-positive rate, and the threshold was chosen on the
-  same cases it is measured on. It should be confirmed when the set grows to 150/30/30, with a
-  judge for whether the extra comments are useful.
+* On this benchmark, 0.4 is a better default for PRism than 0.6. I have not changed the default:
+  16 clean PRs is too few to set a false-positive rate, and the threshold was chosen on the same
+  cases it is measured on. It should be confirmed when the set grows to 150/30/30, with a judge
+  for whether the extra comments are useful.
 * The threshold and the view interact: the whole-PR view at 0.4 is the best configuration
   measured so far (52/57, 9/10, 2/16 clean), against PR-Agent's 54/57, 8/10 and 2/16.
 * A sweep is cheap only because answers are cached by what was asked. Sweeping above the run's

@@ -1,6 +1,9 @@
 # ADR 0025: Ablation, the whole-PR view
 
-Date: 2026-11-16. Status: accepted.
+Status: accepted.
+
+This ablation was measured on the first 83 pull requests of BugBench (57 planted bugs, 10 real
+bugs, 16 clean PRs), before the benchmark was grown.
 
 ## Context
 
@@ -13,21 +16,25 @@ one prompt, and PRism shows Claude one hunk per request, with the code retrieved
 
 `PRISM_REVIEW_UNIT=pr`, used with `PRISM_ROUTE_ALL=true`, puts every hunk routed up front into one
 request per PR, grouped by file, each hunk with the same retrieved context and tool findings as
-before. A new rubric (`PR_RUBRIC.md`) asks Claude to read the whole request before writing, and
-each comment names its `path` as well as its line. Comments are then placed on the hunk that
+before. A separate rubric (`PR_RUBRIC.md`) asks Claude to read the whole request before writing,
+and each comment names its `path` as well as its line. Comments are then placed on the hunk that
 shows their line and go through the same checks as before: line in the diff, not vague, not a
 duplicate, at most 3 per hunk, the confidence threshold and the evidence rule for security. A
 comment on a file or line the PR does not show is dropped.
 
 Everything else is as in `claude-only-01`: the gate, the 40-hunk budget, SAST, graph context and
 the 0.6 threshold. The run (`whole-pr-01`) was seeded from a copy of `claude-only-01`, so the SAST
-verdicts were reused. One difference crept in: Bandit was missing from the virtualenv when
-`mid-01` and `claude-only-01` ran (PRism skips a SAST tool it cannot find), and was installed
-before `gate-off-01`. Here it raised 3 SQL-string findings in sqlite-utils, which were verified
-fresh. None changed a posted comment: in those 3 PRs both runs posted the same comments.
-As for ADR 0023, the same answers were re-scored at confidence 0.3 (`whole-pr-01-conf03`).
+verdicts were reused. As for ADR 0023, the same answers were re-scored at confidence 0.3
+(`whole-pr-01-conf03`).
 
-## Result (eval/reports/bugbench_ablation_whole_pr.md)
+I found that Bandit was missing from the virtualenv when `mid-01` and `claude-only-01` ran (PRism
+skips a SAST tool it cannot find), and was installed before `gate-off-01`. In this run it raised
+3 SQL-string findings in sqlite-utils, which were verified fresh. It did not change any posted
+comment: in those 3 PRs both runs posted the same comments.
+
+## Results
+
+Report: `eval/reports/bugbench_ablation_whole_pr.md`.
 
 | | Claude-only | Whole PR | Claude-only, conf 0.3 | Whole PR, conf 0.3 | PR-Agent |
 |---|---|---|---|---|---|
@@ -55,11 +62,12 @@ The whole-PR view did not make Claude say more. It made what it said land on the
   the first change in these ablations that moves recall by more than a case or two at no extra
   cost in comments.
 * Confidence is the other lever. In both views most of the remaining real-bug misses are named
-  below 0.6, and at 0.3 the false-positive cost on clean PRs is 2 of 16. A threshold ablation
-  across the views is the natural next step.
+  below 0.6, and at 0.3 the false-positive cost on clean PRs is 2 of 16. ADR 0026 sweeps the
+  threshold across the views.
 * The 5 planted bugs still missed at 0.3: 2 are hunks the gate skips (found with the gate off,
   ADR 0024), 1 is left out by the 40-hunk budget, and in 2 the defect's file was in the request
   and Claude wrote nothing.
-* This is not yet a production mode. One request per PR grows with the PR: the biggest request
-  here was 145 KB (an 11-file PR), and only the 40-hunk budget bounds it. For production use it needs a size
-  limit and a way to split a PR by file, both still to do. The default stays per hunk.
+* This is not a production mode yet. One request per PR grows with the PR: the biggest request
+  here was 145 KB (an 11-file PR), and only the 40-hunk budget bounds it. For production use it
+  needs a size limit and a way to split a PR by file, neither built yet. The default stays per
+  hunk.
