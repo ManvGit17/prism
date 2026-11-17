@@ -119,9 +119,12 @@ def ensure_clone(root: Path, cs: CaseSet) -> Path:
     return clone
 
 
-def materialize(root: Path, cs: CaseSet, case: Case) -> Materialized:
-    """A worktree at the case's commit with the defect planted (reused if already there)."""
-    wt = checkout(ensure_clone(root, cs), root / "worktrees" / case.id, case.commit)
+def materialize(root: Path, cs: CaseSet, case: Case, folder: str = "worktrees") -> Materialized:
+    """A worktree at the case's commit with the defect planted (reused if already there).
+
+    Runs that go on at the same time each use their own `folder`: a review resets and re-plants
+    its worktree, which must not happen under another run reading it."""
+    wt = checkout(ensure_clone(root, cs), root / folder / case.id, case.commit)
     lines = case.lines
     if case.group == "injected":
         target = wt / case.path

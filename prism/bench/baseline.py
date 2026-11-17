@@ -69,10 +69,10 @@ def branch_name(subject: str, commit: str) -> str:
     return f"{slug}-{commit[:7]}"
 
 
-def prepare(root: Path, cs: CaseSet, case: Any) -> tuple[Path, str]:
+def prepare(root: Path, cs: CaseSet, case: Any, folder: str = "worktrees") -> tuple[Path, str]:
     """The case's worktree on a branch named after the commit, the defect (if any) amended into
     that commit, and a base branch at the parent. Returns (worktree, base branch)."""
-    m = materialize(root, cs, case)
+    m = materialize(root, cs, case, folder)
     wt = m.checkout
     subject = git(wt, "log", "-1", "--format=%s", case.commit).strip()
     git(wt, "checkout", "-q", "-B", branch_name(subject, case.commit))
@@ -196,6 +196,7 @@ def run_baseline(
     exe: Path,
     notes: Callable[[str], None] = print,
     only: set[str] | None = None,
+    worktrees: str = "worktrees",
 ) -> BaselineRun:
     run_dir = root / "runs" / run
     store = HandoffStore(run_dir / "llm")
@@ -215,7 +216,7 @@ def run_baseline(
                 cfg.write_text(_config(url, case_dir), encoding="utf-8")
                 timing_path = case_dir / "timing.json"
                 timing = json.loads(timing_path.read_text("utf-8")) if timing_path.exists() else {}
-                wt, base = prepare(root, cs, case)
+                wt, base = prepare(root, cs, case, worktrees)
                 findings: list[Finding] = []
                 waiting = False
                 for tool in TOOLS:
@@ -240,7 +241,7 @@ def run_baseline(
         out.round_dir = export_round(store)
         return out
     for cs, case, findings, took in done:
-        lines = list(_defect_lines(root, cs, case))
+        lines = list(_defect_lines(root, cs, case, worktrees))
         hit = next((f for f in findings if hits(f, case.path, lines)), None) if lines else None
         out.results.append(
             BaselineResult(
@@ -269,10 +270,10 @@ def run_baseline(
     return out
 
 
-def _defect_lines(root: Path, cs: CaseSet, case: Any) -> tuple[int, ...]:
+def _defect_lines(root: Path, cs: CaseSet, case: Any, folder: str) -> tuple[int, ...]:
     if case.group == "clean":
         return ()
-    return materialize(root, cs, case).lines
+    return materialize(root, cs, case, folder).lines
 
 
 def _recall(rows: Sequence[BaselineResult]) -> dict[str, Any]:

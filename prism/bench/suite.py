@@ -42,6 +42,7 @@ class RunSpec:
     # Runs to take only the local model's cached replies from (same model and prompt, but
     # different Claude requests, as with another context mode).
     seed_replies: list[str] = field(default_factory=list)
+    worktrees: str = "worktrees"  # give runs that go on at the same time their own folder
     sweep: bool = False
 
 
@@ -139,11 +140,20 @@ async def run_suite(
         if seed(root, spec):
             notes(f"{spec.run}: seeded from {', '.join(spec.seed + spec.seed_replies)}")
         if spec.kind == "pr-agent":
-            got = run_baseline(sets, root, spec.run, pr_agent, notes=notes)
+            got = run_baseline(
+                sets, root, spec.run, pr_agent, notes=notes, worktrees=spec.worktrees
+            )
             if got.waiting and got.round_dir is not None:
                 waiting.append(got.round_dir)
             continue
-        cfg = RunConfig(root, spec.run, mode=spec.mode, verifier=spec.verifier, model=spec.model)
+        cfg = RunConfig(
+            root,
+            spec.run,
+            mode=spec.mode,
+            verifier=spec.verifier,
+            model=spec.model,
+            worktrees=spec.worktrees,
+        )
         result = await run_cases(sets, cfg, settings_for(base, suite, spec), notes=notes)
         if result.waiting and result.round_dir is not None:
             waiting.append(result.round_dir)

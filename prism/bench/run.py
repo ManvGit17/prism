@@ -40,6 +40,7 @@ class RunConfig:
     verifier: str = "handoff"
     model: str | None = None
     sast: bool = True
+    worktrees: str = "worktrees"  # folder under root for this run's checkouts
 
 
 @dataclass
@@ -191,7 +192,7 @@ async def review_case(
     cs: CaseSet, case: Case, cfg: RunConfig, settings: Settings, notes: Callable[[str], None]
 ) -> tuple[Materialized, ReviewOutcome, float]:
     """One case reviewed in its work dir under the run; the first run's time is kept."""
-    m = materialize(cfg.root, cs, case)
+    m = materialize(cfg.root, cs, case, cfg.worktrees)
     case_dir = cfg.root / "runs" / cfg.run / case.id
     timing = _timing(case_dir)
     started = time.monotonic()
