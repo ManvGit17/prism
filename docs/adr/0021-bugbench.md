@@ -58,7 +58,16 @@ all into `eval/reports/bugbench.md`.
 
 Report: `eval/reports/bugbench.md`. On all 198 pull requests:
 
-<!-- RESULTS-0021 -->
+| | PRism | PRism, whole PR to Claude |
+|---|---|---|
+| Planted bugs found | 115/139 | 124/139 |
+| Real bugs found | 17/30 | 18/30 |
+| Clean PRs with any comment | 0/29 | 1/29 |
+| Comments per buggy PR | 0.99 | 1.02 |
+
+The judge rated 162 of the 167 comments PRism posted (0.97) as true and useful, and found a
+comment naming the defect in 117 of the 139 planted-bug PRs and 17 of the 30 real ones. 23 of
+PRism's planted-bug finds came straight from the fine-tuned local reviewer.
 
 ## Consequences
 

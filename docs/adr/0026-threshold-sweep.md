@@ -66,10 +66,12 @@ Injected recall / real-bug recall / clean PRs with any comment:
 
 ## Consequences
 
-* On this benchmark, 0.4 is a better default for PRism than 0.6. I have not changed the default:
-  16 clean PRs is too few to set a false-positive rate, and the threshold was chosen on the same
-  cases it is measured on. It should be confirmed when the set grows to 150/30/30, with a judge
-  for whether the extra comments are useful.
+* On these 83 PRs, 0.4 looked like a better default than 0.6. I kept 0.6 until the bigger set
+  could confirm it, and it did not: on all 198 PRs (`eval/reports/bugbench.md`), 0.4 finds 118
+  planted and 19 real bugs against 115 and 17, but puts a comment on 1 of the 29 clean PRs,
+  where 0.6 puts none. For the whole-PR setup it is 125 and 23 against 124 and 18, with 5 clean
+  PRs flagged against 1. So 0.6 stays the default, and lowering it is a documented trade of
+  recall for comments on clean code.
 * The threshold and the view interact: the whole-PR view at 0.4 is the best configuration
   measured so far (52/57, 9/10, 2/16 clean), against PR-Agent's 54/57, 8/10 and 2/16.
 * A sweep is cheap only because answers are cached by what was asked. Sweeping above the run's

@@ -24,7 +24,9 @@ also judged: **162 of 167 (97%) are true, useful review comments**, and 117 of t
 are named in a comment, wherever it is placed. Of PRism's planted-bug finds, 23 came straight
 from the fine-tuned local model and the rest from Claude after the local pass and routing.
 
-<!-- SWEEP -->
+The confidence threshold decides which of Claude's comments get posted. At the default 0.6 PRism
+leaves every clean PR alone; lowering it to 0.4 finds 118 planted and 19 real bugs at the cost
+of one comment on a clean PR, so the default stays where it is.
 
 Against PR-Agent with the same model behind both (on the first 83 PRs), PR-Agent found a few
 more bugs, while PRism posted half as many comments, none on a clean PR, and sent the model
