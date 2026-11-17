@@ -1,4 +1,4 @@
-"""Index-run ledger in Postgres (PLAN.md Phase 1, "Two stores, one ledger"; ADR 0006).
+"""Index-run ledger in Postgres ("Two stores, one ledger"; ADR 0006).
 
 Neo4j and pgvector cannot share a transaction. An index run is recorded as
 running, both stores are written, then the run is marked complete. Readers use
@@ -164,7 +164,7 @@ class IndexLedger:
 
 def raise_if_indexing(ledger: IndexLedger, repo_id: str) -> None:
     """Raise IndexInProgress while the repo is being indexed. A review task calls this first
-    and retries on the exception (PLAN.md Phase 1, revision 3 item 4)."""
+    and retries on the exception."""
     run = ledger.running(repo_id)
     if run is not None:
         raise IndexInProgress(repo_id, run)

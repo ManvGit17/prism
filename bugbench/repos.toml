@@ -1,0 +1,46 @@
+# BugBench repositories (ADR 0021).
+#
+# `source` are the paths whose added lines may be mutated (minus `exclude`). `test` is the
+# command that decides whether a mutation is a real defect: it must pass at the commit and fail
+# with the mutation. Placeholders: {python} is the repo's test venv under <root>/envs/<name>,
+# {mvn} is PRISM_BENCH_MVN, {m2} is PRISM_BENCH_M2. Python tests run with the worktree on
+# PYTHONPATH, so the mutated code is what they import.
+
+[tinydb]
+url = "https://github.com/msiemens/tinydb.git"
+license = "MIT"
+language = "python"
+source = ["tinydb/"]
+exclude = []
+test = ["{python}", "-m", "pytest", "-q", "-x", "-o", "addopts=", "-p", "no:cacheprovider", "tests"]
+timeout = 120
+
+[aiosqlite]
+url = "https://github.com/omnilib/aiosqlite.git"
+license = "MIT"
+language = "python"
+source = ["aiosqlite/"]
+exclude = ["aiosqlite/tests/"]
+test = ["{python}", "-m", "unittest", "-f", "aiosqlite.tests"]
+timeout = 120
+
+[sqlite-utils]
+url = "https://github.com/simonw/sqlite-utils.git"
+license = "Apache-2.0"
+language = "python"
+source = ["sqlite_utils/"]
+exclude = []
+test = ["{python}", "-m", "pytest", "-q", "-x", "-o", "addopts=", "-p", "no:cacheprovider", "tests"]
+timeout = 300
+
+[jsoup]
+url = "https://github.com/jhy/jsoup.git"
+license = "MIT"
+language = "java"
+source = ["src/main/java/"]
+exclude = []
+test = [
+    "{mvn}", "-B", "-q", "-Dmaven.repo.local={m2}", "-Djacoco.skip=true",
+    "-Danimal.sniffer.skip=true", "-Dsurefire.skipAfterFailureCount=1", "test",
+]
+timeout = 900

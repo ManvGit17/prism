@@ -1,0 +1,233 @@
+# BugBench cases for tinydb, from `prism bench generate` (seed 7, window 150).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+
+[repo]
+name = "tinydb"
+url = "https://github.com/msiemens/tinydb.git"
+license = "MIT"
+
+[[case]]
+id = "tinydb-i01"
+group = "injected"
+commit = "6d7c4fc"
+path = "tinydb/queries.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """    return isinstance(obj, Sequence) and not isinstance(obj, (str, bytes,
+"""
+replace = """    return isinstance(Sequence, obj) and not isinstance(obj, (str, bytes,
+"""
+failing = "tests/test_queries.py::test_any"
+
+[[case]]
+id = "tinydb-i02"
+group = "injected"
+commit = "59ee593"
+path = "tinydb/storages.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if base_dir and not os.path.exists(base_dir):
+"""
+replace = """        if not (base_dir and not os.path.exists(base_dir)):
+"""
+failing = "tests/test_storages.py::test_create_dirs"
+
+[[case]]
+id = "tinydb-i03"
+group = "injected"
+commit = "bc93aad"
+path = "tinydb/table.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """                if isinstance(document, self.document_class):
+"""
+replace = """                if not isinstance(document, self.document_class):
+"""
+failing = "tests/test_operations.py::test_delete[memory]"
+
+[[case]]
+id = "tinydb-i04"
+group = "injected"
+commit = "1fa99fb"
+path = "tinydb/table.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if is_cacheable():
+"""
+replace = """        if not is_cacheable():
+"""
+failing = "tests/test_tables.py::test_query_cache"
+
+[[case]]
+id = "tinydb-i05"
+group = "injected"
+commit = "f200118"
+path = "tinydb/queries.py"
+kind = "wrong boolean operator"
+operator = "or-to-and"
+find = """        return QueryInstance(lambda value: self(value) or other(value), hashval)
+"""
+replace = """        return QueryInstance(lambda value: self(value) and other(value), hashval)
+"""
+failing = "tests/test_queries.py::test_or"
+
+[[case]]
+id = "tinydb-i06"
+group = "injected"
+commit = "717616b"
+path = "tinydb/table.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """        if persist_empty and not self._read_table():
+"""
+replace = """        if persist_empty or not self._read_table():
+"""
+failing = "tests/test_storages.py::test_read_once"
+
+[[case]]
+id = "tinydb-i07"
+group = "injected"
+commit = "6cc942e"
+path = "tinydb/table.py"
+kind = "wrong null check"
+operator = "is-none"
+find = """        if doc_ids is None and cond is None:
+"""
+replace = """        if doc_ids is not None and cond is None:
+"""
+failing = "tests/test_tinydb.py::test_upsert_by_id"
+
+[[case]]
+id = "tinydb-i08"
+group = "injected"
+commit = "3362a4b"
+path = "tinydb/table.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = '''        """
+        if doc_ids is not None:
+'''
+replace = '''        """
+        if doc_ids is None:
+'''
+failing = "tests/test_storages.py::test_json_readwrite"
+
+[[case]]
+id = "tinydb-i09"
+group = "injected"
+commit = "a201533"
+path = "tinydb/table.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = """        if cached_results is not None:
+"""
+replace = """        if cached_results is None:
+"""
+failing = "tests/test_tables.py::test_multiple_tables"
+
+[[case]]
+id = "tinydb-i10"
+group = "injected"
+commit = "bf039e8"
+path = "tinydb/queries.py"
+kind = "wrong return value"
+operator = "true-to-false"
+find = """            return True
+"""
+replace = """            return False
+"""
+failing = "tests/test_queries.py::test_fragment"
+
+[[case]]
+id = "tinydb-i11"
+group = "injected"
+commit = "6a84ca9"
+path = "tinydb/table.py"
+kind = "off-by-one"
+operator = "drop-plus-one"
+find = """        # the current next ID we calculated
+        self._next_id = next_id + 1
+"""
+replace = """        # the current next ID we calculated
+        self._next_id = next_id
+"""
+failing = "tests/test_tinydb.py::test_insert_on_existing_db"
+
+[[case]]
+id = "tinydb-i12"
+group = "injected"
+commit = "bd034d0"
+path = "tinydb/table.py"
+kind = "off-by-one"
+operator = "drop-plus-one"
+find = """                        ) + 1
+"""
+replace = """                        )
+"""
+failing = "tests/test_tinydb.py::test_insert_multiple_mixed_document_and_dict[memory]"
+
+[[case]]
+id = "tinydb-i13"
+group = "injected"
+commit = "19066e0"
+path = "tinydb/utils.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """    def get(self, key: K, default: Optional[D] = None) -> Optional[Union[V, D]]:
+        value = self.cache.get(key, _missing)
+"""
+replace = """    def get(self, key: K, default: Optional[D] = None) -> Optional[Union[V, D]]:
+        value = self.cache.get(_missing, key)
+"""
+failing = "tests/test_tables.py::test_multiple_tables[memory]"
+
+[[case]]
+id = "tinydb-i14"
+group = "injected"
+commit = "770486f"
+path = "tinydb/queries.py"
+kind = "wrong exception handling"
+operator = "type-to-value"
+find = """            except TypeError:
+"""
+replace = """            except ValueError:
+"""
+failing = "tests/test_queries.py::test_custom_with_unhashable_params"
+
+[[case]]
+id = "tinydb-i15"
+group = "injected"
+commit = "5040649"
+path = "tinydb/table.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """        if isinstance(document, Document):
+"""
+replace = """        if isinstance(Document, document):
+"""
+failing = "tests/test_middlewares.py::test_caching_json_write"
+
+[[case]]
+id = "tinydb-c01"
+group = "clean"
+commit = "1cc77cb"
+kind = "clean"
+
+[[case]]
+id = "tinydb-c02"
+group = "clean"
+commit = "3517ddc"
+kind = "clean"
+
+[[case]]
+id = "tinydb-c03"
+group = "clean"
+commit = "322d38d"
+kind = "clean"
+
+[[case]]
+id = "tinydb-c04"
+group = "clean"
+commit = "7e8846f"
+kind = "clean"

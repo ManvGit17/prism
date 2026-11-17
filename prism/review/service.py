@@ -216,6 +216,8 @@ async def review_async(
         # The rules verifier has no model to escalate to.
         escalate=s.escalate and kind != "rules",
         escalate_min_lines=s.escalate_min_lines,
+        route_all=s.route_all and kind != "rules",
+        reviewer_context=s.reviewer_context,
     )
     names = [n.strip() for n in s.sast_tools.split(",") if n.strip()] if req.sast else []
     tools = default_tools(names, s.semgrep_config, s.pmd_home)
@@ -229,12 +231,17 @@ async def review_async(
         raise ReviewError("PRISM_TRACING=langfuse needs `uv sync --group observability`") from exc
     reviewer_prompt = prompts.get(REVIEWER)
     rubrics = {"rubric": prompts.get(VERIFY).text, "review_rubric": prompts.get(REVIEW).text}
+    if s.review_unit == "pr" and not options.route_all:
+        raise ReviewError("PRISM_REVIEW_UNIT=pr needs PRISM_ROUTE_ALL=true", code=2)
+    whole_pr = s.review_unit == "pr"
 
     chosen: Verifier
     claude: ClaudeVerifier | None = None
     verify_dir: Path | None = None
     if kind == "handoff":
-        handoff = HandoffVerifier(work, min_confidence=s.verifier_min_confidence, **rubrics)
+        handoff = HandoffVerifier(
+            work, min_confidence=s.verifier_min_confidence, whole_pr=whole_pr, **rubrics
+        )
         claude, chosen, verify_dir = handoff, handoff, handoff.dir
     elif kind == "api":
         try:
@@ -248,13 +255,15 @@ async def review_async(
             )
         except ImportError as exc:
             raise ReviewError("the api verifier needs `uv sync --group frontier`") from exc
-        claude = ClaudeVerifier(backend, min_confidence=s.verifier_min_confidence, **rubrics)
+        claude = ClaudeVerifier(
+            backend, min_confidence=s.verifier_min_confidence, whole_pr=whole_pr, **rubrics
+        )
         chosen = claude
     else:
         chosen = RuleVerifier()
 
     # Only a Claude verifier reads context; the rules verifier must not need the stores.
-    needs_context = kind != "rules" and context_mode is not ContextMode.NONE
+    needs_context = context_mode is not ContextMode.NONE and (kind != "rules" or s.reviewer_context)
     sources: Any = (
         context_sources(repo, rid, context_mode, req.store, notes, s)
         if needs_context

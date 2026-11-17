@@ -182,3 +182,135 @@ def test_same_line_same_category_keeps_the_strongest() -> None:
 
     kept, cut = cap([rc("bandit", Severity.MAJOR, 0.9), rc("claude", Severity.CRITICAL, 0.95)], 5)
     assert [c.model for c in kept] == ["claude"] and cut == 0
+
+
+def test_whole_pr_view_sends_one_request_and_places_comments_by_path(tmp_path: Path) -> None:
+    def run() -> tuple[PRReview, HandoffVerifier]:
+        verifier = HandoffVerifier(tmp_path, whole_pr=True)
+        result, _ = asyncio.run(
+            run_review(
+                tmp_path,
+                SAFE + RISKY,
+                gate=PassAllGate(),
+                model=FakeModel(),
+                verifier=verifier,
+                options=ReviewOptions(route_all=True),
+                repo_name="demo",
+            )
+        )
+        return result, verifier
+
+    _, verifier = run()
+    assert verifier.pending == 1
+    assert rows(tmp_path, "escalations") == []
+    (req,) = rows(tmp_path, "pr_requests")
+    assert [f["path"] for f in req["files"]] == ["app/a.py", "app/b.py"]
+    assert "<untrusted_pull_request>" in req["files"][1]["hunks"][0]["hunk"]
+    assert (tmp_path / "verify" / "PR_RUBRIC.md").is_file()
+
+    def fc(path: str, line: int, text: str, conf: float = 0.9) -> dict[str, Any]:
+        return {"path": path, "line": line, "comment": text, "category": "bug", "confidence": conf}
+
+    answer(
+        tmp_path,
+        "pr_reviews",
+        [
+            {
+                "id": req["id"],
+                "comments": [
+                    fc("app/b.py", 2, "`cmd` reaches a shell with `shell=True`: injection risk."),
+                    fc("app/a.py", 2, "`total` ignores the discount computed in `price`."),
+                    fc("app/a.py", 40, "`total` is wrong on a line outside the hunk."),
+                    fc("app/z.py", 2, "`total` in a file this PR does not touch."),
+                    fc("app/a.py", 2, "`qty` may be None when `price` is set.", conf=0.3),
+                ],
+            }
+        ],
+    )
+    done, verifier = run()
+    assert verifier.pending == 0
+    # Off-hunk, unknown-file and low-confidence comments are dropped; the rest land by path.
+    assert sorted((c.path, c.line) for c in done.comments) == [("app/a.py", 2), ("app/b.py", 2)]
+
+
+def test_sweep_rescores_saved_answers_and_counts_new_questions(tmp_path: Path) -> None:
+    from prism.bench.sweep import rescore
+
+    def run(threshold: float) -> Any:
+        verifier = HandoffVerifier(tmp_path, min_confidence=threshold)
+        _, state = asyncio.run(
+            run_review(
+                tmp_path,
+                SAFE,
+                gate=PassAllGate(),
+                model=FakeModel(),
+                verifier=verifier,
+                options=ReviewOptions(escalate=True),
+                cache=ReplyCache(tmp_path / "replies.json"),
+            )
+        )
+        return state, verifier
+
+    run(0.6)
+    (req,) = rows(tmp_path, "requests")
+    answer(tmp_path, "verdicts", [keep(req["id"], confidence=0.7)])
+    state, verifier = run(0.6)
+    assert verifier.pending == 0
+    verify = tmp_path / "verify"
+    before = sorted(p.name for p in verify.iterdir())
+
+    posted, _, missing = asyncio.run(rescore(state, verify, 0.6))
+    assert missing == 0 and [c.confidence for c in posted] == [0.7]
+    posted, _, missing = asyncio.run(rescore(state, verify, 0.75))
+    # Above 0.7 the kept comment is weak, so its hunk would go back to Claude: a new question.
+    assert missing == 1 and posted == []
+    posted, _, missing = asyncio.run(rescore(state, verify, 0.3))
+    assert missing == 0 and len(posted) == 1
+    assert sorted(p.name for p in verify.iterdir()) == before, "the sweep writes nothing"
+
+
+def test_route_all_sends_every_planned_hunk_up_front() -> None:
+    from types import SimpleNamespace
+
+    from review_fakes import hunk_diff, task_for
+
+    from prism.review.router import route
+
+    tasks = [task_for(hunk_diff("a.py", 1, ["x = 1"])), task_for(hunk_diff("b.py", 5, ["y = 2"]))]
+    plan: Any = SimpleNamespace(tasks=tasks)  # route reads only the planned tasks
+    assert route(plan, enabled=False, min_lines=60, everything=True) == {
+        ("a.py", 0): ("all",),
+        ("b.py", 0): ("all",),
+    }
+    assert route(plan, enabled=False, min_lines=60) == {}
+
+
+def test_reviewer_context_reaches_the_local_model_but_lines_stay_on_the_hunk(
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    class Spy(FakeModel):
+        async def reply(self, hunk: str, attempt: int) -> str:
+            seen.append(hunk)
+            return json.dumps({"comment": "`total` should round the discount first."})
+
+    def context_fn(tasks: Any) -> dict[tuple[str, str], str]:
+        return {(t.path, t.hunk.header): "def price(): return 2" for t in tasks}
+
+    asyncio.run(
+        run_review(
+            tmp_path,
+            SAFE,
+            gate=PassAllGate(),
+            model=Spy(),
+            verifier=HandoffVerifier(tmp_path),
+            options=ReviewOptions(reviewer_context=True),
+            context_fn=context_fn,
+            cache=ReplyCache(tmp_path / "replies.json"),
+        )
+    )
+    (prompt,) = seen
+    assert prompt.startswith("Code from the repository") and "def price()" in prompt
+    (req,) = rows(tmp_path, "requests")
+    assert req["line"] == 2  # anchored on the hunk, not on the context

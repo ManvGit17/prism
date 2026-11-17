@@ -71,8 +71,8 @@ class Settings(BaseSettings):
     gate: Literal["pass-all", "onnx"] = "pass-all"
     gate_model_dir: str = "models/gate"
 
-    # Review pipeline (Phase 5). Model calls in flight at once; more only queue in Ollama. Start
-    # value from the Phase 4 throughput runs with OLLAMA_NUM_PARALLEL=4.
+    # Review pipeline. Model calls in flight at once; more only queue in Ollama. Start
+    # value from the reviewer throughput runs with OLLAMA_NUM_PARALLEL=4.
     model_concurrency: int = Field(default=4, ge=1)
     reviewer_timeout_s: float = Field(default=180.0, gt=0)
     # A reply that is not valid JSON is retried this many times, then dropped.
@@ -109,6 +109,14 @@ class Settings(BaseSettings):
     # through the verifier) instead of the local reviewer. Needs a model verifier.
     escalate: bool = True
     escalate_min_lines: int = Field(default=60, ge=1)
+    # Evaluation setting: every planned hunk goes to the frontier model, none to the local one.
+    route_all: bool = False
+    # Evaluation setting, with route_all: "pr" shows Claude the whole PR in one request instead of
+    # one hunk per request.
+    review_unit: Literal["hunk", "pr"] = "hunk"
+    # Evaluation setting: the local reviewer also sees retrieved code before each hunk (it was
+    # trained on the hunk alone).
+    reviewer_context: bool = False
 
     # Tracing and prompt management (ADR 0014). "langfuse" needs `uv sync --group observability`
     # and the `langfuse` Compose profile; the keys below are the profile's local defaults.

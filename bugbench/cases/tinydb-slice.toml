@@ -1,0 +1,110 @@
+# A small BugBench smoke set: 10 real TinyDB commits, each with one planted defect.
+#
+# A case's pull request is the whole commit (source, tests, docs) with `find` replaced by
+# `replace` in `path` at that commit. `find` must occur exactly once. The defect's line is the
+# first line of the new file that the replacement changes (for a deletion, the line now in its
+# place). Recall counts a posted comment on that file within 3 lines of it.
+
+[repo]
+name = "tinydb"
+url = "https://github.com/msiemens/tinydb.git"
+license = "MIT"
+
+[[case]]
+id = "tinydb-01"
+commit = "6d7c4fc"
+path = "tinydb/queries.py"
+kind = "wrong boolean operator"
+find = "return isinstance(obj, Sequence) and not isinstance(obj, (str, bytes,"
+replace = "return isinstance(obj, Sequence) or not isinstance(obj, (str, bytes,"
+note = "every non-sequence now counts as a sequence; any/all iterate ints and None"
+
+[[case]]
+id = "tinydb-02"
+commit = "e83efcd"
+path = "tinydb/queries.py"
+kind = "missing cache key"
+find = "('search', self._path, regex, flags)"
+replace = "('search', self._path, regex)"
+note = "search() queries that differ only by flags share a query-cache entry again"
+
+[[case]]
+id = "tinydb-03"
+commit = "18d73a1"
+path = "tinydb/middlewares.py"
+kind = "resource leak"
+find = """
+        self.storage.close()
+"""
+replace = """
+"""
+note = "CachingMiddleware.close() no longer closes the wrapped storage"
+
+[[case]]
+id = "tinydb-04"
+commit = "bd034d0"
+path = "tinydb/table.py"
+kind = "off-by-one"
+find = ") + 1"
+replace = ")"
+note = "the next auto-assigned ID equals the largest existing ID and overwrites that document"
+
+[[case]]
+id = "tinydb-05"
+commit = "19066e0"
+path = "tinydb/utils.py"
+kind = "wrong null check"
+find = "if value is not _missing:"
+replace = "if value is not None:"
+note = "LRUCache.get treats a stored None as missing again"
+
+[[case]]
+id = "tinydb-06"
+commit = "770486f"
+path = "tinydb/queries.py"
+kind = "wrong exception handling"
+find = "except TypeError:"
+replace = "except ValueError:"
+note = "hash() of an unhashable value raises TypeError, which now escapes and crashes"
+
+[[case]]
+id = "tinydb-07"
+commit = "76d21d2"
+path = "tinydb/table.py"
+kind = "missing check"
+find = """
+                updated_ids.extend(
+                    doc_id for doc_id in requested_ids if doc_id in table
+"""
+replace = """
+                updated_ids.extend(
+                    doc_id for doc_id in requested_ids
+"""
+note = "update(doc_ids=...) no longer skips IDs that do not exist and raises KeyError"
+
+[[case]]
+id = "tinydb-08"
+commit = "6f03ec6"
+path = "tinydb/table.py"
+kind = "swapped arguments"
+find = "self.document_class(raw_docs[str(x)] , int(x))"
+replace = "self.document_class(int(x), raw_docs[str(x)])"
+note = "Document(value, doc_id) gets its arguments the wrong way round"
+
+[[case]]
+id = "tinydb-09"
+commit = "2a2abe5"
+path = "tinydb/storages.py"
+kind = "swapped arguments"
+find = "os.rename(temp_file.name, file_name)"
+replace = "os.rename(file_name, temp_file.name)"
+note = "the database file is moved onto the temp file instead of being replaced by it: data loss"
+
+[[case]]
+id = "tinydb-10"
+commit = "b596c92"
+path = "tinydb/table.py"
+kind = "inverted condition"
+find = "if persist_empty:"
+replace = "if not persist_empty:"
+note = "every table without persist_empty is cleared when it is opened: data loss"

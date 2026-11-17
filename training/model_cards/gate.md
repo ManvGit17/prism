@@ -58,7 +58,7 @@ Threshold: 0.1953
 Share filtered is the part of the hunks the gate stops from reaching the reviewer. On test it
 skips about a quarter of all hunks while keeping 90% of the ones that got a comment. That is on
 50/50 data. On real pull requests, where most hunks get no comment, the share filtered should be
-higher and precision lower; Phase 7 measures it on the bench PRs.
+higher and precision lower; BugBench measures it on real PRs.
 
 For scale: counting lines alone separates the labels with an AUC of about 0.64 on test
 (`docs/datasets.md`), so the model learned more than "longer hunks get comments".

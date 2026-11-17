@@ -1,16 +1,16 @@
 # ADR 0018: A Celery queue for App reviews
 
-Date: 2026-11-14. Status: accepted.
+Status: accepted.
 
 ## Context
 
-In stage 3 the web process reviewed PRs itself, one at a time, after answering the webhook. That
-loses a review if the process dies, cannot retry a GitHub rate limit, reviews an old commit after
-a newer push, and lets one busy repo hold the only reviewer. PLAN.md Phase 6 asks for Celery
-tasks with retries, an idempotency key `repo#pr#head_sha`, rate-limit handling, a broker
-visibility timeout above the longest review with late acknowledgement, cancelling superseded
-pushes, and a concurrency limit per installation. Phase 0 said Celery workers run in a container
-only, because Celery's default pool does not run on Windows.
+If the web process reviews PRs itself, one at a time, after answering the webhook, a review is
+lost if the process dies, a GitHub rate limit cannot be retried, an old commit gets reviewed
+after a newer push, and one busy repo can hold the only reviewer. The App needs Celery tasks with
+retries, an idempotency key `repo#pr#head_sha`, rate-limit handling, a broker visibility timeout
+above the longest review with late acknowledgement, cancellation of superseded pushes, and a
+concurrency limit per installation. Celery's default pool does not run on Windows, so workers
+were planned to run in a container only.
 
 ## Decision
 
@@ -40,11 +40,10 @@ A 404 or other client error fails at once.
 
 **Where the worker runs.** On Windows, `prism app worker` uses Celery's solo pool, which does run
 there, and reaches the host's Ollama, the SAST tools and PMD directly. A `Dockerfile` and a
-`worker` Compose profile (worker and beat) are there for Linux hosts; they are not built on the
-build machine, whose C: drive (where Docker keeps images) is short of space, and the image leaves
-PMD out.
+`worker` Compose profile (worker and beat) are there for Linux hosts. I have not built that image
+locally, and it leaves PMD out.
 
-## Checked live
+## Results
 
 With Redis from Compose, the worker, beat, the webhook server in queue mode and the smee tunnel
 running, a push to the test PR (applying the review's own suggested fixes) arrived as a

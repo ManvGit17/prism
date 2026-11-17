@@ -1,4 +1,4 @@
-"""Stored reviews: what `prism review` decided and why (Phase 6, ADR 0015).
+"""Stored reviews: what `prism review` decided and why (ADR 0015).
 
 The MCP tools (`explain_finding`, `review_history`), the GitHub App and the dashboard all read
 reviews back, so every review is saved with every verifier decision, not only the comments that

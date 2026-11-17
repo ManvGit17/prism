@@ -1,4 +1,4 @@
-"""Remove secrets from PR text before it leaves the machine (PLAN.md Phase 5, safety; ADR 0013).
+"""Remove secrets from PR text before it leaves the machine (safety; ADR 0013).
 
 Everything sent to Claude (verifier and escalation requests, by file handoff or API) goes through
 `redact` first. The local reviewer on Ollama is not an external call and sees the hunk as it is.

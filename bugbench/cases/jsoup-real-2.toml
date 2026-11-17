@@ -1,0 +1,98 @@
+# More real-bug cases for jsoup: commits that introduced a bug a later commit fixed,
+# found with SZZ (`prism bench real`) and checked by hand. `lines` are the lines of `path`
+# at `commit` that the fix (`fix`) removed or changed.
+
+[repo]
+name = "jsoup"
+url = "https://github.com/jhy/jsoup.git"
+license = "MIT"
+
+[[case]]
+id = "jsoup-r03"
+group = "real"
+commit = "27e7d5f"
+path = "src/main/java/org/jsoup/nodes/Attribute.java"
+kind = "wrong condition"
+lines = [208]
+fix = "0a4b830c"
+note = "Manual XML key validator rejects digits, hyphen and dot in non-first chars, unlike the regex it replaced"
+
+[[case]]
+id = "jsoup-r04"
+group = "real"
+commit = "5d00201"
+path = "src/main/java/org/jsoup/select/Evaluator.java"
+kind = "wrong condition"
+lines = [67]
+fix = "f2ff26b6"
+note = "TagEndsWith compares the raw, mixed-case tagName() against a lower-cased selector suffix, so it misses mixed-case namespaced elements"
+
+[[case]]
+id = "jsoup-r05"
+group = "real"
+commit = "b934c5d"
+path = "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java"
+kind = "wrong value"
+lines = [764]
+fix = "397a0cae"
+note = "anyOtherEndTag uses the raw end tag name instead of a normalized one, so mixed-case end tags fail to match stack nodes in case-insensitive mode"
+
+[[case]]
+id = "jsoup-r06"
+group = "real"
+commit = "6941818"
+path = "src/main/java/org/jsoup/nodes/FormElement.java"
+kind = "wrong value"
+lines = [98, 99]
+fix = "c01fcd33"
+note = "Checked checkbox/radio without a value attribute is submitted with an empty value instead of the default \"on\""
+
+[[case]]
+id = "jsoup-r07"
+group = "real"
+commit = "961e4d7"
+path = "src/main/java/org/jsoup/helper/HttpConnection.java"
+kind = "missing check"
+lines = [234, 239]
+fix = "311d2e7e"
+note = "Validate.notEmpty called with only the message string, so the name argument is never validated in hasCookie/removeCookie"
+
+[[case]]
+id = "jsoup-r08"
+group = "real"
+commit = "4de5fe8"
+path = "src/main/java/org/jsoup/parser/TokeniserState.java"
+kind = "wrong value"
+lines = [974, 1008]
+fix = "82200d78"
+note = "Copy-pasted '\"' as the additional allowed char for single-quoted and unquoted attribute value character references"
+
+[[case]]
+id = "jsoup-r09"
+group = "real"
+commit = "3982ea1"
+path = "src/main/java/org/jsoup/nodes/Element.java"
+kind = "wrong condition"
+lines = [1086]
+fix = "d94f56c2"
+note = "Operator precedence: out.outline() && size>1 || (size==1 && non-text) is not grouped, so the single-child clause applies without outline mode"
+
+[[case]]
+id = "jsoup-r10"
+group = "real"
+commit = "e8e29ca"
+path = "src/main/java/org/jsoup/helper/StringUtil.java"
+kind = "wrong value"
+lines = [104, 105]
+fix = "82f86831"
+note = "Loop advances by one char while using codePointAt, so surrogate pairs are processed twice and corrupted"
+
+[[case]]
+id = "jsoup-r11"
+group = "real"
+commit = "935cab0"
+path = "src/main/java/org/jsoup/nodes/Entities.java"
+kind = "wrong value"
+lines = [68, 70]
+fix = "20ed24ce"
+note = "Replacement strings passed to appendReplacement without quoteReplacement, so $ or backslash in an unescaped char or original text breaks or throws"

@@ -697,3 +697,431 @@ def dashboard(
     )
     typer.echo(f"dashboard on http://127.0.0.1:{port}", err=True)
     uvicorn.run(web, host="127.0.0.1", port=port, log_level="warning")
+
+
+bench_app = typer.Typer(help="BugBench: planted-defect PRs and recall.", no_args_is_help=True)
+app.add_typer(bench_app, name="bench")
+
+
+@bench_app.command("run")
+def bench_run(
+    cases: Annotated[list[Path], typer.Argument(help="Case files (TOML) under bugbench/cases.")],
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    run: Annotated[str, typer.Option("--run", help="Folder under ROOT/runs.")] = "slice",
+    mode: Annotated[str, typer.Option("--mode", help="Context mode for the verifier.")] = "graph",
+    verifier: Annotated[str, typer.Option("--verifier")] = "handoff",
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    sast: Annotated[bool, typer.Option("--sast/--no-sast")] = True,
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated case ids.")] = None,
+    report: Annotated[
+        Path | None, typer.Option("--report", help="Also write a Markdown report here.")
+    ] = None,
+) -> None:
+    """Review every case. Exit 2 while Claude's answers are missing (the open requests are in
+    one handoff round folder); with everything answered, score and write the results."""
+    import asyncio
+    import json
+
+    from prism.bench.cases import load
+    from prism.bench.run import RunConfig, run_cases
+    from prism.review.service import ReviewError
+
+    s = get_settings().model_copy(update={"review_store": "off", "tracing": "off"})
+    cfg = RunConfig(root.resolve(), run, mode=mode, verifier=verifier, model=model, sast=sast)
+    picked = {x.strip() for x in only.split(",") if x.strip()} if only else None
+    try:
+        result = asyncio.run(
+            run_cases(
+                [load(c) for c in cases],
+                cfg,
+                s,
+                notes=lambda m: typer.echo(m, err=True),
+                only=picked,
+            )
+        )
+    except ReviewError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(exc.code) from exc
+    if result.waiting:
+        typer.echo(
+            f"{len(result.waiting)} case(s) waiting for Claude; answer the files in "
+            f"{result.round_dir} and run again",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if report is not None:
+        from prism.bench.report import render
+
+        report.write_text(render(result.summary, result.results), encoding="utf-8")
+        typer.echo(f"report written to {report}", err=True)
+    typer.echo(json.dumps(result.summary, indent=2))
+
+
+@bench_app.command("sweep")
+def bench_sweep(
+    cases: Annotated[list[Path], typer.Argument(help="The run's case files.")],
+    run: Annotated[str, typer.Option("--run", help="A finished run under ROOT/runs.")],
+    thresholds: Annotated[
+        str, typer.Option("--thresholds", help="Comma-separated confidence thresholds.")
+    ] = "0.3,0.4,0.5,0.6,0.7,0.8,0.9",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    mode: Annotated[str, typer.Option("--mode", help="Context mode for the verifier.")] = "graph",
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    sast: Annotated[bool, typer.Option("--sast/--no-sast")] = True,
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated case ids.")] = None,
+) -> None:
+    """Re-score a finished run at other confidence thresholds from its saved answers (no new
+    Claude work). Run it with the run's own settings; writes ROOT/runs/RUN/sweep.json."""
+    import asyncio
+
+    from prism.bench.cases import load
+    from prism.bench.run import RunConfig
+    from prism.bench.sweep import render_sweep, run_sweep
+
+    s = get_settings().model_copy(update={"review_store": "off", "tracing": "off"})
+    cfg = RunConfig(root.resolve(), run, mode=mode, verifier="handoff", model=model, sast=sast)
+    picked = {x.strip() for x in only.split(",") if x.strip()} if only else None
+    ts = [float(x) for x in thresholds.split(",") if x.strip()]
+    try:
+        sweep = asyncio.run(
+            run_sweep(
+                [load(c) for c in cases],
+                cfg,
+                s,
+                ts,
+                notes=lambda m: typer.echo(m, err=True),
+                only=picked,
+            )
+        )
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(render_sweep([(run, sweep)], f"Threshold sweep: {run}"))
+
+
+@bench_app.command("sweep-table")
+def bench_sweep_table(
+    runs: Annotated[list[str], typer.Argument(help="NAME=RUN pairs of swept runs.")],
+    report: Annotated[Path, typer.Option("--report", help="Markdown file to write.")],
+    title: Annotated[str, typer.Option("--title")] = "BugBench threshold sweep",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """The sweeps of several runs side by side."""
+    import json
+
+    from prism.bench.sweep import render_sweep
+
+    cols = []
+    for pair in runs:
+        name, _, run = pair.partition("=")
+        path = root.resolve() / "runs" / (run or name) / "sweep.json"
+        cols.append((name, json.loads(path.read_text("utf-8"))))
+    out = render_sweep(cols, title)
+    report.write_text(out, encoding="utf-8", newline="\n")
+    typer.echo(out)
+
+
+@bench_app.command("judge")
+def bench_judge(
+    cases: Annotated[list[Path], typer.Argument(help="Case files the runs used.")],
+    runs: Annotated[str, typer.Option("--runs", help="Comma-separated finished runs.")],
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """Judge every comment the runs posted: precision, and whether it names the defect. Exit 2
+    while verdicts are missing (the open requests are in ROOT/judge/round_NN)."""
+    import json
+
+    from prism.bench.cases import load
+    from prism.bench.judge import judge_runs
+
+    names = [r.strip() for r in runs.split(",") if r.strip()]
+    out, round_dir = judge_runs([load(c) for c in cases], root.resolve(), names)
+    if round_dir is not None:
+        typer.echo(f"comments waiting for the judge; answer the files in {round_dir}", err=True)
+        raise typer.Exit(2)
+    typer.echo(json.dumps(out, indent=2))
+
+
+@bench_app.command("all")
+def bench_all(
+    config: Annotated[Path, typer.Argument(help="The suite, e.g. bugbench/configs.toml.")] = Path(
+        "bugbench/configs.toml"
+    ),
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    only: Annotated[
+        str | None, typer.Option("--only", help="Comma-separated run folders to run, in order.")
+    ] = None,
+    pr_agent: Annotated[
+        Path | None, typer.Option("--pr-agent", help="The pr-agent executable.")
+    ] = None,
+) -> None:
+    """Run every configuration in CONFIG, judge the comments and write the report. Exit 2 while
+    Claude answers are missing, listing the handoff rounds to answer."""
+    import asyncio
+
+    from prism.bench.suite import load_suite, run_suite
+
+    suite = load_suite(config)
+    if only:
+        wanted = [x.strip() for x in only.split(",") if x.strip()]
+        by_run = {r.run: r for r in suite.runs}
+        suite.runs = [by_run[w] for w in wanted]
+    base = root.resolve()
+    exe = pr_agent or base / "envs" / "pr-agent" / (
+        "Scripts/pr-agent.exe" if sys.platform == "win32" else "bin/pr-agent"
+    )
+    waiting, text = asyncio.run(
+        run_suite(
+            suite, base, get_settings(), pr_agent=exe, notes=lambda m: typer.echo(m, err=True)
+        )
+    )
+    if waiting:
+        typer.echo("Claude answers missing; answer these rounds and run again:", err=True)
+        for rd in waiting:
+            typer.echo(f"  {rd}", err=True)
+        raise typer.Exit(2)
+    typer.echo(text or "")
+    typer.echo(f"report written to {suite.report}", err=True)
+
+
+@bench_app.command("experiments")
+def bench_experiments(
+    cases: Annotated[list[Path], typer.Argument(help="Case files the runs used.")],
+    runs: Annotated[str, typer.Option("--runs", help="Comma-separated NAME=RUN pairs.")],
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """Publish finished runs to Langfuse as experiments over a `bugbench` dataset (needs
+    `uv sync --group observability` and the `langfuse` Compose profile)."""
+    from langfuse import Langfuse
+
+    from prism.bench.cases import load
+    from prism.bench.experiments import publish
+
+    s = get_settings()
+    client = Langfuse(
+        public_key=s.langfuse_public_key,
+        secret_key=s.langfuse_secret_key.get_secret_value(),
+        base_url=s.langfuse_host,
+    )
+    pairs = []
+    for pair in runs.split(","):
+        name, _, run = pair.strip().partition("=")
+        pairs.append((name, run or name))
+    done = publish(client, [load(c) for c in cases], root.resolve(), pairs)
+    typer.echo(f"{len(done)} experiment(s) published to {s.langfuse_host}: {', '.join(done)}")
+
+
+@bench_app.command("generate")
+def bench_generate(
+    repo: Annotated[str, typer.Argument(help="A repo name from bugbench/repos.toml.")],
+    out: Annotated[Path, typer.Option("--out", help="Case file to write.")],
+    injected: Annotated[int, typer.Option("--injected")] = 15,
+    clean: Annotated[int, typer.Option("--clean")] = 4,
+    window: Annotated[int, typer.Option("--window", help="Recent commits to draw from.")] = 150,
+    seed: Annotated[int, typer.Option("--seed")] = 7,
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    repos: Annotated[Path, typer.Option("--repos")] = Path("bugbench/repos.toml"),
+    extend: Annotated[
+        list[Path] | None,
+        typer.Option("--extend", help="Existing case files of REPO: skip their commits."),
+    ] = None,
+) -> None:
+    """Mutate recent commits of REPO and keep the mutations a test catches (ADR 0021)."""
+    import re
+    from collections import Counter
+
+    from prism.bench.cases import load
+    from prism.bench.mutate import generate, load_repos, write_cases
+
+    spec = load_repos(repos)[repo]
+    note = lambda m: typer.echo(m, err=True)  # noqa: E731
+    old = [c for f in extend or [] for c in load(f).cases]
+
+    def after(tag: str) -> int:
+        nums = [int(m.group(1)) for c in old if (m := re.fullmatch(rf".+-{tag}(\d+)", c.id))]
+        return max(nums, default=0) + 1
+
+    got = generate(
+        root.resolve(),
+        spec,
+        injected=injected,
+        clean=clean,
+        window=window,
+        seed=seed,
+        notes=note,
+        used=[c.commit for c in old],
+        kinds_used=Counter(c.kind for c in old if c.group == "injected"),
+        first_injected=after("i"),
+        first_clean=after("c"),
+        progress=root.resolve() / "gen" / f"{out.stem}.progress.jsonl",
+    )
+    header = (
+        f"BugBench cases for {repo}, from `prism bench generate` (seed {seed}, window {window}).\n"
+        "Injected cases: one mutation on a line the commit added; the repo's tests pass at the\n"
+        "commit and `failing` fails with the mutation. Clean cases: the commit as it is."
+    )
+    write_cases(out, spec, [*got.injected, *got.clean], header)
+    typer.echo(
+        f"{len(got.injected)} injected, {len(got.clean)} clean written to {out}; "
+        f"skipped: {dict(got.skipped)}",
+        err=True,
+    )
+
+
+@bench_app.command("real")
+def bench_real(
+    repo: Annotated[str, typer.Argument(help="A repo name from bugbench/repos.toml.")],
+    out: Annotated[Path, typer.Option("--out", help="JSONL file of candidates to curate.")],
+    window: Annotated[int, typer.Option("--window", help="Recent commits to search.")] = 300,
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    repos: Annotated[Path, typer.Option("--repos")] = Path("bugbench/repos.toml"),
+    extend: Annotated[
+        list[Path] | None,
+        typer.Option("--extend", help="Existing case files of REPO: skip their commits."),
+    ] = None,
+) -> None:
+    """Real-bug candidates for REPO (SZZ: a fix blamed back to the commit that introduced it),
+    to read and curate by hand into a case file."""
+    import json
+    from dataclasses import asdict
+
+    from prism.bench.cases import load
+    from prism.bench.mutate import load_repos
+    from prism.bench.realbugs import candidates
+
+    spec = load_repos(repos)[repo]
+    taken = {c.commit[:7] for f in extend or [] for c in load(f).cases}
+    found = [
+        c for c in candidates(root.resolve() / spec.name, spec, window) if c.introduced not in taken
+    ]
+    out.write_text(
+        "".join(json.dumps(asdict(c)) + "\n" for c in found), encoding="utf-8", newline="\n"
+    )
+    typer.echo(f"{len(found)} candidate(s) written to {out}", err=True)
+
+
+@bench_app.command("baseline")
+def bench_baseline(
+    cases: Annotated[list[Path], typer.Argument(help="Case files (TOML) under bugbench/cases.")],
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+    run: Annotated[str, typer.Option("--run", help="Folder under ROOT/runs.")] = "pr-agent",
+    pr_agent: Annotated[
+        Path | None, typer.Option("--pr-agent", help="The pr-agent executable.")
+    ] = None,
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated case ids.")] = None,
+) -> None:
+    """Run PR-Agent on every case with Claude answering through a handoff. Exit 2 while
+    prompts are unanswered; with everything answered, score and write the results."""
+    import json
+
+    from prism.bench.baseline import run_baseline
+    from prism.bench.cases import load
+
+    base = root.resolve()
+    exe = pr_agent or base / "envs" / "pr-agent" / (
+        "Scripts/pr-agent.exe" if sys.platform == "win32" else "bin/pr-agent"
+    )
+    picked = {x.strip() for x in only.split(",") if x.strip()} if only else None
+    out = run_baseline(
+        [load(c) for c in cases],
+        base,
+        run,
+        exe,
+        notes=lambda m: typer.echo(m, err=True),
+        only=picked,
+    )
+    if out.waiting:
+        typer.echo(
+            f"{len(out.waiting)} case(s) waiting for Claude; answer the files in "
+            f"{out.round_dir} and run again",
+            err=True,
+        )
+        raise typer.Exit(2)
+    typer.echo(json.dumps(out.summary, indent=2))
+
+
+@bench_app.command("compare")
+def bench_compare(
+    prism_run: Annotated[str, typer.Argument(help="PRism run under ROOT/runs.")],
+    other_run: Annotated[str, typer.Argument(help="Baseline run under ROOT/runs.")],
+    report: Annotated[Path, typer.Option("--report", help="Markdown file to write.")],
+    name: Annotated[str, typer.Option("--name")] = "PR-Agent",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """Compare a PRism run with a baseline run on the same cases."""
+    import glob
+    import json
+    import os
+
+    from prism.bench.report import render_comparison
+
+    runs = root.resolve() / "runs"
+
+    def rows(run: str) -> list[dict[str, object]]:
+        text = (runs / run / "results.jsonl").read_text(encoding="utf-8")
+        return [json.loads(x) for x in text.splitlines() if x.strip()]
+
+    def volume(patterns: list[str]) -> dict[str, float]:
+        files = [f for p in patterns for f in glob.glob(str(runs / p))]
+        calls = sum(
+            sum(1 for line in Path(f).read_text(encoding="utf-8").splitlines() if line.strip())
+            for f in files
+        )
+        return {"calls": calls, "mb": sum(os.path.getsize(f) for f in files) / 1e6}
+
+    claude = {
+        "prism": volume(
+            [
+                f"{prism_run}/handoff/round_*/requests_*.jsonl",
+                f"{prism_run}/handoff/round_*/escalations_*.jsonl",
+            ]
+        ),
+        "other": volume([f"{other_run}/llm/rounds/round_*/prompts_*.jsonl"]),
+    }
+    text = render_comparison(prism_run, rows(prism_run), other_run, rows(other_run), name, claude)
+    report.write_text(text, encoding="utf-8", newline="\n")
+    typer.echo(text)
+
+
+@bench_app.command("table")
+def bench_table(
+    runs: Annotated[list[str], typer.Argument(help="NAME=RUN pairs, one column each.")],
+    report: Annotated[Path, typer.Option("--report", help="Markdown file to write.")],
+    title: Annotated[str, typer.Option("--title")] = "BugBench ablations",
+    root: Annotated[
+        Path, typer.Option("--root", envvar="PRISM_BENCH_ROOT", help="Clones, worktrees, runs.")
+    ] = Path(".bench"),
+) -> None:
+    """A side-by-side table of finished runs (PRism or PR-Agent) on their shared cases."""
+    import json
+
+    from prism.bench.report import render_table
+
+    cols = []
+    for pair in runs:
+        name, _, run = pair.partition("=")
+        text = (root.resolve() / "runs" / (run or name) / "results.jsonl").read_text("utf-8")
+        cols.append((name, [json.loads(x) for x in text.splitlines() if x.strip()]))
+    out = render_table(cols, title)
+    report.write_text(out, encoding="utf-8", newline="\n")
+    typer.echo(out)

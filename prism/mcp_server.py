@@ -1,8 +1,8 @@
-"""PRism's review tools over MCP (PLAN.md Phase 6, ADR 0016).
+"""PRism's review tools over MCP (ADR 0016).
 
     claude mcp add prism -- uv run --directory <repo> --group mcp --group sast prism mcp
 
-The tools are review tools, not general code-graph lookups (decision 7 in PLAN.md):
+The tools are review tools, not general code-graph lookups (a deliberate choice):
 
 * `review_diff` reviews a diff (by default the repo's uncommitted changes). With the handoff
   verifier it returns the verification requests and rubrics instead of a review: the MCP client

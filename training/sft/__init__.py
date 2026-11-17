@@ -1,4 +1,4 @@
-"""Reviewer fine-tuning (Phase 4).
+"""Reviewer fine-tuning.
 
 Unsloth patches transformers and peft when it is imported, so it has to come before them. This
 package import runs before any module in it, which makes it the one place that guarantees that.

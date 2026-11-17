@@ -1,0 +1,28 @@
+# Real-bug cases for aiosqlite: commits that introduced a bug a later commit fixed, found with
+# SZZ (`prism.bench.realbugs`) and checked by hand. `lines` are the lines of `path` at
+# `commit` that the fix (`fix`) removed or changed.
+
+[repo]
+name = "aiosqlite"
+url = "https://github.com/omnilib/aiosqlite.git"
+license = "MIT"
+
+[[case]]
+id = "aiosqlite-r01"
+group = "real"
+commit = "197d659"
+path = "aiosqlite/core.py"
+kind = "late-binding closure"
+lines = [101, 102, 103, 105, 109, 110, 111, 113]
+fix = "8576305"
+note = "set_result/set_exception close over `future`, which the loop rebinds before they run"
+
+[[case]]
+id = "aiosqlite-r02"
+group = "real"
+commit = "7fa8553"
+path = "aiosqlite/core.py"
+kind = "wrong conversion"
+lines = [273]
+fix = "8497f3c"
+note = "str() on a bytes database path turns b'x.db' into the string \"b'x.db'\""

@@ -51,7 +51,7 @@ services:
       retries: 20
     mem_limit: 256m
 
-  # Off until Phase 5: `docker compose --profile ops up -d`.
+  # Off by default: `docker compose --profile ops up -d`.
   prometheus:
     image: prom/prometheus:v2.55.1
     profiles: ["ops"]

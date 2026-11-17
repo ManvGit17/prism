@@ -1,6 +1,6 @@
 # Training
 
-Phase 3 (the gate classifier) lives in `training/gate/`, Phase 4 (the reviewer model) in
+The gate classifier lives in `training/gate/`, the reviewer model in
 `training/sft/`.
 Logic is in importable modules; the notebook only calls them.
 
@@ -38,7 +38,7 @@ only when `WANDB_API_KEY` is set; otherwise `metrics.json` holds the log history
 ## Real run on Kaggle (free T4)
 
 1. Make a GitHub token with read access to the private repo (fine-grained, "Contents: read" on
-   `ManvGit17/prism`).
+   `OWNER/prism`).
 2. On kaggle.com: Create, New Notebook. File, Import Notebook, upload
    `training/gate/gate_kaggle.ipynb`.
 3. Right panel, Session options: Accelerator, **GPU T4 x1** (not P100). Internet: **On** (needs a
@@ -73,7 +73,7 @@ validation pass; 2 epochs are enough (see the model card).
 4. `uv run python eval/gate_breakdown.py data/codereviewer/Diff_Quality_Estimation.zip` scores a
    sample of the test split by language and hunk length, for the model card's limits.
 
-## Reviewer model (Phase 4)
+## Reviewer model
 
 | Module | Job |
 |---|---|

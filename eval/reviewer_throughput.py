@@ -8,7 +8,8 @@ Start the server with room for parallel requests first, or Ollama queues them on
 
 The same hunks are sent at each level (after one warm-up request). Per level it records wall
 time, hunks per minute, generated tokens per second over all requests, the per-request decode
-speed Ollama reports, and latency percentiles. Phase 5 sets its concurrency limit from this.
+speed Ollama reports, and latency percentiles. The review pipeline's concurrency limit comes
+from this.
 Appends one JSON line per run to eval/reports/reviewer_throughput.jsonl.
 """
 

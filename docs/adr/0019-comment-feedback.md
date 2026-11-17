@@ -1,27 +1,27 @@
 # ADR 0019: Feedback on posted comments, into Langfuse
 
-Date: 2026-11-15. Status: accepted.
+Status: accepted.
 
 ## Context
 
-PLAN.md Phase 6 asks for a feedback loop: a periodic task reads 👍/👎 reactions on PRism's
-comments, writes them to Langfuse as scores on the matching trace and adds them to a dataset of
-good and bad comments for a later DPO round. Polling must be bounded (comments from the last 14
-days, conditional requests so unchanged comments cost no quota), and replies and resolved
-threads arrive by webhook.
+PRism learns from what people do with its comments. A periodic task reads thumbs-up and
+thumbs-down reactions on PRism's comments, writes them to Langfuse as scores on the matching
+trace and adds them to a dataset of good and bad comments for a later DPO round. Polling must be
+bounded (comments from the last 14 days, conditional requests so unchanged comments cost no
+quota), and replies and resolved threads arrive by webhook.
 
 ## Decision
 
 **What is kept** (migration 4, `comment_feedback`): per posted finding, the human 👍 and 👎
 counts, replies, whether its thread is resolved, the ETag of the last reactions response, when it
-was checked, and what was last sent to Langfuse. Reviews now record their installation id, which
-the reaction reads need. Reactions and replies from bots, PRism's own included, do not count.
+was checked, and what was last sent to Langfuse. Reviews record their installation id, which the
+reaction reads need. Reactions and replies from bots, PRism's own included, do not count.
 
 **Reactions** (`prism.collect_feedback`, beat, every `PRISM_APP_FEEDBACK_INTERVAL_S` = 15 min;
 `prism app feedback` for one pass). For each comment of a review posted in the last
 `PRISM_APP_FEEDBACK_WINDOW_DAYS` (14), `GET /repos/{repo}/pulls/comments/{id}/reactions` with
 `If-None-Match` set to the last ETag. GitHub answers 304 for an unchanged list and does not count
-it against the rate limit; this was checked live (the remaining quota stayed at 4972 across a
+it against the rate limit; I checked this live (the remaining quota stayed at 4972 across a
 304). The ETag is tied to the token, and installation tokens last an hour, so the saving applies
 within the long-running beat worker; a separate process with a new token reads everything once.
 
@@ -38,14 +38,14 @@ hunk as input, the comment as expected output and the label and counts as metada
 item ids are `prism-finding-<id>`, so new reactions update them instead of adding duplicates.
 Feedback is sent again only when it changes.
 
-**Also in this stage:** a review with nothing to post is posted only when it is PRism's first
-review on the PR (`PRISM_APP_POST_EMPTY=first`), so later pushes with nothing to add stay quiet.
-And posted comments are matched to findings through the PR's comment list: GitHub's
-`/reviews/{id}/comments` returns `line: null`, so before this fix no comment id was ever stored.
+**Empty reviews and comment ids.** A review with nothing to post is posted only when it is
+PRism's first review on the PR (`PRISM_APP_POST_EMPTY=first`), so later pushes with nothing to
+add stay quiet. Posted comments are matched to findings through the PR's comment list, because
+GitHub's `/reviews/{id}/comments` returns `line: null` and cannot be used for the match.
 
-## Checked live
+## Results
 
-On the test repo's PR #2 (an order report with an unsafe `yaml.load`, a mutable default argument
+On a test repo's PR #2 (an order report with an unsafe `yaml.load`, a mutable default argument
 and a division by an empty list's length), PRism's review was posted with three comments. One
 was given 👍, one 👎 and its thread resolved, one a reply. The reply arrived by webhook; one
 feedback pass stored all three, labelled the first good and the second bad (a 👎 outweighs the
@@ -57,4 +57,4 @@ endpoints) and two dataset items. A second pass in the same process got three 30
 
 - A reply alone has no label. Replies are stored but not yet read for sentiment.
 - The dataset holds comments, not pairs; pairing a bad comment with a better one for the same
-  hunk is the next training round's job.
+  hunk is the job of the next training round.

@@ -1,6 +1,6 @@
 """Pydantic contracts for review output.
 
-Two shapes are kept apart on purpose (PLAN.md section 2b):
+Two shapes are kept apart on purpose:
 
 * `ReviewerReply` is what the reviewer model writes: a comment and nothing
   else. CodeReviewer has no line labels (ADR 0009), so the model is not asked
@@ -112,12 +112,12 @@ class PRReview(_Strict):
         return tuple(c for f in self.files for c in f.comments)
 
 
-# Retrieved context (Phase 2, ADR 0007). The verifier and the frontier path read it;
+# Retrieved context (ADR 0007). The verifier and the frontier path read it;
 # the fine-tuned reviewer is served the hunk alone.
 
 
 class ContextMode(StrEnum):
-    """What retrieval may use. Phase 7 compares the four."""
+    """What retrieval may use. BugBench can compare the four."""
 
     NONE = "none"
     VECTOR = "vector"

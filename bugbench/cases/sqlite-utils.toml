@@ -1,0 +1,225 @@
+# BugBench cases for sqlite-utils, from `prism bench generate` (seed 7, window 150).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+
+[repo]
+name = "sqlite-utils"
+url = "https://github.com/simonw/sqlite-utils.git"
+license = "Apache-2.0"
+
+[[case]]
+id = "sqlite-utils-i01"
+group = "injected"
+commit = "fd5b09f"
+path = "sqlite_utils/cli.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = """            if tracker is not None:
+"""
+replace = """            if tracker is None:
+"""
+failing = "tests/test_cli_memory.py::test_memory_csv[True-test]"
+
+[[case]]
+id = "sqlite-utils-i02"
+group = "injected"
+commit = "45af93d"
+path = "sqlite_utils/db.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                yield dict(zip(keys, row))
+"""
+replace = """                yield dict(zip(row, keys))
+"""
+failing = "tests/test_cli.py::test_create_index"
+
+[[case]]
+id = "sqlite-utils-i03"
+group = "injected"
+commit = "6bc1d33"
+path = "sqlite_utils/utils.py"
+kind = "resource leak"
+operator = "drop-close"
+find = """            buffered.close()
+"""
+failing = "tests/test_rows_from_file.py::test_detect_format_closes_eager_reader[-Format.CSV-expected_rows3]"
+
+[[case]]
+id = "sqlite-utils-i04"
+group = "injected"
+commit = "56093de"
+path = "sqlite_utils/cli.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """    if drop_foreign_keys:
+"""
+replace = """    if not drop_foreign_keys:
+"""
+failing = "tests/test_cli.py::test_transform_add_or_drop_foreign_key[extra_args0-expected_schema0]"
+
+[[case]]
+id = "sqlite-utils-i05"
+group = "injected"
+commit = "b5d0080"
+path = "sqlite_utils/db.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """        if not list_mode and not all_columns:
+"""
+replace = """        if not list_mode or not all_columns:
+"""
+failing = "tests/test_analyze_tables.py::test_analyze_column[owner-extra_kwargs1-expected1]"
+
+[[case]]
+id = "sqlite-utils-i06"
+group = "injected"
+commit = "60811e7"
+path = "sqlite_utils/db.py"
+kind = "wrong exception handling"
+operator = "key-to-index"
+find = """                        except KeyError:
+"""
+replace = """                        except IndexError:
+"""
+failing = "tests/test_create.py::test_insert_ignore_hash_id_reports_pk"
+
+[[case]]
+id = "sqlite-utils-i07"
+group = "injected"
+commit = "35377a8"
+path = "sqlite_utils/cli.py"
+kind = "inverted condition"
+operator = "drop-not"
+find = """            if not no_detect_types:
+"""
+replace = """            if no_detect_types:
+"""
+failing = "tests/test_cli.py::test_insert_encoding"
+
+[[case]]
+id = "sqlite-utils-i08"
+group = "injected"
+commit = "2616dec"
+path = "sqlite_utils/db.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """                        if key in extracts and record_values[i] is not None:
+"""
+replace = """                        if key in extracts or record_values[i] is not None:
+"""
+failing = "tests/test_extracts.py::test_extracts_null_values_list_mode"
+
+[[case]]
+id = "sqlite-utils-i09"
+group = "injected"
+commit = "be27a96"
+path = "sqlite_utils/db.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                        quote_identifier(cast(str, fk.other_column)),
+"""
+replace = """                        quote_identifier(cast(fk.other_column, str)),
+"""
+failing = "tests/test_atomic.py::test_transform_parent_table_with_foreign_keys_in_atomic"
+
+[[case]]
+id = "sqlite-utils-i10"
+group = "injected"
+commit = "f7ff3e2"
+path = "sqlite_utils/db.py"
+kind = "wrong null check"
+operator = "is-none"
+find = """            and cursor.description is None
+"""
+replace = """            and cursor.description is not None
+"""
+failing = "tests/test_atomic.py::test_execute_write_commits_immediately"
+
+[[case]]
+id = "sqlite-utils-i11"
+group = "injected"
+commit = "8f0c06e"
+path = "sqlite_utils/utils.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """            float(cast(Any, value))
+"""
+replace = """            float(cast(value, Any))
+"""
+failing = "tests/test_cli.py::test_insert_detect_types[None]"
+
+[[case]]
+id = "sqlite-utils-i12"
+group = "injected"
+commit = "8845746"
+path = "sqlite_utils/cli.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """            and db.table(table).exists()
+"""
+replace = """            or db.table(table).exists()
+"""
+failing = "tests/test_cli.py::test_upsert"
+
+[[case]]
+id = "sqlite-utils-i13"
+group = "injected"
+commit = "d9a0fd2"
+path = "sqlite_utils/db.py"
+kind = "inverted condition"
+operator = "drop-not"
+find = """            if not released and self.conn.in_transaction:
+"""
+replace = """            if released and self.conn.in_transaction:
+"""
+failing = "tests/test_query.py::test_query_rejects_statements_that_return_no_rows"
+
+[[case]]
+id = "sqlite-utils-i14"
+group = "injected"
+commit = "6225eba"
+path = "sqlite_utils/db.py"
+kind = "off-by-one"
+operator = "gt-to-ge"
+find = """                        "s" if len(missing_pk_cols) > 1 else "",
+"""
+replace = """                        "s" if len(missing_pk_cols) >= 1 else "",
+"""
+failing = "tests/test_create.py::test_insert_all_pk_not_in_records_raises[0]"
+
+[[case]]
+id = "sqlite-utils-i15"
+group = "injected"
+commit = "0bad212"
+path = "sqlite_utils/cli.py"
+kind = "off-by-one"
+operator = "gt-to-ge"
+find = """            if len(distinct) > 1:
+"""
+replace = """            if len(distinct) >= 1:
+"""
+failing = "tests/test_cli_migrate.py::test_stop_before_with_legacy_migrations_class"
+
+[[case]]
+id = "sqlite-utils-c01"
+group = "clean"
+commit = "c728c25"
+kind = "clean"
+
+[[case]]
+id = "sqlite-utils-c02"
+group = "clean"
+commit = "c76aad5"
+kind = "clean"
+
+[[case]]
+id = "sqlite-utils-c03"
+group = "clean"
+commit = "23a21c1"
+kind = "clean"
+
+[[case]]
+id = "sqlite-utils-c04"
+group = "clean"
+commit = "1c6ea54"
+kind = "clean"

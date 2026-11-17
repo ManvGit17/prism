@@ -1,0 +1,38 @@
+# Real-bug cases for sqlite-utils: commits that introduced a bug a later commit fixed, found with
+# SZZ (`prism.bench.realbugs`) and checked by hand. `lines` are the lines of `path` at
+# `commit` that the fix (`fix`) removed or changed.
+
+[repo]
+name = "sqlite-utils"
+url = "https://github.com/simonw/sqlite-utils.git"
+license = "Apache-2.0"
+
+[[case]]
+id = "sqlite-utils-r01"
+group = "real"
+commit = "1c745df"
+path = "sqlite_utils/utils.py"
+kind = "missing case"
+lines = [16, 17]
+fix = "b436bdb"
+note = "a column whose values are all None gets no type and is left out"
+
+[[case]]
+id = "sqlite-utils-r02"
+group = "real"
+commit = "489eda9"
+path = "sqlite_utils/db.py"
+kind = "wrong check"
+lines = [964, 965]
+fix = "7c28a4d"
+note = "upsert(hash_id=...) is refused because the pk check ignores hash_id"
+
+[[case]]
+id = "sqlite-utils-r03"
+group = "real"
+commit = "997d875"
+path = "sqlite_utils/db.py"
+kind = "unquoted SQL identifier"
+lines = [294]
+fix = "a76e3b3"
+note = "FOREIGN KEY SQL formats column and table names unquoted; names with spaces break it"

@@ -1,14 +1,14 @@
 # ADR 0017: The GitHub App holds reviews until Claude has verified them
 
-Date: 2026-11-14. Status: accepted.
+Status: accepted.
 
 ## Context
 
-PLAN.md Phase 6 asks for a GitHub App that reviews pull requests and posts inline comments:
-webhook HMAC check, installation-token auth, diff fetch, a review with inline comments, and
-smee.io or polling for local development. The verifier is a Claude handoff (ADR 0011) and the
-machine has no API key, so a review cannot always finish inside the webhook's lifetime, and the
-local model's comments are not fit to post unverified (eval/reports/review_pipeline.md).
+PRism needs a GitHub App that reviews pull requests and posts inline comments: webhook HMAC
+check, installation-token auth, diff fetch, a review with inline comments, and smee.io or polling
+for local development. The verifier is a Claude handoff (ADR 0011) and I run without an API key,
+so a review cannot always finish inside the webhook's lifetime, and the local model's comments
+are not fit to post unverified (eval/reports/review_pipeline.md).
 
 ## Decision
 
@@ -35,27 +35,29 @@ posted. A Claude session sees it through the MCP `pending_reviews` tool and answ
 Before posting, the head commit is checked again: if someone pushed meanwhile the result is
 dropped as superseded, because its line numbers may be stale; the new push brings its own review.
 A posted review records its GitHub review id and each comment id (migration 3), so it is never
-posted twice and the feedback loop can find the comments.
+posted twice and the feedback loop (ADR 0019) can find the comments.
 
 **What is posted.** One review with event `COMMENT` (never `APPROVE` or `REQUEST_CHANGES`): the
 summary as its body, one inline comment per kept finding on the new-file line, with the suggested
 fix if there is one and a footer naming the severity, category, author and finding id.
 
-**Checked live.** A private test repo, `prism-playground`, with the App installed on it alone.
-PR #1 added a coupon lookup built with an f-string SQL query and a `remove(position)` that
-documents 1-based positions but calls `pop(position)`. The `opened` webhook went GitHub to smee
-to 127.0.0.1, passed the HMAC check and was queued. The worker read the PR, fetched the diff,
-checked out the head commit and reviewed it: the one hunk was escalated to Claude as
-security-sensitive and Bandit flagged the SQL, so the review was held with 2 answers needed.
-A Claude session answered both; on the next poll the review was rerun from cached replies and
-posted by the App's bot as one `COMMENT` review with 3 inline comments: the SQL injection
-(critical, with a parameterized-query fix), the off-by-one (major, fix `pop(position - 1)`)
-and the missing tests (minor). Bandit's own SQL comment was merged into Claude's on the same
-line. Polling found the PR on its own after a server restart.
+## Results
+
+I checked this live on a private test repo with the App installed on it alone. PR #1 added a
+coupon lookup built with an f-string SQL query and a `remove(position)` that documents 1-based
+positions but calls `pop(position)`. The `opened` webhook went GitHub to smee to 127.0.0.1,
+passed the HMAC check and was queued. The worker read the PR, fetched the diff, checked out the
+head commit and reviewed it: the one hunk was escalated to Claude as security-sensitive and
+Bandit flagged the SQL, so the review was held with 2 answers needed. A Claude session answered
+both; on the next poll the review was rerun from cached replies and posted by the App's bot as
+one `COMMENT` review with 3 inline comments: the SQL injection (critical, with a
+parameterized-query fix), the off-by-one (major, fix `pop(position - 1)`) and the missing tests
+(minor). Bandit's own SQL comment was merged into Claude's on the same line. Polling found the PR
+on its own after a server restart.
 
 ## Consequences
 
 - A PR's first review can take as long as it takes someone to answer the handoff. With
   `PRISM_VERIFIER=api` it posts within the webhook's background task.
-- Reviews run one at a time in the server process; stage 4 moves them to a Celery queue with
-  retries and per-installation limits.
+- Without the queue, reviews run one at a time in the server process; ADR 0018 moves them to a
+  Celery queue with retries and per-installation limits.

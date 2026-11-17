@@ -1,0 +1,178 @@
+# BugBench cases for aiosqlite, from `prism bench generate` (seed 7, window 150).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+# aiosqlite-i07 was removed by hand: its mutation read `while not True:`, which looks planted.
+# The operator now skips that shape (tests/test_bench.py).
+
+[repo]
+name = "aiosqlite"
+url = "https://github.com/omnilib/aiosqlite.git"
+license = "MIT"
+
+[[case]]
+id = "aiosqlite-i01"
+group = "injected"
+commit = "b28bed9"
+path = "aiosqlite/core.py"
+kind = "missing await"
+operator = "drop-await"
+find = """        await self._execute(self._conn.set_progress_handler, handler, n)
+"""
+replace = """        self._execute(self._conn.set_progress_handler, handler, n)
+"""
+failing = "test_set_progress_handler (aiosqlite.tests.smoke.SmokeTest.test_set_progress_handler)"
+
+[[case]]
+id = "aiosqlite-i02"
+group = "injected"
+commit = "2642e78"
+path = "aiosqlite/core.py"
+kind = "missing await"
+operator = "drop-await"
+find = """            kwargs["deterministic"] = deterministic
+
+        await self._execute(
+"""
+replace = """            kwargs["deterministic"] = deterministic
+
+        self._execute(
+"""
+failing = "test_create_function (aiosqlite.tests.smoke.SmokeTest.test_create_function)"
+
+[[case]]
+id = "aiosqlite-i03"
+group = "injected"
+commit = "8ec31b8"
+path = "aiosqlite/core.py"
+kind = "missing await"
+operator = "drop-await"
+find = """        if sys.version_info >= (3, 8):
+            await self._execute(
+"""
+replace = """        if sys.version_info >= (3, 8):
+            self._execute(
+"""
+failing = "test_create_function (aiosqlite.tests.smoke.SmokeTest.test_create_function)"
+
+[[case]]
+id = "aiosqlite-i04"
+group = "injected"
+commit = "e9bb960"
+path = "aiosqlite/cursor.py"
+kind = "wrong null check"
+operator = "is-none"
+find = """        if row is None:
+"""
+replace = """        if row is not None:
+"""
+failing = "test_context_cursor (aiosqlite.tests.smoke.SmokeTest.test_context_cursor)"
+
+[[case]]
+id = "aiosqlite-i05"
+group = "injected"
+commit = "5c3f61c"
+path = "aiosqlite/core.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """            result = function()
+
+            if future:
+"""
+replace = """            result = function()
+
+            if not future:
+"""
+failing = "timeout"
+
+[[case]]
+id = "aiosqlite-i06"
+group = "injected"
+commit = "8576305"
+path = "aiosqlite/core.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                def set_result(fut, result):
+"""
+replace = """                def set_result(result, fut):
+"""
+failing = "timeout"
+
+[[case]]
+id = "aiosqlite-i08"
+group = "injected"
+commit = "611d7b4"
+path = "aiosqlite/core.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """        await self._execute(self._conn.set_authorizer, authorizer_callback)
+"""
+replace = """        await self._execute(authorizer_callback, self._conn.set_authorizer)
+"""
+failing = "test_set_authorizer_deny_drops (aiosqlite.tests.smoke.SmokeTest.test_set_authorizer_deny_drops)"
+
+[[case]]
+id = "aiosqlite-i09"
+group = "injected"
+commit = "4044281"
+path = "aiosqlite/core.py"
+kind = "wrong null check"
+operator = "is-none"
+find = '''        """Complete queued queries/cursors and close the connection."""
+
+        if self._connection is None:
+'''
+replace = '''        """Complete queued queries/cursors and close the connection."""
+
+        if self._connection is not None:
+'''
+failing = "timeout"
+
+[[case]]
+id = "aiosqlite-i10"
+group = "injected"
+commit = "11c7512"
+path = "aiosqlite/core.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """                if task.done():
+"""
+replace = """                if not task.done():
+"""
+failing = "test_iterdump (aiosqlite.tests.smoke.SmokeTest.test_iterdump)"
+
+[[case]]
+id = "aiosqlite-i11"
+group = "injected"
+commit = "bdac749"
+path = "aiosqlite/core.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """    return Connection(connector, iter_chunk_size)
+"""
+replace = """    return Connection(iter_chunk_size, connector)
+"""
+failing = "test_backup_aiosqlite (aiosqlite.tests.smoke.SmokeTest.test_backup_aiosqlite)"
+
+[[case]]
+id = "aiosqlite-c01"
+group = "clean"
+commit = "f18cdb2"
+kind = "clean"
+
+[[case]]
+id = "aiosqlite-c02"
+group = "clean"
+commit = "9b127ce"
+kind = "clean"
+
+[[case]]
+id = "aiosqlite-c03"
+group = "clean"
+commit = "acf9d41"
+kind = "clean"
+
+[[case]]
+id = "aiosqlite-c04"
+group = "clean"
+commit = "c8194e8"
+kind = "clean"

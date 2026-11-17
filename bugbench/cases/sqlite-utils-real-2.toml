@@ -1,0 +1,58 @@
+# More real-bug cases for sqlite-utils: commits that introduced a bug a later commit fixed,
+# found with SZZ (`prism bench real`) and checked by hand. `lines` are the lines of `path`
+# at `commit` that the fix (`fix`) removed or changed.
+
+[repo]
+name = "sqlite-utils"
+url = "https://github.com/simonw/sqlite-utils.git"
+license = "Apache-2.0"
+
+[[case]]
+id = "sqlite-utils-r04"
+group = "real"
+commit = "36ffcaf"
+path = "sqlite_utils/db.py"
+kind = "wrong value"
+lines = [3545]
+fix = "6a45683"
+note = "String defaults are returned with doubled single quotes not unescaped"
+
+[[case]]
+id = "sqlite-utils-r05"
+group = "real"
+commit = "8e015d0"
+path = "sqlite_utils/db.py"
+kind = "crash"
+lines = [2015, 2016]
+fix = "1ed95e4"
+note = "pks_and_rows_where on Queryable now uses self.pks/self.use_rowid, which views lack, so it fails on views"
+
+[[case]]
+id = "sqlite-utils-r06"
+group = "real"
+commit = "50d2096"
+path = "sqlite_utils/cli.py"
+kind = "wrong condition"
+lines = [681]
+fix = "7e2dcbb"
+note = "--no-headers forces csv=True even when --tsv is given, so --no-headers --tsv wrongly errors as both csv and tsv"
+
+[[case]]
+id = "sqlite-utils-r07"
+group = "real"
+commit = "947bb76"
+path = "sqlite_utils/db.py"
+kind = "logic"
+lines = [1078, 1079, 1080, 1081, 1082, 1083]
+fix = "8f042ae"
+note = "Comprehension checks membership against all_columns before it is extended, so a new column appearing in several records of a chunk is appended repeatedly"
+
+[[case]]
+id = "sqlite-utils-r08"
+group = "real"
+commit = "acea548"
+path = "sqlite_utils/db.py"
+kind = "wrong value"
+lines = [44]
+fix = "e51f36d"
+note = "REFERENCES clause bracket-quotes the table and column together as [table(column)], producing invalid foreign key SQL"

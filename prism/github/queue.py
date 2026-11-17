@@ -1,4 +1,4 @@
-"""The review queue: Celery tasks over Redis (PLAN.md Phase 6, ADR 0018).
+"""The review queue: Celery tasks over Redis (ADR 0018).
 
     webhook / poll --enqueue()--> Redis --> worker: review_pull(job)
                                             beat:   resume_held every minute (posts answered
