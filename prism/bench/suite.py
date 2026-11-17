@@ -44,6 +44,7 @@ class RunSpec:
     seed_replies: list[str] = field(default_factory=list)
     worktrees: str = "worktrees"  # give runs that go on at the same time their own folder
     sweep: bool = False
+    judge: bool = True  # judge this run's posted comments
 
 
 @dataclass
@@ -160,7 +161,8 @@ async def run_suite(
     if waiting:
         return waiting, None
 
-    judged, judge_round = judge_runs(sets, root, [s.run for s in suite.runs])
+    judged_specs = [s for s in suite.runs if s.judge]
+    judged, judge_round = judge_runs(sets, root, [s.run for s in judged_specs])
     if judge_round is not None:
         return [judge_round], None
 
@@ -171,7 +173,8 @@ async def run_suite(
         return [json.loads(x) for x in text.splitlines() if x.strip()]
 
     text = render_table([(s.name, rows(s.run)) for s in suite.runs], "BugBench results")
-    text += "\n" + render_judged([(s.name, judged[s.run]) for s in suite.runs])
+    if judged_specs:
+        text += "\n" + render_judged([(s.name, judged[s.run]) for s in judged_specs])
     sweeps = []
     for spec in suite.runs:
         if spec.sweep and suite.thresholds:

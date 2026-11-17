@@ -25,3 +25,4 @@ settings = { route_all = true, review_unit = "pr" }
 seed = ["whole-pr-01"]
 sweep = true
 worktrees = "worktrees-whole-pr"
+judge = false
