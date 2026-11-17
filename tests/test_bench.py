@@ -370,3 +370,150 @@ def test_sweep_table_marks_thresholds_with_unscored_prs() -> None:
     text = render_sweep([("PRism", sweep)], "t")
     assert "| 0.60 | 1/1 |" in text
     assert "| 0.80 | 0/0 (1 PR(s) unscored) |" in text
+
+
+def test_generate_skips_used_commits_and_continues_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from collections import Counter
+
+    from prism.bench import mutate
+
+    spec = mutate.RepoSpec(
+        name="demo",
+        url="u",
+        license="MIT",
+        language="python",
+        source=("pkg/",),
+        exclude=(),
+        test=("x",),
+        timeout=10,
+    )
+    (tmp_path / "gen" / "demo").mkdir(parents=True)
+    (tmp_path / "gen" / "demo" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(mutate, "recent_commits", lambda *a: ["aaaaaaa", "bbbbbbb", "ccccccc"])
+    monkeypatch.setattr(mutate, "_changed_lines", lambda *a: 1)
+    monkeypatch.setattr(mutate, "checkout", lambda *a: None)
+    monkeypatch.setattr(
+        mutate,
+        "candidates",
+        lambda clone, commit, spec: [
+            mutate.Mutation(commit, "a.py", 1, "off_by_one", "off-by-one", "x = 1", "x = 2")
+        ],
+    )
+
+    def fake_tests(root: Path, spec: object, wt: Path, timeout: float | None = None) -> object:
+        text = (wt / "a.py").read_text(encoding="utf-8")
+        ok = "x = 1" in text
+        return mutate.TestRun(ok, 1.0, "" if ok else "tests/t.py::test_x")
+
+    monkeypatch.setattr(mutate, "run_tests", fake_tests)
+    got = mutate.generate(
+        tmp_path,
+        spec,
+        injected=1,
+        clean=1,
+        notes=lambda m: None,
+        used=["bbbbbbb1"],
+        kinds_used=Counter({"off-by-one": 1}),
+        first_injected=16,
+        first_clean=5,
+    )
+    commits = {r["commit"] for r in [*got.injected, *got.clean]}
+    assert "bbbbbbb" not in commits and len(commits) == 2
+    assert got.injected[0]["id"] == "demo-i16" and got.clean[0]["id"] == "demo-c05"
+
+    # A run that stops is resumed from its progress file without testing a commit again.
+    progress = tmp_path / "p.jsonl"
+    first = mutate.generate(
+        tmp_path, spec, injected=1, clean=0, notes=lambda m: None, progress=progress
+    )
+    calls = {"n": 0}
+
+    def counting(root: Path, spec: object, wt: Path, timeout: float | None = None) -> object:
+        calls["n"] += 1
+        return fake_tests(root, spec, wt, timeout)
+
+    monkeypatch.setattr(mutate, "run_tests", counting)
+    again = mutate.generate(
+        tmp_path, spec, injected=1, clean=1, notes=lambda m: None, progress=progress
+    )
+    assert again.injected == first.injected
+    assert calls["n"] == 1, "only the one new commit is tested"
+
+
+def test_judge_keys_comments_by_content_and_scores_runs() -> None:
+    from prism.bench.judge import hunk_around, posted, summarize
+
+    prism_row = {
+        "case_id": "a-i01",
+        "group": "injected",
+        "comments": [{"path": "a.py", "line": 3, "comment": "off by one"}],
+    }
+    agent_row = {
+        "case_id": "a-i01",
+        "group": "injected",
+        "details": [{"path": "a.py", "start": 3, "end": 3, "text": "off by one"}],
+    }
+    clean_row = {
+        "case_id": "a-c01",
+        "group": "clean",
+        "comments": [{"path": "a.py", "line": 1, "comment": "nit"}],
+    }
+    (p,) = posted(prism_row)
+    (q,) = posted(agent_row)
+    assert p.key == q.key, "the same comment from two runs is judged once"
+    verdicts = {
+        p.key: {"valid": True, "names_defect": True},
+        posted(clean_row)[0].key: {"valid": False, "names_defect": None},
+    }
+    s = summarize([prism_row, clean_row], verdicts)
+    assert s["precision"] == 0.5 and s["named"] == {"injected": [1, 1]}
+
+    diff = (
+        "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n"
+        "@@ -1,2 +1,3 @@\n x = 1\n-y = 2\n+y = 3\n+z = 4\n"
+    )
+    text = hunk_around(diff, "a.py", 2, 2)
+    assert "-y = 2" in text and "+y = 3" in text
+
+
+def test_experiment_scores_per_case_and_per_run() -> None:
+    from prism.bench.experiments import item_scores, run_scores
+    from prism.bench.judge import posted
+
+    hit = {
+        "case_id": "a-i01",
+        "group": "injected",
+        "hit": True,
+        "comments": [{"path": "a.py", "line": 3, "comment": "off by one"}],
+    }
+    clean = {"case_id": "a-c01", "group": "clean", "hit": False, "comments": []}
+    verdicts = {posted(hit)[0].key: {"valid": True, "names_defect": True}}
+    scores = {s["name"]: s["value"] for s in item_scores(hit, verdicts)}
+    assert scores == {"comments": 1, "hit": 1, "valid_share": 1.0, "names_defect": 1}
+    assert {s["name"]: s["value"] for s in run_scores([hit, clean])} == {
+        "recall_injected": 1.0,
+        "clean_flagged": 0.0,
+    }
+
+
+def test_suite_loads_configs_and_seeds_only_what_a_run_lacks(tmp_path: Path) -> None:
+    from prism.bench.suite import RunSpec, load_suite, seed
+
+    suite = load_suite(Path("bugbench/configs.toml"))
+    assert suite.runs[0].run == "bb-prism" and suite.settings == {"gate": "onnx"}
+    assert not any(p.name == "tinydb-slice.toml" for p in suite.cases)
+
+    runs = tmp_path / "runs"
+    (runs / "old" / "c1" / "verify").mkdir(parents=True)
+    (runs / "old" / "c1" / "replies.json").write_text("{}", encoding="utf-8")
+    (runs / "old" / "c1" / "verify" / "verdicts_bench.jsonl").write_text("", encoding="utf-8")
+    (runs / "old" / "results.jsonl").write_text("", encoding="utf-8")
+    (runs / "new" / "c2").mkdir(parents=True)
+    assert seed(tmp_path, RunSpec(name="n", run="new", seed=["old"])) == 1
+    assert (runs / "new" / "c1" / "verify" / "verdicts_bench.jsonl").exists()
+    assert not (runs / "new" / "results.jsonl").exists()
+
+    assert seed(tmp_path, RunSpec(name="r", run="replies", seed_replies=["old"])) == 1
+    assert sorted(p.name for p in (runs / "replies" / "c1").iterdir()) == ["replies.json"]

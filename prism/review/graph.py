@@ -37,7 +37,7 @@ from prism.review.aggregate import cap, file_reviews, summary, verdict
 from prism.review.checks import Candidate, Decision, Escalation, VerifyBatch, new_side_lines
 from prism.review.handoff import ReplyCache
 from prism.review.plan import FilePlan, HunkTask, NotReviewed, ReviewPlan, git_churn, plan_review
-from prism.review.reviewer_client import HunkResult, ReviewerModel, review_hunk
+from prism.review.reviewer_client import HunkResult, ReviewerModel, review_hunk, with_context
 from prism.review.router import RouteKey, route
 from prism.review.sast import LEVEL_RANK, Finding, SastReport, at_least
 from prism.schemas import PRReview, RawComment
@@ -73,6 +73,8 @@ class ReviewOptions:
     escalate: bool = False
     escalate_min_lines: int = 60
     route_all: bool = False
+    # Evaluation setting: the local reviewer also sees retrieved code before each hunk.
+    reviewer_context: bool = False
 
 
 class ReviewState(TypedDict, total=False):
@@ -81,6 +83,7 @@ class ReviewState(TypedDict, total=False):
     deadline: float
     plan: ReviewPlan
     routes: dict[RouteKey, tuple[str, ...]]
+    reviewer_contexts: dict[tuple[str, str], str]
     escalations: Annotated[list[Escalation], operator.add]
     candidates: Annotated[list[Candidate], operator.add]
     unreviewed: Annotated[list[NotReviewed], operator.add]
@@ -95,6 +98,7 @@ class FileState(TypedDict):
     file: FilePlan
     deadline: float
     routes: dict[RouteKey, tuple[str, ...]]
+    contexts: dict[tuple[str, str], str]
 
 
 class SastState(TypedDict):
@@ -151,13 +155,22 @@ def build_graph(
             },
             metadata={"gate": gate.name, "max_hunks": options.max_hunks},
         )
-        return {"plan": plan, "routes": routes}
+        contexts: dict[tuple[str, str], str] = {}
+        if options.reviewer_context and context_fn is not None:
+            local = [t for t in plan.tasks if (t.path, t.index) not in routes]
+            contexts = context_fn(local) if local else {}
+        return {"plan": plan, "routes": routes, "reviewer_contexts": contexts}
 
     def fan_out(state: ReviewState) -> list[Send] | str:
         sends = [
             Send(
                 "file_reviewer",
-                FileState(file=f, deadline=state["deadline"], routes=state["routes"]),
+                FileState(
+                    file=f,
+                    deadline=state["deadline"],
+                    routes=state["routes"],
+                    contexts=state.get("reviewer_contexts", {}),
+                ),
             )
             for f in state["plan"].files
             if f.tasks
@@ -194,7 +207,9 @@ def build_graph(
                     output="escalated to the frontier model", metadata={"reasons": list(reasons)}
                 )
                 return Escalation(task, reasons)
-            cached = cache.get(model.name, task.path, task.text) if cache else None
+            ctx = state["contexts"].get((task.path, task.hunk.header), "")
+            prompt = with_context(task.text, ctx)
+            cached = cache.get(model.name, task.path, prompt) if cache else None
             if cached is not None:
                 file_span.child(name, input=task.text).end(
                     output=cached, metadata={"cached": True, "model": model.name}
@@ -207,12 +222,12 @@ def build_graph(
                 name,
                 kind="generation",
                 model=model.name,
-                input=task.text,
+                input=prompt,
                 prompt=reviewer_prompt,
                 metadata={"gate_score": task.gate_score},
             )
             result = await review_hunk(
-                model, task.text, limit, retries=options.retries, deadline=deadline
+                model, task.text, limit, retries=options.retries, deadline=deadline, context=ctx
             )
             gen.end(
                 output=result.comment.model_dump() if result.comment else result.error,
@@ -225,7 +240,7 @@ def build_graph(
             )
             # A raised error (server down, timeout) is not cached, so a rerun tries again.
             if cache is not None and result.status != "error":
-                cache.put(model.name, task.path, task.text, _cache_entry(result))
+                cache.put(model.name, task.path, prompt, _cache_entry(result))
             if result.status == "time":
                 return NotReviewed(task.path, task.hunk.header, "time")
             if result.comment is None:

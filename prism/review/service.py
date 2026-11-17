@@ -217,6 +217,7 @@ async def review_async(
         escalate=s.escalate and kind != "rules",
         escalate_min_lines=s.escalate_min_lines,
         route_all=s.route_all and kind != "rules",
+        reviewer_context=s.reviewer_context,
     )
     names = [n.strip() for n in s.sast_tools.split(",") if n.strip()] if req.sast else []
     tools = default_tools(names, s.semgrep_config, s.pmd_home)
@@ -262,7 +263,7 @@ async def review_async(
         chosen = RuleVerifier()
 
     # Only a Claude verifier reads context; the rules verifier must not need the stores.
-    needs_context = kind != "rules" and context_mode is not ContextMode.NONE
+    needs_context = context_mode is not ContextMode.NONE and (kind != "rules" or s.reviewer_context)
     sources: Any = (
         context_sources(repo, rid, context_mode, req.store, notes, s)
         if needs_context

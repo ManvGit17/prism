@@ -77,6 +77,13 @@ class HunkResult:
     wait_s: float = 0.0
 
 
+def with_context(hunk: str, context: str) -> str:
+    """The reviewer's input: the hunk, or retrieved code and then the hunk."""
+    if not context:
+        return hunk
+    return f"Code from the repository, for context:\n{context}\n\nThe hunk to review:\n{hunk}"
+
+
 async def review_hunk(
     model: ReviewerModel,
     hunk: str,
@@ -84,9 +91,14 @@ async def review_hunk(
     *,
     retries: int = 2,
     deadline: float | None = None,
+    context: str = "",
 ) -> HunkResult:
     """Review one hunk. The deadline is checked once a model slot is held, not before: all hunks
-    of a PR start at once and wait on the semaphore, so a check at start would always pass."""
+    of a PR start at once and wait on the semaphore, so a check at start would always pass.
+
+    With `context` (an evaluation setting) the model also sees retrieved code before the hunk;
+    the comment is still placed on a line of the hunk alone."""
+    prompt = with_context(hunk, context)
     error: str | None = None
     status: Status = "invalid"
     wait = 0.0
@@ -97,7 +109,7 @@ async def review_hunk(
                 wait += time.monotonic() - queued
                 if deadline is not None and time.monotonic() > deadline:
                     return HunkResult(None, attempt, "time", wait_s=wait)
-                text = await model.reply(hunk, attempt)
+                text = await model.reply(prompt, attempt)
         except (httpx.HTTPError, KeyError, ValueError) as exc:
             error, status = f"{type(exc).__name__}: {exc}", "error"
             log.warning("reviewer call failed (attempt %d): %s", attempt + 1, error)

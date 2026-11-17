@@ -236,3 +236,32 @@ def render_table(columns: Sequence[tuple[str, Sequence[dict[str, Any]]]], title:
         marks = " | ".join("hit" if by[cid]["hit"] else "-" for _, by in cols)
         lines.append(f"| {cid} | {first['group']} | {marks} |")
     return "\n".join(lines) + "\n"
+
+
+def render_judged(columns: Sequence[tuple[str, dict[str, Any]]]) -> str:
+    """Judge results per run: precision, and defects named in any comment (wherever placed)."""
+
+    def named(s: dict[str, Any], group: str) -> str:
+        got = s["named"].get(group)
+        return f"{got[0]}/{got[1]}" if got else "-"
+
+    def precision(s: dict[str, Any]) -> str:
+        if not s["comments"]:
+            return "-"
+        return f"{s['precision']:.2f} ({s['valid']}/{s['comments']})"
+
+    head = "| | " + " | ".join(n for n, _ in columns) + " |"
+    lines = [
+        "## Judged",
+        "",
+        "Every posted comment was judged: is it a true, useful review comment, and does it name "
+        "the defect (wherever it is placed)?",
+        "",
+        head,
+        "|---|" + "---|" * len(columns),
+        "| Precision | " + " | ".join(precision(s) for _, s in columns) + " |",
+        "| Planted bugs named | " + " | ".join(named(s, "injected") for _, s in columns) + " |",
+        "| Real bugs named | " + " | ".join(named(s, "real") for _, s in columns) + " |",
+        "",
+    ]
+    return "\n".join(lines)

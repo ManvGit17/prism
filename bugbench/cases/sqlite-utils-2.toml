@@ -1,0 +1,361 @@
+# BugBench cases for sqlite-utils, from `prism bench generate` (seed 11, window 500).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+
+[repo]
+name = "sqlite-utils"
+url = "https://github.com/simonw/sqlite-utils.git"
+license = "Apache-2.0"
+
+[[case]]
+id = "sqlite-utils-i16"
+group = "injected"
+commit = "8572d1e"
+path = "sqlite_utils/db.py"
+kind = "wrong boolean operator"
+operator = "or-to-and"
+find = """                    lookup_col=quote_identifier(rename.get(column) or column),
+"""
+replace = """                    lookup_col=quote_identifier(rename.get(column) and column),
+"""
+failing = "tests/test_cli.py::test_extract[args0-expected_table_schema0-CREATE"
+
+[[case]]
+id = "sqlite-utils-i17"
+group = "injected"
+commit = "4fc2f12"
+path = "sqlite_utils/cli.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """    if sniff_buffer:
+"""
+replace = """    if not sniff_buffer:
+"""
+failing = "tests/test_cli.py::test_upsert"
+
+[[case]]
+id = "sqlite-utils-i18"
+group = "injected"
+commit = "07b603e"
+path = "sqlite_utils/utils.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                new_key = "{}_{}".format(key, suffix)
+"""
+replace = """                new_key = "{}_{}".format(suffix, key)
+"""
+failing = "tests/test_cli.py::test_query_json_duplicate_columns_are_deduped"
+
+[[case]]
+id = "sqlite-utils-i19"
+group = "injected"
+commit = "5a7f522"
+path = "sqlite_utils/utils.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if callable(fn):
+"""
+replace = """        if not callable(fn):
+"""
+failing = "tests/test_cli_convert.py::test_convert_multi_dryrun"
+
+[[case]]
+id = "sqlite-utils-i20"
+group = "injected"
+commit = "d6753a9"
+path = "sqlite_utils/db.py"
+kind = "wrong null check"
+operator = "is-none"
+find = """            if any(record_values[i] is None for i in pk_indexes):
+"""
+replace = """            if any(record_values[i] is not None for i in pk_indexes):
+"""
+failing = "tests/test_cli.py::test_upsert"
+
+[[case]]
+id = "sqlite-utils-i21"
+group = "injected"
+commit = "f10459c"
+path = "sqlite_utils/db.py"
+kind = "off-by-one"
+operator = "gt-to-ge"
+find = """            is_compound = len(rows) > 1
+"""
+replace = """            is_compound = len(rows) >= 1
+"""
+failing = "tests/test_cli.py::test_add_foreign_key[args0-Explicit"
+
+[[case]]
+id = "sqlite-utils-i22"
+group = "injected"
+commit = "8c73955"
+path = "sqlite_utils/cli.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """        docs = itertools.islice(docs, stop_after)
+"""
+replace = """        docs = itertools.islice(stop_after, docs)
+"""
+failing = "tests/test_cli_insert.py::test_insert_stop_after[[{\"name\":"
+
+[[case]]
+id = "sqlite-utils-i23"
+group = "injected"
+commit = "8e015d0"
+path = "sqlite_utils/db.py"
+kind = "wrong boolean operator"
+operator = "or-to-and"
+find = """                rename.get(pk_name) or pk_name
+"""
+replace = """                rename.get(pk_name) and pk_name
+"""
+failing = "tests/test_atomic.py::test_transform_parent_table_with_foreign_keys_in_atomic"
+
+[[case]]
+id = "sqlite-utils-i24"
+group = "injected"
+commit = "d516e58"
+path = "sqlite_utils/cli.py"
+kind = "wrong boolean operator"
+operator = "or-to-and"
+find = """                    tablefmt=fmt or "simple",
+"""
+replace = """                    tablefmt=fmt and "simple",
+"""
+failing = "tests/test_cli.py::test_output_table[options2-expected2]"
+
+[[case]]
+id = "sqlite-utils-i25"
+group = "injected"
+commit = "30cc95c"
+path = "sqlite_utils/migrations.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = '''        This is a read-only operation - it does not write to the database.
+        """
+        table = _table(db, self.migrations_table)
+'''
+replace = '''        This is a read-only operation - it does not write to the database.
+        """
+        table = _table(self.migrations_table, db)
+'''
+failing = "tests/test_cli_migrate.py::test_basic[TMPDIR]"
+
+[[case]]
+id = "sqlite-utils-i26"
+group = "injected"
+commit = "374a816"
+path = "sqlite_utils/db.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if execute_plugins:
+"""
+replace = """        if not execute_plugins:
+"""
+failing = "tests/test_plugins.py::test_prepare_connection"
+
+[[case]]
+id = "sqlite-utils-i27"
+group = "injected"
+commit = "373b788"
+path = "sqlite_utils/cli.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        elif raw_lines:
+"""
+replace = """        elif not raw_lines:
+"""
+failing = "tests/test_cli.py::test_output_table[options0-expected0]"
+
+[[case]]
+id = "sqlite-utils-i28"
+group = "injected"
+commit = "adc10df"
+path = "sqlite_utils/db.py"
+kind = "wrong boolean operator"
+operator = "or-to-and"
+find = '''        if sql[i].isspace() or sql[i] in (";", "\ufeff"):
+'''
+replace = '''        if sql[i].isspace() and sql[i] in (";", "\ufeff"):
+'''
+failing = "tests/test_atomic.py::test_execute_prefixed_begin_leaves_transaction_open[;"
+
+[[case]]
+id = "sqlite-utils-i29"
+group = "injected"
+commit = "8443d7f"
+path = "sqlite_utils/db.py"
+kind = "wrong null check"
+operator = "is-none"
+find = """            if all(c is None for c in other_columns):
+"""
+replace = """            if all(c is not None for c in other_columns):
+"""
+failing = "tests/test_foreign_keys.py::test_implicit_primary_key_reference_is_resolved"
+
+[[case]]
+id = "sqlite-utils-i30"
+group = "injected"
+commit = "623331b"
+path = "sqlite_utils/db.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """            if self.conn.in_transaction:
+"""
+replace = """            if not self.conn.in_transaction:
+"""
+failing = "tests/test_atomic.py::test_transform_does_not_commit_open_atomic_block"
+
+[[case]]
+id = "sqlite-utils-i31"
+group = "injected"
+commit = "bcd9a26"
+path = "sqlite_utils/db.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = """            if autocommit is not None and autocommit != getattr(
+"""
+replace = """            if autocommit is None and autocommit != getattr(
+"""
+failing = "tests/test_constructor.py::test_autocommit_connections_are_rejected[True]"
+
+[[case]]
+id = "sqlite-utils-i32"
+group = "injected"
+commit = "347fdc8"
+path = "sqlite_utils/db.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """    elif isinstance(value, datetime.timedelta):
+"""
+replace = """    elif isinstance(datetime.timedelta, value):
+"""
+failing = "tests/test_analyze.py::test_analyze_whole_database"
+
+[[case]]
+id = "sqlite-utils-i33"
+group = "injected"
+commit = "6500fed"
+path = "sqlite_utils/db.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if str(value).endswith(")"):
+"""
+replace = """        if not str(value).endswith(")"):
+"""
+failing = "tests/test_cli.py::test_add_column_not_null_default"
+
+[[case]]
+id = "sqlite-utils-i34"
+group = "injected"
+commit = "d100264"
+path = "sqlite_utils/db.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = """                (self.other_column,) if self.other_column is not None else ()
+"""
+replace = """                (self.other_column,) if self.other_column is None else ()
+"""
+failing = "tests/test_atomic.py::test_transform_detects_foreign_key_check_violations"
+
+[[case]]
+id = "sqlite-utils-i35"
+group = "injected"
+commit = "8906f57"
+path = "sqlite_utils/cli.py"
+kind = "wrong boolean operator"
+operator = "or-to-and"
+find = """    if getattr(sys, "_sqlite_utils_memory_test", False) or not getattr(
+"""
+replace = """    if getattr(sys, "_sqlite_utils_memory_test", False) and not getattr(
+"""
+failing = "tests/test_cli_memory.py::test_memory_named_database_hack[True]"
+
+[[case]]
+id = "sqlite-utils-i36"
+group = "injected"
+commit = "8e7d018"
+path = "sqlite_utils/db.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = """            if not upsert and result is not None:
+"""
+replace = """            if not upsert and result is None:
+"""
+failing = "tests/test_analyze_tables.py::test_analyze_table_validate_columns[args0-These"
+
+[[case]]
+id = "sqlite-utils-i37"
+group = "injected"
+commit = "05e2bb8"
+path = "sqlite_utils/db.py"
+kind = "resource leak"
+operator = "drop-close"
+find = """        self.conn.close()
+"""
+failing = "tests/test_constructor.py::test_database_close[True]"
+
+[[case]]
+id = "sqlite-utils-i38"
+group = "injected"
+commit = "b75edf4"
+path = "sqlite_utils/db.py"
+kind = "off-by-one"
+operator = "gt-to-ge"
+find = """        if other_table is None:
+            if len(columns) > 1:
+"""
+replace = """        if other_table is None:
+            if len(columns) >= 1:
+"""
+failing = "tests/test_cli.py::test_add_foreign_key[args2-Automatically"
+
+[[case]]
+id = "sqlite-utils-i39"
+group = "injected"
+commit = "1500c19"
+path = "sqlite_utils/db.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """            strict=" STRICT" if strict and self.supports_strict else "",
+"""
+replace = """            strict=" STRICT" if strict or self.supports_strict else "",
+"""
+failing = "tests/test_cli.py::test_tables_schema"
+
+[[case]]
+id = "sqlite-utils-i40"
+group = "injected"
+commit = "93640a7"
+path = "sqlite_utils/cli.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """            _display_migration_list(db, migration_sets)
+"""
+replace = """            _display_migration_list(migration_sets, db)
+"""
+failing = "tests/test_cli_migrate.py::test_basic[TMPDIR]"
+
+[[case]]
+id = "sqlite-utils-c05"
+group = "clean"
+commit = "0aefbb6"
+kind = "clean"
+
+[[case]]
+id = "sqlite-utils-c06"
+group = "clean"
+commit = "86a352f"
+kind = "clean"
+
+[[case]]
+id = "sqlite-utils-c07"
+group = "clean"
+commit = "965ca0d"
+kind = "clean"
+
+[[case]]
+id = "sqlite-utils-c08"
+group = "clean"
+commit = "fa5d66b"
+kind = "clean"

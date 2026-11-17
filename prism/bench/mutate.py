@@ -13,6 +13,7 @@ balanced. Commits whose tests pass and that got no case can become clean cases.
 from __future__ import annotations
 
 import ast
+import json
 import os
 import random
 import re
@@ -461,35 +462,71 @@ def generate(
     tries_per_commit: int = 4,
     seed: int = 7,
     notes: Callable[[str], None] = print,
+    used: Sequence[str] = (),
+    kinds_used: Counter[str] | None = None,
+    first_injected: int = 1,
+    first_clean: int = 1,
+    progress: Path | None = None,
 ) -> Generated:
+    """`used` are commits already in a case file (skipped), `kinds_used` the kinds already
+    planted there, and ids start at `first_injected` / `first_clean`, so a set can be grown.
+
+    With `progress`, every commit tried is recorded there as it is decided, and a rerun picks
+    up where the last one stopped instead of testing the same commits again."""
     clone = root / spec.name
     rng = random.Random(seed)
-    commits = recent_commits(clone, spec, window)
+    taken = {c[:7] for c in used}
+    commits = [c for c in recent_commits(clone, spec, window) if c[:7] not in taken]
     rng.shuffle(commits)
     wt = root / "gen" / spec.name
-    kinds: Counter[str] = Counter()
-    cap = max(2, -(-injected // 5))  # no kind takes more than about a fifth of the set
+    kinds: Counter[str] = Counter(kinds_used or {})
+    # No kind takes more than about a fifth of the repo's planted cases, old and new.
+    cap = max(2, -(-(injected + sum(kinds.values())) // 5))
     out = Generated()
     spare: list[str] = []  # commits whose tests pass and that got no case
+    tried: set[str] = set()
+    if progress is not None and progress.exists():
+        for line in progress.read_text(encoding="utf-8").splitlines():
+            rec = json.loads(line)
+            tried.add(rec["commit"])
+            if rec["outcome"] == "injected":
+                out.injected.append(rec["row"])
+                kinds[rec["row"]["kind"]] += 1
+            elif rec["outcome"] == "spare":
+                spare.append(rec["commit"])
+            else:
+                out.skipped[rec["outcome"]] += 1
+
+    def record(commit: str, outcome: str, row: dict[str, Any] | None = None) -> None:
+        if progress is not None:
+            with progress.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"commit": commit, "outcome": outcome, "row": row}) + "\n")
+
     for commit in commits:
         if len(out.injected) >= injected and len(spare) >= clean:
             break
+        if commit in tried:
+            continue
         try:
             if _changed_lines(clone, commit) > MAX_CHANGED_LINES:
                 out.skipped["too large"] += 1
+                record(commit, "too large")
                 continue
             muts = candidates(clone, commit, spec)
         except subprocess.CalledProcessError:
             out.skipped["git error"] += 1
+            record(commit, "git error")
             continue
         checkout(clone, wt, commit)
         base = run_tests(root, spec, wt)
         if not base.passed:
             out.skipped["tests fail at the commit"] += 1
+            record(commit, "tests fail at the commit")
             notes(f"{spec.name} {commit}: tests fail at the commit ({base.failing})")
             continue
         if len(out.injected) >= injected or not muts:
             spare.append(commit)
+            record(commit, "spare")
             continue
         # Least-used kinds first, then at random, so the kinds stay balanced.
         rng.shuffle(muts)
@@ -515,26 +552,27 @@ def generate(
                 out.skipped["no test fails"] += 1
                 continue
             kinds[mut.kind] += 1
-            n = len(out.injected) + 1
-            out.injected.append(
-                {
-                    "id": f"{spec.name}-i{n:02d}",
-                    "group": "injected",
-                    "commit": commit,
-                    "path": mut.path,
-                    "kind": mut.kind,
-                    "operator": mut.operator,
-                    "find": mut.find,
-                    "replace": mut.replace,
-                    "failing": run.failing,
-                }
-            )
+            n = len(out.injected) + first_injected
+            row = {
+                "id": f"{spec.name}-i{n:02d}",
+                "group": "injected",
+                "commit": commit,
+                "path": mut.path,
+                "kind": mut.kind,
+                "operator": mut.operator,
+                "find": mut.find,
+                "replace": mut.replace,
+                "failing": run.failing,
+            }
+            out.injected.append(row)
+            record(commit, "injected", row)
             notes(f"{spec.name} {commit}: {mut.kind} ({mut.operator}) caught by {run.failing}")
             kept = True
             break
         if not kept:
             spare.append(commit)
-    for n, commit in enumerate(spare[:clean], 1):
+            record(commit, "spare")
+    for n, commit in enumerate(spare[:clean], first_clean):
         out.clean.append(
             {"id": f"{spec.name}-c{n:02d}", "group": "clean", "commit": commit, "kind": "clean"}
         )

@@ -1,0 +1,164 @@
+# BugBench cases for aiosqlite, from `prism bench generate` (seed 11, window 500).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+
+[repo]
+name = "aiosqlite"
+url = "https://github.com/omnilib/aiosqlite.git"
+license = "MIT"
+
+[[case]]
+id = "aiosqlite-i12"
+group = "injected"
+commit = "57bcc6a"
+path = "aiosqlite/core.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """                get_loop(future).call_soon_threadsafe(future.set_result, result)
+"""
+replace = """                get_loop(future).call_soon_threadsafe(result, future.set_result)
+"""
+failing = "timeout"
+
+[[case]]
+id = "aiosqlite-i13"
+group = "injected"
+commit = "7b518ce"
+path = "aiosqlite/core.py"
+kind = "missing await"
+operator = "drop-await"
+find = '''        """
+        await self._execute(
+'''
+replace = '''        """
+        self._execute(
+'''
+failing = "test_create_function (aiosqlite.tests.smoke.SmokeTest.test_create_function)"
+
+[[case]]
+id = "aiosqlite-i14"
+group = "injected"
+commit = "6415948"
+path = "aiosqlite/core.py"
+kind = "missing await"
+operator = "drop-await"
+find = """            await self._execute(self._conn.close)
+"""
+replace = """            self._execute(self._conn.close)
+"""
+failing = "test_connection_await (aiosqlite.tests.smoke.SmokeTest.test_connection_await)"
+
+[[case]]
+id = "aiosqlite-i15"
+group = "injected"
+commit = "d9f28c9"
+path = "aiosqlite/core.py"
+kind = "missing await"
+operator = "drop-await"
+find = """        finally:
+            await self._stop_running()
+"""
+replace = """        finally:
+            self._stop_running()
+"""
+failing = "test_close_blocking_until_transaction_queue_empty (aiosqlite.tests.smoke.SmokeTest.test_close_blocking_until_transaction_queue_empty)"
+
+[[case]]
+id = "aiosqlite-i16"
+group = "injected"
+commit = "95ec896"
+path = "aiosqlite/core.py"
+kind = "inverted condition"
+operator = "drop-not"
+find = '''    """Set the exception of a future if it hasn't been set already."""
+    if not fut.done():
+'''
+replace = '''    """Set the exception of a future if it hasn't been set already."""
+    if fut.done():
+'''
+failing = "timeout"
+
+[[case]]
+id = "aiosqlite-i17"
+group = "injected"
+commit = "a2c7946"
+path = "aiosqlite/core.py"
+kind = "inverted condition"
+operator = "drop-not"
+find = """        if not self._running or not self._connection:
+"""
+replace = """        if self._running or not self._connection:
+"""
+failing = "test_backup_aiosqlite (aiosqlite.tests.smoke.SmokeTest.test_backup_aiosqlite)"
+
+[[case]]
+id = "aiosqlite-i18"
+group = "injected"
+commit = "7a83b7c"
+path = "aiosqlite/context.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """    def send(self, value) -> None:
+"""
+replace = """    def send(value, self) -> None:
+"""
+failing = "test_multiple_queries (aiosqlite.tests.smoke.SmokeTest.test_multiple_queries)"
+
+[[case]]
+id = "aiosqlite-i19"
+group = "injected"
+commit = "5a2c4d1"
+path = "aiosqlite/core.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if isinstance(target, Connection):
+"""
+replace = """        if not isinstance(target, Connection):
+"""
+failing = "test_backup_aiosqlite (aiosqlite.tests.smoke.SmokeTest.test_backup_aiosqlite)"
+
+[[case]]
+id = "aiosqlite-i20"
+group = "injected"
+commit = "1cd60ad"
+path = "aiosqlite/core.py"
+kind = "wrong null check"
+operator = "is-none"
+find = """    def __del__(self):
+        if self._connection is None:
+"""
+replace = """    def __del__(self):
+        if self._connection is not None:
+"""
+failing = "timeout"
+
+[[case]]
+id = "aiosqlite-i21"
+group = "injected"
+commit = "ea281b8"
+path = "aiosqlite/core.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """                if self._running:
+"""
+replace = """                if not self._running:
+"""
+failing = "timeout"
+
+[[case]]
+id = "aiosqlite-c05"
+group = "clean"
+commit = "db3a3a1"
+kind = "clean"
+
+[[case]]
+id = "aiosqlite-c06"
+group = "clean"
+commit = "da616d6"
+kind = "clean"
+
+[[case]]
+id = "aiosqlite-c07"
+group = "clean"
+commit = "3f548b5"
+kind = "clean"

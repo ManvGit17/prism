@@ -283,3 +283,34 @@ def test_route_all_sends_every_planned_hunk_up_front() -> None:
         ("b.py", 0): ("all",),
     }
     assert route(plan, enabled=False, min_lines=60) == {}
+
+
+def test_reviewer_context_reaches_the_local_model_but_lines_stay_on_the_hunk(
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    class Spy(FakeModel):
+        async def reply(self, hunk: str, attempt: int) -> str:
+            seen.append(hunk)
+            return json.dumps({"comment": "`total` should round the discount first."})
+
+    def context_fn(tasks: Any) -> dict[tuple[str, str], str]:
+        return {(t.path, t.hunk.header): "def price(): return 2" for t in tasks}
+
+    asyncio.run(
+        run_review(
+            tmp_path,
+            SAFE,
+            gate=PassAllGate(),
+            model=Spy(),
+            verifier=HandoffVerifier(tmp_path),
+            options=ReviewOptions(reviewer_context=True),
+            context_fn=context_fn,
+            cache=ReplyCache(tmp_path / "replies.json"),
+        )
+    )
+    (prompt,) = seen
+    assert prompt.startswith("Code from the repository") and "def price()" in prompt
+    (req,) = rows(tmp_path, "requests")
+    assert req["line"] == 2  # anchored on the hunk, not on the context

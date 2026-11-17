@@ -1,4 +1,4 @@
-.PHONY: sync up down langfuse-up langfuse-down ps logs test unit train-test lint format typecheck check stats
+.PHONY: sync up down langfuse-up langfuse-down ps logs test unit train-test lint format typecheck check stats eval-bugbench
 
 sync:
 	uv sync
@@ -50,3 +50,9 @@ check: lint typecheck unit
 
 stats:
 	docker stats --no-stream
+
+# The whole BugBench evaluation (bugbench/configs.toml) into eval/reports/bugbench.md. Set
+# PRISM_BENCH_ROOT to where the clones and runs live. Stops with exit code 2 while Claude
+# answers are missing and lists the handoff rounds to answer; run it again afterwards.
+eval-bugbench:
+	uv run --group sast prism bench all bugbench/configs.toml

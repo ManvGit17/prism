@@ -114,6 +114,9 @@ class Settings(BaseSettings):
     # Phase 7 ablation, with route_all: "pr" shows Claude the whole PR in one request instead of
     # one hunk per request.
     review_unit: Literal["hunk", "pr"] = "hunk"
+    # Evaluation setting: the local reviewer also sees retrieved code before each hunk (it was
+    # trained on the hunk alone).
+    reviewer_context: bool = False
 
     # Tracing and prompt management (ADR 0014). "langfuse" needs `uv sync --group observability`
     # and the `langfuse` Compose profile; the keys below are the profile's local defaults.

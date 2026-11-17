@@ -1,0 +1,361 @@
+# BugBench cases for tinydb, from `prism bench generate` (seed 11, window 500).
+# Injected cases: one mutation on a line the commit added; the repo's tests pass at the
+# commit and `failing` fails with the mutation. Clean cases: the commit as it is.
+
+[repo]
+name = "tinydb"
+url = "https://github.com/msiemens/tinydb.git"
+license = "MIT"
+
+[[case]]
+id = "tinydb-i16"
+group = "injected"
+commit = "7d4d149"
+path = "tinydb/queries.py"
+kind = "wrong return value"
+operator = "false-to-true"
+find = """        if self._key not in element:
+            return False
+"""
+replace = """        if self._key not in element:
+            return True
+"""
+failing = "tests/test_queries.py::test_and"
+
+[[case]]
+id = "tinydb-i17"
+group = "injected"
+commit = "b887fda"
+path = "tinydb/database.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """        if cond is None and doc_ids is None:
+"""
+replace = """        if cond is None or doc_ids is None:
+"""
+failing = "tests/test_storages.py::test_json_readwrite"
+
+[[case]]
+id = "tinydb-i18"
+group = "injected"
+commit = "7ca972d"
+path = "tinydb/database.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """        table = self.table_class(StorageProxy(self._storage, name), name,
+"""
+replace = """        table = self.table_class(StorageProxy(name, self._storage), name,
+"""
+failing = "tests/test_middlewares.py::test_caching_read"
+
+[[case]]
+id = "tinydb-i19"
+group = "injected"
+commit = "8c3eeec"
+path = "tinydb/queries.py"
+kind = "inverted condition"
+operator = "drop-not"
+find = """        if not self._path:
+"""
+replace = """        if self._path:
+"""
+failing = "tests/test_operations.py::test_delete"
+
+[[case]]
+id = "tinydb-i20"
+group = "injected"
+commit = "6cb6f6a"
+path = "tinydb/database.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """        table = table_class(StorageProxy(self._storage, name), name, **options)
+"""
+replace = """        table = table_class(StorageProxy(name, self._storage), name, **options)
+"""
+failing = "tests/test_middlewares.py::test_caching_read"
+
+[[case]]
+id = "tinydb-i21"
+group = "injected"
+commit = "a254a3d"
+path = "tinydb/database.py"
+kind = "wrong null check"
+operator = "is-none"
+find = """        if cond is None and eids is None:
+"""
+replace = """        if cond is not None and eids is None:
+"""
+failing = "tests/test_storages.py::test_json_readwrite"
+
+[[case]]
+id = "tinydb-i22"
+group = "injected"
+commit = "f959c8c"
+path = "tinydb/utils.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if warning_filter:
+"""
+replace = """        if not warning_filter:
+"""
+failing = "tests/test_utils.py::test_catch_warning"
+
+[[case]]
+id = "tinydb-i23"
+group = "injected"
+commit = "dced4e7"
+path = "tinydb/database.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = """        if value is not None:
+"""
+replace = """        if value is None:
+"""
+failing = "tests/test_storages.py::test_json_readwrite"
+
+[[case]]
+id = "tinydb-i24"
+group = "injected"
+commit = "2dee418"
+path = "tinydb/queries.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """        self._func = lambda x: hasattr(x,'__iter__') and any(function(e) for e in x)
+"""
+replace = """        self._func = lambda x: hasattr(x,'__iter__') or any(function(e) for e in x)
+"""
+failing = "tests/test_queries.py::test_any_query"
+
+[[case]]
+id = "tinydb-i25"
+group = "injected"
+commit = "9e1ac16"
+path = "tinydb/operations.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """def add(field, n):
+"""
+replace = """def add(n, field):
+"""
+failing = "tests/test_operations.py::test_add_int"
+
+[[case]]
+id = "tinydb-i26"
+group = "injected"
+commit = "302ef9e"
+path = "tinydb/database.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """    def insert_multiple(self, elements):
+"""
+replace = """    def insert_multiple(elements, self):
+"""
+failing = "tests/test_tables.py::test_one_table"
+
+[[case]]
+id = "tinydb-i27"
+group = "injected"
+commit = "4e0ce38"
+path = "tinydb/queries.py"
+kind = "off-by-one"
+operator = "le-to-lt"
+find = """            lambda value: value <= rhs,
+"""
+replace = """            lambda value: value < rhs,
+"""
+failing = "tests/test_queries.py::test_le"
+
+[[case]]
+id = "tinydb-i28"
+group = "injected"
+commit = "03f8df7"
+path = "tinydb/database.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """                        if query(data[eid]):
+"""
+replace = """                        if not query(data[eid]):
+"""
+failing = "tests/test_tables.py::test_smart_query_cache"
+
+[[case]]
+id = "tinydb-i29"
+group = "injected"
+commit = "983b936"
+path = "tinydb/database.py"
+kind = "off-by-one"
+operator = "gt-to-ge"
+find = """        if len(doc_ids) > 0 and max(doc_ids) > self._last_id:
+"""
+replace = """        if len(doc_ids) >= 0 and max(doc_ids) > self._last_id:
+"""
+failing = "tests/test_tinydb.py::test_write_back_empty_ok"
+
+[[case]]
+id = "tinydb-i30"
+group = "injected"
+commit = "89a3ebc"
+path = "tinydb/queries.py"
+kind = "wrong return value"
+operator = "false-to-true"
+find = """            return False
+"""
+replace = """            return True
+"""
+failing = "tests/test_queries.py::test_nested_query"
+
+[[case]]
+id = "tinydb-i31"
+group = "injected"
+commit = "6b33fee"
+path = "tinydb/database.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """        if doc_ids is not None and not len(documents) == len(doc_ids):
+"""
+replace = """        if doc_ids is not None or not len(documents) == len(doc_ids):
+"""
+failing = "tests/test_tinydb.py::test_write_back"
+
+[[case]]
+id = "tinydb-i32"
+group = "injected"
+commit = "2206110"
+path = "tinydb/database.py"
+kind = "off-by-one"
+operator = "gt-to-ge"
+find = """        if len(self._queries_cache) > self._cache_size:
+"""
+replace = """        if len(self._queries_cache) >= self._cache_size:
+"""
+failing = "tests/test_tables.py::test_query_cache_size"
+
+[[case]]
+id = "tinydb-i33"
+group = "injected"
+commit = "91d4375"
+path = "tinydb/utils.py"
+kind = "wrong boolean operator"
+operator = "or-to-and"
+find = """        self.capacity = kwargs.pop('capacity', None) or float('nan')
+"""
+replace = """        self.capacity = kwargs.pop('capacity', None) and float('nan')
+"""
+failing = "tests/test_tables.py::test_query_cache_size"
+
+[[case]]
+id = "tinydb-i34"
+group = "injected"
+commit = "8c25bc0"
+path = "tinydb/database.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if self._smart_cache:
+"""
+replace = """        if not self._smart_cache:
+"""
+failing = "tests/test_tables.py::test_smart_query_cache"
+
+[[case]]
+id = "tinydb-i35"
+group = "injected"
+commit = "c8c843c"
+path = "tinydb/queries.py"
+kind = "swapped arguments"
+operator = "swap-args"
+find = """    def one_of(self, items):
+"""
+replace = """    def one_of(items, self):
+"""
+failing = "tests/test_queries.py::test_one_of"
+
+[[case]]
+id = "tinydb-i36"
+group = "injected"
+commit = "8977d5a"
+path = "tinydb/database.py"
+kind = "wrong null check"
+operator = "is-not-none"
+find = """        return self.get(cond) is not None
+"""
+replace = """        return self.get(cond) is None
+"""
+failing = "tests/test_tinydb.py::test_insert_multiple[db0]"
+
+[[case]]
+id = "tinydb-i37"
+group = "injected"
+commit = "d82c98a"
+path = "tinydb/migrate.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """    if isinstance(data['_default'], dict):
+"""
+replace = """    if not isinstance(data['_default'], dict):
+"""
+failing = "tests/test_migrate.py::test_upgrade"
+
+[[case]]
+id = "tinydb-i38"
+group = "injected"
+commit = "af759c6"
+path = "tinydb/database.py"
+kind = "inverted condition"
+operator = "negate-if"
+find = """        if self._opened:
+"""
+replace = """        if not self._opened:
+"""
+failing = "tests/test_middlewares.py::test_caching_json_write"
+
+[[case]]
+id = "tinydb-i39"
+group = "injected"
+commit = "171556e"
+path = "tinydb/queries.py"
+kind = "wrong boolean operator"
+operator = "and-to-or"
+find = """                return is_sequence(value) and all(e in value for e in cond)
+"""
+replace = """                return is_sequence(value) or all(e in value for e in cond)
+"""
+failing = "tests/test_queries.py::test_all"
+
+[[case]]
+id = "tinydb-i40"
+group = "injected"
+commit = "fce7bcd"
+path = "tinydb/database.py"
+kind = "wrong exception handling"
+operator = "key-to-index"
+find = """            self._storage.write(data)
+        except KeyError:
+"""
+replace = """            self._storage.write(data)
+        except IndexError:
+"""
+failing = "tests/test_tinydb.py::test_purge_table"
+
+[[case]]
+id = "tinydb-c05"
+group = "clean"
+commit = "6b518b8"
+kind = "clean"
+
+[[case]]
+id = "tinydb-c06"
+group = "clean"
+commit = "8a2dc20"
+kind = "clean"
+
+[[case]]
+id = "tinydb-c07"
+group = "clean"
+commit = "5bb3a9e"
+kind = "clean"
+
+[[case]]
+id = "tinydb-c08"
+group = "clean"
+commit = "8fdb973"
+kind = "clean"

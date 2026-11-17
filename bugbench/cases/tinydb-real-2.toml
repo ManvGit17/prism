@@ -1,0 +1,68 @@
+# More real-bug cases for tinydb: commits that introduced a bug a later commit fixed,
+# found with SZZ (`prism bench real`) and checked by hand. `lines` are the lines of `path`
+# at `commit` that the fix (`fix`) removed or changed.
+
+[repo]
+name = "tinydb"
+url = "https://github.com/msiemens/tinydb.git"
+license = "MIT"
+
+[[case]]
+id = "tinydb-r04"
+group = "real"
+commit = "8470d3e"
+path = "tinydb/queries.py"
+kind = "wrong value"
+lines = [298, 317]
+fix = "e83efcd"
+note = "matches/search hash omits flags so queries differing only by flags share a cache entry"
+
+[[case]]
+id = "tinydb-r05"
+group = "real"
+commit = "7c1525f"
+path = "tinydb/table.py"
+kind = "wrong value"
+lines = [341, 343]
+fix = "6a84ca9"
+note = "_get_next_id stores max_id+1 and returns it without advancing, so the next insert reuses the ID"
+
+[[case]]
+id = "tinydb-r06"
+group = "real"
+commit = "790c7dc"
+path = "tinydb/utils.py"
+kind = "logic"
+lines = [48]
+fix = "b6b6392"
+note = "get() uses truthiness so falsy cached values are treated as missing"
+
+[[case]]
+id = "tinydb-r07"
+group = "real"
+commit = "6b33fee"
+path = "tinydb/database.py"
+kind = "crash"
+lines = [503]
+fix = "983b936"
+note = "sorted(doc_ids)[-1] raises IndexError when doc_ids is empty"
+
+[[case]]
+id = "tinydb-r08"
+group = "real"
+commit = "91d4375"
+path = "tinydb/utils.py"
+kind = "wrong condition"
+lines = [17]
+fix = "06d64f4"
+note = "`kwargs.pop('capacity', None) or float('nan')` treats capacity 0 as unlimited"
+
+[[case]]
+id = "tinydb-r09"
+group = "real"
+commit = "6b518b8"
+path = "tinydb/utils.py"
+kind = "resource leak"
+lines = [105]
+fix = "f959c8c"
+note = "catch_warning yields without try/finally, so the warning filter is not restored if the body raises"

@@ -50,9 +50,11 @@ class RunResult:
     summary: dict[str, Any] = field(default_factory=dict)
 
 
-def _rows(directory: Path, prefix: str) -> list[dict[str, Any]]:
+def _rows(directory: Path, prefix: str, *, exact: bool = False) -> list[dict[str, Any]]:
+    """Rows of every `<prefix>_*.jsonl` in `directory`, or of `<prefix>.jsonl` with `exact`."""
     rows: list[dict[str, Any]] = []
-    for path in sorted(directory.glob(f"{prefix}_*.jsonl")):
+    pattern = f"{prefix}.jsonl" if exact else f"{prefix}_*.jsonl"
+    for path in sorted(directory.glob(pattern)):
         rows += [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
     return rows
 
@@ -62,27 +64,32 @@ def _rounds(handoff: Path) -> list[Path]:
 
 
 def import_answers(run_dir: Path, case_ids: list[str]) -> int:
-    """Hand every answer in the handoff rounds back to its case. Returns how many."""
+    """Hand every answer in the handoff rounds back to its case. Returns how many.
+
+    Answers a case already holds (for example copied from another run, see `seed`) are kept;
+    an answer from a round replaces one with the same id."""
     handoff = run_dir / "handoff"
     count = 0
     for _, ans in _PAIRS:
-        by_case: dict[str, list[dict[str, Any]]] = {c: [] for c in case_ids}
+        by_case: dict[str, dict[str, dict[str, Any]]] = {c: {} for c in case_ids}
         for rd in _rounds(handoff):
             answers, _ = read_answers(rd, ans)
             for full, obj in answers.items():
                 case, sep, rid = full.partition(SEP)
                 if sep and case in by_case:
-                    by_case[case].append({**obj, "id": rid})
-        for case, rows in by_case.items():
-            target = run_dir / case / "verify" / f"{ans}_bench.jsonl"
-            if not rows:
-                target.unlink(missing_ok=True)
+                    by_case[case][rid] = {**obj, "id": rid}
+        for case, fresh in by_case.items():
+            if not fresh:
                 continue
+            target = run_dir / case / "verify" / f"{ans}_bench.jsonl"
+            held = {r["id"]: r for r in _rows(target.parent, f"{ans}_bench", exact=True)}
+            rows = {**held, **fresh}
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(
-                "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8"
+                "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows.values()),
+                encoding="utf-8",
             )
-            count += len(rows)
+            count += len(fresh)
     return count
 
 
@@ -270,6 +277,7 @@ async def run_cases(
             "escalate": settings.escalate,
             "route_all": settings.route_all,
             "review_unit": settings.review_unit,
+            "reviewer_context": settings.reviewer_context,
             "min_confidence": settings.verifier_min_confidence,
         },
     }
