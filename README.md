@@ -1,189 +1,162 @@
 # PRism
 
-PRism is a code reviewer I built that understands the repository a pull request lands in. It
-parses the repo into a code graph, pulls the callers, callees and tests of every changed
-function, reviews each hunk with a small model I fine-tuned to run on a laptop CPU, runs static
-analysis next to it, and has Claude check every comment against the code before anything is
-posted. It runs from the command line, inside Claude Code as an MCP server, or as a GitHub App.
+**A code reviewer that understands your repository, runs on a laptop, and only speaks when it
+has something worth saying.**
 
-## Results
+![PRism reviewing a pull request on GitHub](docs/images/github-review.png)
 
-I measured PRism on BugBench, a benchmark I built from 198 real pull requests in four
-open-source projects (TinyDB, aiosqlite, sqlite-utils and jsoup): 139 with a planted bug that a
-test catches, 30 that introduced a real bug fixed later, and 29 clean ones.
+## The problem
+
+Code review is where bugs are cheapest to catch, and it is the step teams skimp on first.
+Reviewers are busy, pull requests are large, and the bug is rarely in the line that changed: it
+is in how that line meets a caller, a contract or a test somewhere else in the repository.
+
+AI reviewers promise to help, but most of them fall short in one of three ways:
+
+- **They only see the diff.** A model that reads a hunk in isolation cannot know that the
+  function it changed is called with `None` from three places.
+- **They are noisy.** Comment on everything, and people stop reading. A reviewer that flags
+  style nits on a clean pull request trains its users to ignore it.
+- **They are expensive and opaque.** Every hunk goes to a large hosted model, nobody can see
+  why a comment was made, and there is no way to learn from what developers accepted or
+  ignored.
+
+## What PRism does about it
+
+PRism reviews a pull request the way a careful senior engineer would: it reads the change in
+the context of the code around it, lets a cheap model do the first pass, and only posts what a
+stronger model has checked.
+
+- **It knows the repository.** PRism parses the code into a graph (functions, classes, calls,
+  tests) and gives every changed hunk its callers, callees and tests as context.
+- **It is cheap where it can be.** A small classifier decides which hunks deserve attention,
+  and a 3B model I fine-tuned for code review writes the first comments, locally, on a CPU.
+- **It is careful where it must be.** Claude verifies every comment against the code before it
+  is posted, reviews risky hunks itself, and flags code that hides a bug the first pass missed.
+  Security comments need evidence. Secrets are redacted before anything leaves the machine.
+- **It is quiet.** On 29 clean pull requests, PRism posted nothing at all.
+- **It is observable and it learns.** Every review is traced. Reactions and replies on its
+  comments flow back as scores and as training data for the next model.
+
+## Proof
+
+I built a benchmark, BugBench, from 198 real pull requests in four open-source projects
+(TinyDB, aiosqlite, sqlite-utils and jsoup): 139 with a planted bug that a test catches, 30 that
+introduced a real bug fixed later, and 29 clean ones.
 
 | | PRism | PRism, whole PR to Claude |
 |---|---|---|
-| Planted bugs found | 115/139 (83%) | 124/139 (89%) |
+| Planted bugs found | **115/139 (83%)** | **124/139 (89%)** |
 | Real bugs found | 17/30 | 18/30 |
-| Clean PRs with any comment | 0/29 | 1/29 |
+| Clean PRs with any comment | **0/29** | 1/29 |
 | Comments per buggy PR | 0.99 | 1.02 |
 
-A bug is found when a posted comment sits within 3 lines of it. Every comment PRism posted was
-also judged: **162 of 167 (97%) are true, useful review comments**, and 117 of the planted bugs
-are named in a comment, wherever it is placed. Of PRism's planted-bug finds, 23 came straight
-from the fine-tuned local model and the rest from Claude after the local pass and routing.
+- **97% of PRism's comments are true, useful review comments** (162 of 167, judged one by one).
+- **About one comment per pull request**, almost always on the bug.
+- On the first 83 pull requests, compared with PR-Agent using the same model, PRism posted half
+  as many comments, none on a clean PR, and sent the model about a quarter less input, while
+  PR-Agent found a few more bugs. Ablations then showed where the difference comes from and how
+  much of it closes. The full story is in [the evaluation](docs/evaluation/bugbench.md).
 
-The confidence threshold decides which of Claude's comments get posted. At the default 0.6 PRism
-leaves every clean PR alone; lowering it to 0.4 finds 118 planted and 19 real bugs at the cost
-of one comment on a clean PR, so the default stays where it is.
-
-Against PR-Agent with the same model behind both (on the first 83 PRs), PR-Agent found a few
-more bugs, while PRism posted half as many comments, none on a clean PR, and sent the model
-about a quarter less input. The ablations then showed where the gap came from: replacing my
-local reviewer with Claude changed little, and showing Claude the whole pull request at once
-closed most of it. The full tables are in [`eval/reports`](eval/reports) and the reasoning in
-ADRs 0021 to 0026.
-
-
-## How a review works
+## How it works
 
 ```mermaid
 flowchart LR
-    D[PR diff] --> P[Planner]
-    P -->|risk + gate score| G{CodeBERT gate}
+    D[Pull request] --> P[Planner<br/>file risk]
+    P --> G{CodeBERT gate}
     G -->|worth a look| R[Fine-tuned reviewer<br/>Qwen2.5-Coder 3B]
     G -->|risky or large| C
-    P --> S[SAST<br/>Bandit, Semgrep, Ruff, PMD]
-    R --> X[Context<br/>code graph + vectors]
+    P --> S[Static analysis<br/>Bandit, Semgrep, Ruff, PMD]
+    R --> X[Context from the<br/>code graph and vectors]
     S --> X
     X --> C[Claude verifier]
-    C --> A[Review comments]
+    C --> A[Posted review]
+    A -. reactions and replies .-> F[Feedback loop<br/>Langfuse]
 ```
 
-1. **Plan.** The diff is split into hunks, and each file gets a risk score (churn, security
-   paths, size). A CodeBERT classifier, exported to ONNX, scores each hunk; the review budget
-   goes to the hunks that matter most.
-2. **Review.** A Qwen2.5-Coder 3B model I fine-tuned with QLoRA writes one comment per hunk,
-   locally through Ollama. Security-sensitive or very large hunks skip it and go straight to
-   Claude.
-3. **Static analysis.** Bandit, Semgrep, Ruff and PMD run on the changed files at the same time.
-4. **Context.** For every hunk with something to check, PRism retrieves related code from a
-   Neo4j code graph (callers, callees, tests, the enclosing class) and from pgvector embeddings,
-   reranks it and packs it into a token budget.
-5. **Verify.** Claude judges each comment against the hunk and its context: it keeps, drops,
-   relabels or moves it, and flags hunks that hide a bug the comment missed for a review of
-   their own. A comment is posted only above a confidence threshold, and a security comment
-   only with evidence. Secrets are redacted before anything leaves the machine, and PR text is
-   treated as untrusted.
+Every review is traced in a self-hosted Langfuse: each step, each model call, the prompt
+version, and later the feedback on each comment.
 
-Every review is traced in a self-hosted Langfuse, and prompts are served from it.
+![A PRism review traced in Langfuse](docs/images/langfuse-trace.png)
 
-## Tech stack
+The dashboard shows what PRism did across reviews: comments posted and dropped with the
+verifier's reasons, who wrote each comment, and how developers reacted.
 
-- **Language and tooling:** Python 3.12, `uv`, Typer, Pydantic, Ruff, mypy, pytest, Docker
-  Compose, GitHub Actions.
-- **Code graph and retrieval:** tree-sitter (Python and Java), Neo4j, Postgres with pgvector,
-  `nomic-embed-text` embeddings, a MiniLM cross-encoder reranker.
-- **Models:** a fine-tuned Qwen2.5-Coder 3B served by Ollama as a Q4_K_M GGUF, a CodeBERT gate
-  classifier on ONNX Runtime, and Claude as verifier and frontier reviewer.
-- **Agent:** LangGraph (fan-out per file, a shared concurrency limit, routing and a second
-  verification round).
-- **Static analysis:** Bandit, Semgrep, Ruff and PMD.
-- **Product:** a GitHub App on FastAPI with a Celery and Redis queue, an MCP server for Claude
-  Code, comment feedback into Langfuse, and a React and TypeScript dashboard built with Vite.
-- **Observability:** self-hosted Langfuse for traces, prompts, datasets and experiments.
+![The PRism dashboard](docs/images/dashboard.png)
 
-## How I trained the models
+## Ways to use it
 
-Both models were trained on free Kaggle T4 GPUs, from thin notebooks that clone the repo and run
-the code in `training/`. Runs were tracked in Weights & Biases.
+- **Command line:** `prism review` on any diff.
+- **Inside Claude Code:** an MCP server with review tools, where Claude Code is the verifier.
+- **As a GitHub App:** reviews every pull request, holds a review until it is verified, posts
+  inline comments, and collects feedback from reactions.
 
-- **Gate classifier.** CodeBERT fine-tuned with Hugging Face Transformers on the CodeReviewer
-  quality-estimation data (does this hunk get a review comment?), threshold set for high recall
-  on the validation split, exported to ONNX so it runs on a CPU in milliseconds
-  ([model card](training/model_cards/gate.md)).
-- **Reviewer.** Qwen2.5-Coder-3B-Instruct fine-tuned with QLoRA through Unsloth on CodeReviewer
-  comment generation, with the data filtered to specific, human-written comments. The adapter is
-  merged and quantized to a GGUF for Ollama. Against the base model on 500 held-out hunks it
-  writes shorter, more specific comments and almost always valid JSON
-  ([results](eval/reports/sft.md), [model card](training/model_cards/reviewer.md)).
+## Get started
 
-## Run it locally
-
-You need Docker, [`uv`](https://docs.astral.sh/uv/), `make` and [Ollama](https://ollama.com).
+You need Python 3.12 with [`uv`](https://docs.astral.sh/uv/) and [Ollama](https://ollama.com).
+Docker is optional.
 
 ```bash
+git clone https://github.com/ManvGit17/prism.git && cd prism
+uv sync --group sast && cp .env.example .env
 ollama pull qwen2.5-coder:3b
-ollama pull nomic-embed-text
-make sync && make up
-uv sync --group sast
 uv run prism review --repo path/to/repo --diff change.diff --store memory --mode graph
 ```
 
-The fine-tuned reviewer's weights are not published (the base model's licence is
-non-commercial), so set `PRISM_REVIEWER_MODEL=qwen2.5-coder:3b` in `.env`; the base model works
-as the first-pass reviewer.
+The [Quickstart](docs/getting-started/quickstart.md) walks through a full review, including
+how Claude verifies it. The full documentation (concepts, guides, reference, operations and the
+design decisions behind each part) is in [`docs/`](docs/index.md); run `make docs` to browse it
+as a site.
 
-Without an Anthropic API key the verifier is a handoff: the first run stops with exit code 2
-and writes the requests and a rubric into the work directory, a Claude session answers them, and
-the same command again prints the review. With `ANTHROPIC_API_KEY` set,
-`PRISM_VERIFIER=api` (and `uv sync --group frontier`) does it in one run. `--verifier rules`
-skips Claude and keeps only the deterministic checks.
+## Models
 
-More commands:
+Both models are published on Hugging Face:
 
-```bash
-uv run prism index path/to/repo                 # code graph in Neo4j, embeddings in pgvector
-uv run prism graph callers Cart.add             # also callees, tests, neighbours
-uv run prism context path/to/repo change.diff --mode graph --render   # the context for a diff
-make test                                       # everything; `make unit` needs no services
-```
+- [`Maverick0824/prism-reviewer-3b`](https://huggingface.co/Maverick0824/prism-reviewer-3b):
+  Qwen2.5-Coder-3B-Instruct fine-tuned with QLoRA on CodeReviewer comment generation, as a
+  GGUF for Ollama plus the LoRA adapter. Built with Qwen; Qwen Research License,
+  non-commercial use.
+- [`Maverick0824/prism-gate`](https://huggingface.co/Maverick0824/prism-gate): CodeBERT
+  fine-tuned to predict which hunks need a comment, exported to ONNX.
 
-## Use it from Claude Code
+Both were trained on a free Kaggle T4 from the code in [`training/`](training/README.md).
 
-```bash
-uv sync --group mcp --group sast
-claude mcp add prism -- uv run --directory /path/to/prism --group mcp --group sast prism mcp
-```
+## Tech stack
 
-Then ask Claude Code to review your uncommitted changes with PRism. `review_diff` reviews
-`git diff HEAD`, and when it needs verification Claude Code answers the requests with
-`submit_answers` and asks again. `explain_finding`, `sast_evidence`, `impacted_tests`,
-`review_history` and `pending_reviews` cover the rest.
+| Area | Tools |
+|---|---|
+| Language and tooling | Python 3.12, uv, Typer, Pydantic, Ruff, mypy, pytest, Docker Compose, GitHub Actions |
+| Code graph and retrieval | tree-sitter (Python, Java), Neo4j, Postgres with pgvector, nomic-embed-text, a MiniLM cross-encoder reranker |
+| Models | Qwen2.5-Coder 3B (QLoRA, Unsloth, GGUF, Ollama), CodeBERT (Transformers, ONNX Runtime), Claude |
+| Agent | LangGraph |
+| Static analysis | Bandit, Semgrep, Ruff, PMD |
+| Product | GitHub App on FastAPI, Celery and Redis, MCP server, React and TypeScript dashboard (Vite) |
+| Observability and evaluation | Langfuse (traces, prompts, scores, datasets, experiments), BugBench |
+| Training | Kaggle T4 GPUs, Hugging Face Transformers, PEFT, Unsloth, Weights & Biases |
 
-## Run it as a GitHub App
+## Future scope
 
-Register an App (pull requests read and write, contents read-only, the pull request event),
-install it on a repository, and put its id, private key path and webhook secret in `.env`
-(see `.env.example`). Then:
-
-```bash
-uv sync --group app --group sast --group mcp
-uv run prism app serve --port 8080 --poll
-```
-
-Reviews are held until their verification is answered, then posted with inline comments.
-`PRISM_APP_QUEUE=celery` runs reviews on a Celery worker (`prism app worker`, `prism app beat`).
-Reactions and replies on PRism's comments feed back into Langfuse as scores. The dashboard
-(`cd dashboard && npm ci && npm run build`, then `uv run prism dashboard`) shows reviews,
-comments posted and dropped with the verifier's reasons, routing, and the eval reports.
-
-## BugBench
-
-`bugbench/configs.toml` lists the configurations, and one command runs them, judges the
-comments, sweeps the confidence threshold and writes [`eval/reports/bugbench.md`](eval/reports/bugbench.md):
-
-```bash
-export PRISM_BENCH_ROOT=/path/outside/the/repo   # clones, worktrees, test environments, runs
-make eval-bugbench
-```
-
-The run stops with exit code 2 while Claude's answers are missing and puts every open request
-in one handoff folder with a README; answer it (a Claude session or subagents) and run it again.
-Answers are cached, so each pass only reviews what is still waiting. `prism bench generate`
-grows the planted cases (a mutation is kept only if the repo's tests catch it), `prism bench
-real` lists real-bug candidates, and `prism bench experiments` replays finished runs into
-Langfuse as experiments.
-
-## Design notes
-
-Every design decision has a short record in [`docs/adr`](docs/adr): the comment schemas, call
-resolution, retrieval and packing, the gate, fine-tuning, the review graph, the verifier,
-routing and redaction, tracing, the GitHub App, BugBench and each ablation.
+- **Learn from every review.** The feedback loop already exports preference pairs; a DPO round
+  on accepted versus ignored comments would tune the reviewer to what a team actually values,
+  and per-repository thresholds would follow from the feedback report.
+- **More languages.** The indexer is built on tree-sitter, so TypeScript, Go and Rust are a
+  grammar and a resolver away, which covers most of today's pull requests.
+- **Review the whole change, cheaply.** BugBench showed that showing Claude the whole pull
+  request finds the most bugs; splitting large PRs by file and caching per-file context would
+  make that the default without growing the cost.
+- **Cross-file impact analysis.** The code graph already knows callers and tests; surfacing
+  which call sites and tests a change affects, next to each comment, would make reviews faster
+  to act on.
+- **Bring your own model.** Any OpenAI-compatible endpoint for the first pass and any frontier
+  model for verification, so teams can keep code on their own infrastructure.
+- **Run it in CI.** A GitHub Action mode that reviews in the CI runner with an in-memory graph,
+  for teams that do not want to run an App.
+- **Security review as a first-class mode.** Taint tracking through the code graph, combined
+  with the static-analysis evidence PRism already collects, for injection and secret-handling
+  bugs.
 
 ## Built with
 
 I built PRism with the assistance of Claude Code.
 
-Licensed under Apache 2.0.
+Licensed under Apache 2.0. The fine-tuned reviewer weights are under the Qwen Research License.

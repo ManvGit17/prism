@@ -679,6 +679,45 @@ def app_feedback() -> None:
     typer.echo(", ".join(f"{k} {v}" for k, v in counts.items()))
 
 
+@app_cmd.command("feedback-report")
+def app_feedback_report(
+    days: Annotated[int, typer.Option("--days", help="Comments posted in the last N days.")] = 90,
+    target: Annotated[float, typer.Option("--target", help="Useful share to aim for.")] = 0.8,
+    out: Annotated[Path | None, typer.Option("--out", help="Also write the report here.")] = None,
+) -> None:
+    """How useful PRism's posted comments were, by author, category and confidence, and the
+    threshold that would keep the useful share at TARGET (from reactions and resolved threads)."""
+    from prism.github.feedback_loop import rated, render, report
+    from prism.store.reviews import PostgresReviewStore
+
+    store = PostgresReviewStore.from_settings()
+    try:
+        text = render(report(rated(store, days), target), days)
+    finally:
+        store.close()
+    if out is not None:
+        out.write_text(text, encoding="utf-8")
+    typer.echo(text)
+
+
+@app_cmd.command("feedback-export")
+def app_feedback_export(
+    out: Annotated[Path, typer.Option("--out", help="JSONL of rated comments.")],
+    days: Annotated[int, typer.Option("--days", help="Comments posted in the last N days.")] = 90,
+) -> None:
+    """Rated comments as JSONL, plus preference pairs (prompt, chosen, rejected) for a DPO
+    round on the reviewer, in OUT's folder as <name>.pairs.jsonl."""
+    from prism.github.feedback_loop import export, rated
+    from prism.store.reviews import PostgresReviewStore
+
+    store = PostgresReviewStore.from_settings()
+    try:
+        items, pairs = export(rated(store, days), out)
+    finally:
+        store.close()
+    typer.echo(f"{items} rated comment(s) and {pairs} preference pair(s) written next to {out}")
+
+
 @app.command("dashboard")
 def dashboard(
     port: Annotated[int, typer.Option("--port")] = 8090,

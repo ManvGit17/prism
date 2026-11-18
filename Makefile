@@ -1,4 +1,4 @@
-.PHONY: sync up down langfuse-up langfuse-down ps logs test unit train-test lint format typecheck check stats eval-bugbench
+.PHONY: sync up down langfuse-up langfuse-down ps logs test unit train-test lint format typecheck check stats eval-bugbench docs docs-build docs-reference
 
 sync:
 	uv sync
@@ -56,3 +56,14 @@ stats:
 # answers are missing and lists the handoff rounds to answer; run it again afterwards.
 eval-bugbench:
 	uv run --group sast prism bench all bugbench/configs.toml
+
+# The documentation site (mkdocs.yml, docs/). Served locally only.
+docs:
+	uv run --group docs mkdocs serve -a 127.0.0.1:8000
+
+docs-build:
+	uv run --group docs mkdocs build --strict
+
+# Regenerate docs/reference/configuration.md and docs/reference/cli.md from the code.
+docs-reference:
+	uv run python scripts/gen_reference.py

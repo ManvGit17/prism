@@ -39,6 +39,9 @@ dev = [
     "pytest>=8.2",
     "ruff>=0.6",
 ]
+docs = [
+    "mkdocs-material>=9.5,<10",
+]
 frontier = [
     "anthropic>=2.8.0",
 ]

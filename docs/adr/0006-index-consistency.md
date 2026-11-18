@@ -39,11 +39,14 @@ running row whose heartbeat is older than `PRISM_INDEX_RUN_STALE_AFTER_S` (defau
 taken as crashed. The next run marks it failed and starts. An incremental update whose last run
 did not complete becomes a full index, since a crashed run may have left the graph half-written.
 
-**A review waits while its repo is being indexed.** Neo4j is updated in place, so the ledger
-alone does not give a reader a consistent snapshot. A reader in the middle of an update could
-see a file's new nodes with another file's old edges. The review task calls
-`raise_if_indexing(ledger, repo_id)` first and retries on `IndexInProgress`. A stale run does
-not block reviews; `needs_full_index` tells the caller to schedule a full index instead.
+**Reading during an update.** Neo4j is updated in place, so the ledger alone does not give a
+reader a consistent snapshot: a reader in the middle of an update could see a file's new nodes
+with another file's old edges. The ledger exposes `raise_if_indexing(ledger, repo_id)`, which
+raises `IndexInProgress` while a run is live, for a caller that should wait and retry; a stale
+run does not count, and `needs_full_index` tells the caller to schedule a full index instead.
+The review path does not call it yet: reviews in the CLI, MCP server and App index the checkout
+in memory or read the persistent graph as it is, so wiring this check into the persistent read
+path is the remaining step.
 
 ## Alternative: tag nodes with a run id
 

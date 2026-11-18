@@ -99,8 +99,9 @@ between sessions (`eval/reports/reviewer_throughput.jsonl`).
   same hunk (0 of 20 identical, all 20 valid JSON); it was not scored separately.
 - **The labels are what reviewers wrote on open-source projects in 2022 and earlier.** Comments
   about project habits and code outside the hunk are part of the data.
-- **Licence.** The base model is under the Qwen research licence (non-commercial). The tuned
-  weights are not published until the licence terms are checked.
+- **Licence.** The base model is under the Qwen Research License, and so are the tuned weights:
+  non-commercial use only. They are published on Hugging Face as
+  `Maverick0824/prism-reviewer-3b`, with the licence and "Built with Qwen".
 
 ## Use
 

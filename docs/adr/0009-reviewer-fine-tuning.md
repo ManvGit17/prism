@@ -80,8 +80,9 @@ Ollama as `prism-reviewer:v1` (run 1) or `prism-reviewer:v2` (run 2) with greedy
 - On the blinded judge the tuned model is level with the base model (48.6%). What tuning bought
   is what the pipeline needs from a first pass: shorter, more specific replies that are almost
   always valid JSON.
-- The 3B model is under the Qwen research licence (non-commercial). The tuned weights are not
-  pushed to Hugging Face until the licence terms are checked.
+- The 3B model is under the Qwen Research License (non-commercial), so the tuned weights are
+  published under the same licence, marked "Built with Qwen" and non-commercial, as
+  `Maverick0824/prism-reviewer-3b` on Hugging Face.
 - Unsloth runs on one GPU, so the second Kaggle T4 sits idle.
 - Greedy decoding makes the tuned model open 89% of comments with "I think" and ask almost no
   questions, though 44% of its training comments are questions. Sampling or DPO could change

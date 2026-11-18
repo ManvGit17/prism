@@ -1,0 +1,112 @@
+site_name: PRism
+site_description: A repo-aware AI code reviewer with a fine-tuned local model and Claude as verifier.
+repo_url: https://github.com/ManvGit17/prism
+repo_name: ManvGit17/prism
+edit_uri: edit/main/docs/
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Quickstart: getting-started/quickstart.md
+      - Installation: getting-started/installation.md
+  - Concepts:
+      - Architecture: concepts/architecture.md
+      - The review pipeline: concepts/review-pipeline.md
+      - Code graph and retrieval: concepts/code-graph-and-retrieval.md
+      - Verification and routing: concepts/verification-and-routing.md
+      - Security and privacy: concepts/security-and-privacy.md
+  - Guides:
+      - Reviewing from the CLI: guides/reviewing-from-the-cli.md
+      - Claude Code and MCP: guides/claude-code-mcp.md
+      - GitHub App: guides/github-app.md
+      - Dashboard: guides/dashboard.md
+      - Langfuse and the feedback loop: guides/langfuse.md
+      - Models: guides/models.md
+  - Evaluation:
+      - BugBench and results: evaluation/bugbench.md
+      - Running BugBench: evaluation/running-bugbench.md
+  - Operations:
+      - Running the services: operations/running-the-services.md
+      - Troubleshooting: operations/troubleshooting.md
+      - FAQ: operations/faq.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Configuration: reference/configuration.md
+      - Data and schemas: reference/data-and-schemas.md
+      - Datasets: datasets.md
+      - Memory budget: memory-budget.md
+      - Indexer check: indexer-check.md
+  - Design decisions:
+      - adr/index.md
+      - adr/0001-raw-and-verified-comment-schemas.md
+      - adr/0002-host-ollama-and-compose-layout.md
+      - adr/0003-base-reviewer-model.md
+      - adr/0004-call-resolution.md
+      - adr/0005-embeddings.md
+      - adr/0006-index-consistency.md
+      - adr/0007-retrieval-and-packing.md
+      - adr/0008-gate-classifier.md
+      - adr/0009-reviewer-fine-tuning.md
+      - adr/0010-review-pipeline.md
+      - adr/0011-claude-verifier-handoff.md
+      - adr/0012-sast-evidence.md
+      - adr/0013-routing-redaction-injection.md
+      - adr/0014-langfuse-tracing-and-prompts.md
+      - adr/0015-stored-reviews.md
+      - adr/0016-mcp-review-tools.md
+      - adr/0017-github-app.md
+      - adr/0018-review-queue.md
+      - adr/0019-comment-feedback.md
+      - adr/0020-dashboard.md
+      - adr/0021-bugbench.md
+      - adr/0022-pr-agent-baseline.md
+      - adr/0023-ablation-claude-only.md
+      - adr/0024-ablation-gate.md
+      - adr/0025-ablation-whole-pr.md
+      - adr/0026-threshold-sweep.md
